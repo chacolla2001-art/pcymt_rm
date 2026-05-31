@@ -31,14 +31,12 @@ jobs:
         run: npm install -g vercel@54
 
       - name: Pull Vercel env
-        working-directory: apps/backend
         run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_API }}
 
       - name: Deploy Backend to Production
-        working-directory: apps/backend
         run: vercel deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -62,14 +60,12 @@ jobs:
         run: npm install -g vercel@54
 
       - name: Pull Vercel env
-        working-directory: apps/web-admin
         run: vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
 
       - name: Deploy Frontend to Production
-        working-directory: apps/web-admin
         run: vercel deploy --prod --yes --token="${{ secrets.VERCEL_TOKEN }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
