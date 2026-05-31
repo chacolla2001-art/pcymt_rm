@@ -129,9 +129,8 @@ export class ThreeRendererService {
    */
   private loadGLTF(url: string, modelId: string): void {
     const loader = new GLTFLoader();
-    // Set auth header so Three.js can fetch protected files
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && this.isApiOrigin(url)) {
       loader.setRequestHeader({ Authorization: `Bearer ${token}` });
     }
 
@@ -180,7 +179,7 @@ export class ThreeRendererService {
   private loadFBX(url: string, modelId: string): void {
     const loader = new FBXLoader();
     const token = localStorage.getItem('token');
-    if (token) {
+    if (token && this.isApiOrigin(url)) {
       loader.setRequestHeader({ Authorization: `Bearer ${token}` });
     }
 
@@ -368,6 +367,16 @@ export class ThreeRendererService {
   setBackgroundColor(color: number): void {
     if (this.renderer) {
       this.renderer.setClearColor(color);
+    }
+  }
+
+  /** Solo envía JWT cuando la URL apunta al backend (/api/files), no a Supabase */
+  private isApiOrigin(url: string): boolean {
+    try {
+      const urlObj = new URL(url, window.location.origin);
+      return !urlObj.hostname.includes('supabase.co');
+    } catch {
+      return true;
     }
   }
 

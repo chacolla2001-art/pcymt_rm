@@ -87,7 +87,7 @@ export class VirtualAssetTableComponent extends BaseTableComponent {
    * Abre el visor 3D para reproducir el modelo
    */
   public onPlay(element: VirtualAsset): void {
-    this.openModelViewer(this.apiRoutes.getAssetUrl(element.model_url));
+    this.openModelViewer(this.apiRoutes.getModelUrl(element.model_url));
   }
 
   protected buildEditDialog(element: VirtualAsset): DialogData {

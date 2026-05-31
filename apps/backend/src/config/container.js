@@ -7,7 +7,7 @@ const {
   Session,
   MapConfiguration,
 } = require('../infrastructure/database/models');
-const { EmailService, GoogleAuthService, FileUploadService } = require('../infrastructure/external');
+const { EmailService, GoogleAuthService, FileUploadService, SupabaseStorageService } = require('../infrastructure/external');
 const logger = require('../shared/utils/logger.util');
 
 // Domain - Repositories
@@ -83,6 +83,11 @@ class Container {
     this._instances.emailService = new EmailService();
     this._instances.googleAuthService = new GoogleAuthService();
     this._instances.fileUploadService = new FileUploadService(env.uploadDir);
+    this._instances.supabaseStorageService = new SupabaseStorageService({
+      url: env.supabaseUrl,
+      bucket: env.supabaseStorageBucket,
+      serviceRoleKey: env.supabaseServiceRoleKey,
+    });
 
     // Repositories
     this._instances.userRepository = new UserRepository(User);
@@ -178,7 +183,10 @@ class Container {
 
     this._instances.configController = new ConfigController();
 
-    this._instances.fileController = new FileController(env.uploadDir);
+    this._instances.fileController = new FileController(
+      env.uploadDir,
+      this._instances.supabaseStorageService,
+    );
 
     this._instances.mapConfigurationController = new MapConfigurationController(
       this._instances.mapConfigurationService,

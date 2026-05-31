@@ -37,6 +37,10 @@ class ConfigController {
    */
   getPublicConfig = async (req, res, next) => {
     try {
+      const storagePublicBaseUrl = env.supabaseUrl && env.supabaseStorageBucket
+        ? `${env.supabaseUrl}/storage/v1/object/public/${env.supabaseStorageBucket}`
+        : null;
+
       const config = {
         google: {
           webClientId: env.googleClientId || null,
@@ -46,9 +50,15 @@ class ConfigController {
         arcore: {
           cloudAnchorTtlDays: env.cloudAnchorTtlDays,
         },
+        storage: {
+          enabled: !!storagePublicBaseUrl,
+          publicBaseUrl: storagePublicBaseUrl,
+          bucket: env.supabaseStorageBucket || null,
+        },
         features: {
           googleAuthEnabled: !!env.googleClientId,
           mapsEnabled: !!env.googleMapsApiKey,
+          supabaseStorageEnabled: !!storagePublicBaseUrl,
         },
       };
 

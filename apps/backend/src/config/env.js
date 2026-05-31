@@ -18,9 +18,15 @@ const loadEnvFile = () => {
   console.log = originalLog;
 
   if (result.error) {
-    console.error('[ENV] ERROR: .env file not found!');
-    console.error('[ENV] ACTION: Copy .env.example to .env and configure your secrets');
-    process.exit(1);
+    const required = ['DATABASE_URL', 'JWT_SECRET'];
+    const missing = required.filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+      console.error('[ENV] ERROR: .env file not found!');
+      console.error('[ENV] ACTION: Copy .env.example to .env and configure your secrets');
+      process.exit(1);
+    }
+    // Cloud deploy (Vercel, Render, etc.) — vars injected via platform env
+    return;
   }
 
   // Validate critical environment variables
@@ -105,6 +111,17 @@ const env = {
   // Upload
   uploadDir: process.env.UPLOAD_DIR || path.resolve(__dirname, '..', '..', '..', '..', 'shared', 'uploads'),
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 50 * 1024 * 1024,
+
+  // Supabase Storage (proxy /api/files/* in production when local disk is unavailable)
+  supabaseUrl: (() => {
+    const explicit = process.env.SUPABASE_URL;
+    if (explicit) return explicit.replace(/\/$/, '');
+    const ref = process.env.SUPABASE_PROJECT_REF;
+    if (ref) return `https://${ref}.supabase.co`;
+    return null;
+  })(),
+  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'uploads',
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || null,
 
   // Admin credentials
   adminEmail: process.env.ADMIN_EMAIL,

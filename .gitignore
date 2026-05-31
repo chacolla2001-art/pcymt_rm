@@ -64,6 +64,11 @@ captures/
 tools/cloud-anchor-cli/.token.json
 tools/cloud-anchor-cli/.env
 
+# Supabase CLI (credenciales locales del link)
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
 # Temporary files
 *.tmp
 *.temp

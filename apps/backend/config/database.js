@@ -11,33 +11,40 @@ if (!process.env.DATABASE_URL && process.env.DB_HOST) {
   process.env.DATABASE_URL = `postgresql://${user}:${pass}@${host}:${port}/${name}`;
 }
 
-// SSL only for remote databases (Render, Railway, etc.)
-const useSSL = process.env.DATABASE_URL?.includes('render.com') || 
-               process.env.DATABASE_URL?.includes('railway.app') ||
-               process.env.DB_SSL === 'true';
+// SSL for remote databases (Render, Railway, Supabase, Neon, etc.)
+const useSSL =
+  process.env.DATABASE_URL?.includes('render.com') ||
+  process.env.DATABASE_URL?.includes('railway.app') ||
+  process.env.DATABASE_URL?.includes('supabase.co') ||
+  process.env.DATABASE_URL?.includes('neon.tech') ||
+  process.env.DB_SSL === 'true';
 
-const sslConfig = useSSL ? {
-  ssl: {
-    require: true,
-    rejectUnauthorized: false
-  }
-} : {};
+const dialectOptions = useSSL
+  ? {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    }
+  : {};
 
 module.exports = {
   development: {
-    use_env_variable: "DATABASE_URL",
-    dialect: "postgres",
-    logging: false
+    use_env_variable: 'DATABASE_URL',
+    dialect: 'postgres',
+    dialectOptions,
+    logging: false,
   },
   test: {
-    use_env_variable: "DATABASE_URL",
-    dialect: "postgres",
-    logging: false
+    use_env_variable: 'DATABASE_URL',
+    dialect: 'postgres',
+    dialectOptions,
+    logging: false,
   },
   production: {
-    use_env_variable: "DATABASE_URL",
-    dialect: "postgres",
-    dialectOptions: sslConfig,
-    logging: false
-  }
+    use_env_variable: 'DATABASE_URL',
+    dialect: 'postgres',
+    dialectOptions,
+    logging: false,
+  },
 };

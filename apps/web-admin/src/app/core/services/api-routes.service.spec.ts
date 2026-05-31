@@ -1,12 +1,21 @@
 import { TestBed } from '@angular/core/testing';
 import { ApiRoutesService } from './api-routes.service';
+import { AppConfigService } from './app-config.service';
 import { environment } from '../../environments/environment';
 
 describe('ApiRoutesService', () => {
   let service: ApiRoutesService;
+  let appConfigSpy: jasmine.SpyObj<AppConfigService>;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    appConfigSpy = jasmine.createSpyObj('AppConfigService', ['getStoragePublicBaseUrl']);
+    appConfigSpy.getStoragePublicBaseUrl.and.returnValue(null);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AppConfigService, useValue: appConfigSpy },
+      ],
+    });
     service = TestBed.inject(ApiRoutesService);
   });
 
@@ -126,6 +135,29 @@ describe('ApiRoutesService', () => {
     it('should normalize /uploads/ path to /api/files/', () => {
       const result = service.getAssetUrl('/uploads/images/photo.jpg');
       expect(result).toContain('/api/files/images/photo.jpg');
+    });
+  });
+
+  describe('getModelUrl()', () => {
+    it('should return empty string for null/undefined', () => {
+      expect(service.getModelUrl(null)).toBe('');
+      expect(service.getModelUrl(undefined)).toBe('');
+    });
+
+    it('should use Supabase public URL for .glb when storage is configured', () => {
+      appConfigSpy.getStoragePublicBaseUrl.and.returnValue(
+        'https://example.supabase.co/storage/v1/object/public/uploads'
+      );
+
+      const result = service.getModelUrl('/api/files/bear.glb');
+      expect(result).toBe(
+        'https://example.supabase.co/storage/v1/object/public/uploads/bear.glb'
+      );
+    });
+
+    it('should fall back to getAssetUrl when storage is not configured', () => {
+      const result = service.getModelUrl('/api/files/bear.glb');
+      expect(result).toContain('/api/files/bear.glb');
     });
   });
 

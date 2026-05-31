@@ -763,7 +763,7 @@ export class TableControl implements OnInit {
 
   // Método para manejar el botón "play"
   onPlay(element: any) {
-    this.openModelViewer(this.apiRoutes.getAssetUrl(element.modelURL));
+    this.openModelViewer(this.apiRoutes.getModelUrl(element.modelURL));
 
     // Aquí puedes agregar la lógica para reproducir el modelo 3D o visualizarlo
   }

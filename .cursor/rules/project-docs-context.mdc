@@ -1,0 +1,29 @@
+---
+description: Usar la documentación Markdown del proyecto como contexto principal
+alwaysApply: true
+---
+
+# Contexto del proyecto — Documentación Markdown
+
+Antes de implementar, depurar o responder sobre este monorepo, **consulta los `.md` relevantes** como fuente de verdad. No improvises arquitectura ni convenciones si ya están documentadas.
+
+## Mapa de documentación
+
+| Área | Archivos clave |
+|------|----------------|
+| Visión general | `AGENTS.md`, `README.md`, `docs/README.md` |
+| Instalación | `docs/getting-started/INSTALL.md` |
+| Arquitectura | `docs/architecture/overview.md` |
+| Backend | `apps/backend/agents-backend.md`, `apps/backend/README.md` |
+| Frontend | `apps/web-admin/agents-frontend.md`, `apps/web-admin/README.md` |
+| Mobile | `apps/mobile-android/agents-movil.md`, `apps/mobile-android/README.md` |
+| AR / Cloud Anchors | `docs/ar/mixed-reality.md`, `docs/ar/cloud-anchors.md`, `tools/cloud-anchor-cli/README.md` |
+| Datos compartidos | `shared/data/README.md`, `shared/map-stickers/README.md` |
+
+## Reglas de uso
+
+1. **`AGENTS.md` es el índice maestro** — léelo primero para entender dominio, tablas, endpoints y convenciones.
+2. Al trabajar en un componente, lee su `agents-*.md` y su `README.md` local.
+3. Respeta lo documentado: nombres (`Location` = anchor point), rutas API, stack y flujos de negocio.
+4. Si la documentación y el código difieren, prioriza el código y señala la discrepancia.
+5. No dupliques información de los `.md` en respuestas largas; cita el archivo cuando aplique.

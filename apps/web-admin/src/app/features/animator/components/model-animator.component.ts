@@ -223,7 +223,7 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
   }
 
   onAssetSelected(asset: VirtualAsset): void {
-    const url = this.apiRoutes.getAssetUrl(asset.model_url);
+    const url = this.apiRoutes.getModelUrl(asset.model_url);
     this.loadAsset(url, asset.id);
 
     const existingSequence = this.toTimelineBlocks(asset.animation_sequence);

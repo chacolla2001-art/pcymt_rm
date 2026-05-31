@@ -1,4 +1,5 @@
-import { ApplicationConfig, provideZoneChangeDetection, isDevMode } from '@angular/core';
+import { ApplicationConfig, provideZoneChangeDetection, isDevMode, inject, provideAppInitializer } from '@angular/core';
+import { AppConfigService } from './core/services/app-config.service';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors, withFetch } from '@angular/common/http';
 import { provideClientHydration } from '@angular/platform-browser';
@@ -23,6 +24,7 @@ import { provideServiceWorker } from '@angular/service-worker';
  */
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideAppInitializer(() => inject(AppConfigService).ensureLoaded()),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideClientHydration(),

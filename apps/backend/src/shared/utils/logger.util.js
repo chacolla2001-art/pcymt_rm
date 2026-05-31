@@ -41,8 +41,8 @@ const createTransports = () => {
     }),
   ];
 
-  // Add file transports in production
-  if (process.env.NODE_ENV === 'production') {
+  // File logs only on persistent servers (not Vercel/serverless)
+  if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
     const logsDir = path.join(process.cwd(), 'logs');
 
     transports.push(

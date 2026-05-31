@@ -25,6 +25,17 @@ const sequelizeLogger = (process.env.LOG_LEVEL === 'debug')
   ? (sql, timing) => logger.debug(`[SQL] ${sql}`, { timing })
   : false;
 
+const parseDatabaseUrl = (url) => {
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname,
+    port: Number(parsed.port) || 5432,
+    username: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database: parsed.pathname.replace(/^\//, '') || 'postgres',
+  };
+};
+
 // Determine if SSL is required
 // SSL is only for cloud providers (Render, Railway, Neon, Supabase, etc.)
 // Local PostgreSQL typically doesn't support SSL
@@ -33,12 +44,16 @@ const isCloudProvider = connectionString && (
   connectionString.includes('railway.app') ||
   connectionString.includes('neon.tech') ||
   connectionString.includes('supabase.co') ||
+  connectionString.includes('pooler.supabase.com') ||
   connectionString.includes('amazonaws.com') ||
   connectionString.includes('azure.com')
 );
-const requiresSSL = connectionString?.includes('sslmode=require') || 
+const requiresSSL = connectionString?.includes('sslmode=require') ||
                     process.env.DB_SSL === 'true' ||
                     isCloudProvider;
+
+// pg v8+ ignores rejectUnauthorized when using a connection string — parse URL for cloud DBs
+const useParsedConfig = Boolean(requiresSSL && connectionString);
 
 // Build Sequelize configuration
 const sequelizeOptions = {
@@ -61,22 +76,24 @@ const sequelizeOptions = {
     dialectOptions: {
       ssl: {
         require: true,
-        rejectUnauthorized: env.dbSslRejectUnauthorized,
+        rejectUnauthorized: env.dbSslRejectUnauthorized ?? false,
       },
     },
   }),
 };
 
-const sequelize = connectionString
-  ? new Sequelize(connectionString, sequelizeOptions)
-  : new Sequelize({
-    host: env.dbHost,
-    database: env.dbName,
-    username: env.dbUser,
-    password: env.dbPassword,
-    port: env.dbPort,
-    ...sequelizeOptions,
-  });
+const sequelize = useParsedConfig
+  ? new Sequelize({ ...parseDatabaseUrl(connectionString), ...sequelizeOptions })
+  : connectionString
+    ? new Sequelize(connectionString, sequelizeOptions)
+    : new Sequelize({
+      host: env.dbHost,
+      database: env.dbName,
+      username: env.dbUser,
+      password: env.dbPassword,
+      port: env.dbPort,
+      ...sequelizeOptions,
+    });
 
 /**
  * Delay helper for retry logic

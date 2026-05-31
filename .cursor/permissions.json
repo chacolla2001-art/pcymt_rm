@@ -1,0 +1,66 @@
+{
+  "approvalMode": "unrestricted",
+  "terminalAllowlist": [
+    "git",
+    "npm",
+    "npx",
+    "node",
+    "pnpm",
+    "curl",
+    "wget",
+    "gh",
+    "vercel",
+    "supabase",
+    "docker",
+    "gradle",
+    "java",
+    "python3",
+    "bash",
+    "sh",
+    "chmod",
+    "mkdir",
+    "cp",
+    "mv",
+    "cat",
+    "head",
+    "tail",
+    "grep",
+    "find",
+    "ls",
+    "cd",
+    "echo",
+    "printf",
+    "jq",
+    "sed",
+    "awk",
+    "sort",
+    "uniq",
+    "wc",
+    "tee",
+    "xargs",
+    "which",
+    "test",
+    "sleep",
+    "kill",
+    "pkill",
+    "export",
+    "source",
+    "./gradlew",
+    "./scripts/"
+  ],
+  "mcpAllowlist": [
+    "*:*"
+  ],
+  "autoRun": {
+    "allow_instructions": [
+      "Comandos de desarrollo del monorepo pcymt_rm (install, test, lint, build, dev servers, git status/diff/log) son seguros.",
+      "Lectura e inspeccion de archivos dentro del workspace es segura.",
+      "Deploy con vercel, supabase CLI, gh y curl a APIs del proyecto son seguros.",
+      "No pedir confirmacion para operaciones rutinarias de desarrollo en este repositorio."
+    ],
+    "block_instructions": [
+      "Bloquear rm -rf, git push --force a main/master, y borrado de produccion sin confirmacion explicita.",
+      "Bloquear commit de archivos .env con secretos."
+    ]
+  }
+}

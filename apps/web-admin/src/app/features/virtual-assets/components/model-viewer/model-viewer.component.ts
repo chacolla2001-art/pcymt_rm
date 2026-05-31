@@ -107,9 +107,8 @@ export class ModelViewerComponent implements OnInit, OnDestroy {
     const fileExtension = urlWithoutQuery.split('.').pop()?.toLowerCase();
     if (fileExtension === 'gltf' || fileExtension === 'glb') {
       const gltfLoader = new GLTFLoader();
-      // Set auth header so Three.js can fetch protected files
       const token = localStorage.getItem('token');
-      if (token) {
+      if (token && this.isApiOrigin(this.data.modelUrl)) {
         gltfLoader.setRequestHeader({ Authorization: `Bearer ${token}` });
       }
       gltfLoader.load(this.data.modelUrl, (gltf: any) => {
@@ -134,7 +133,7 @@ export class ModelViewerComponent implements OnInit, OnDestroy {
     } else if (fileExtension === 'fbx') {
       const fbxLoader = new FBXLoader();
       const fbxToken = localStorage.getItem('token');
-      if (fbxToken) {
+      if (fbxToken && this.isApiOrigin(this.data.modelUrl)) {
         fbxLoader.setRequestHeader({ Authorization: `Bearer ${fbxToken}` });
       }
       fbxLoader.load(this.data.modelUrl, (fbx: any) => {
@@ -212,5 +211,14 @@ export class ModelViewerComponent implements OnInit, OnDestroy {
 
   closeDialog() {
     this.dialogRef.close();
+  }
+
+  private isApiOrigin(url: string): boolean {
+    try {
+      const urlObj = new URL(url, window.location.origin);
+      return !urlObj.hostname.includes('supabase.co');
+    } catch {
+      return true;
+    }
   }
 }

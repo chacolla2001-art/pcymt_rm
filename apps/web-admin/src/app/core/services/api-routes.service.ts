@@ -1,5 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
+import { AppConfigService } from './app-config.service';
+
+const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'fbx']);
 
 /**
  * Definición de todos los endpoints de la API
@@ -121,6 +124,8 @@ export interface ApiEndpoints {
   providedIn: 'root',
 })
 export class ApiRoutesService {
+  private readonly appConfig = inject(AppConfigService);
+
   /** URL base de la API */
   readonly baseUrl: string = environment.apiUrl;
 
@@ -282,6 +287,35 @@ export class ApiRoutesService {
    * @param path - Path del archivo (puede incluir o no el '/' inicial)
    * @returns URL completa del archivo con token de autenticación
    */
+  /**
+   * URL para modelos 3D (.glb, .gltf, .fbx).
+   * Usa Supabase Storage cuando está configurado; si no, cae en /api/files/ del backend.
+   */
+  getModelUrl(path: string | null | undefined): string {
+    if (!path) return '';
+
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+
+    const objectPath = this.extractStorageObjectPath(path);
+    const extension = objectPath.split('.').pop()?.toLowerCase();
+
+    if (extension && MODEL_EXTENSIONS.has(extension)) {
+      const storageBase = this.appConfig.getStoragePublicBaseUrl();
+      if (storageBase) {
+        const encoded = objectPath
+          .split('/')
+          .filter(Boolean)
+          .map((segment) => encodeURIComponent(segment))
+          .join('/');
+        return `${storageBase}/${encoded}`;
+      }
+    }
+
+    return this.getAssetUrl(path);
+  }
+
   getAssetUrl(path: string | null | undefined): string {
     if (!path) return '';
 
@@ -303,6 +337,14 @@ export class ApiRoutesService {
     // Adjuntar token JWT como query param para autenticación en <img> tags
     const token = localStorage.getItem('token');
     return token ? `${url}?token=${token}` : url;
+  }
+
+  /** Extrae la ruta relativa dentro del bucket (ej. bear.glb, map-icons/foo.svg) */
+  extractStorageObjectPath(path: string): string {
+    return path
+      .replace(/^\/uploads\//, '')
+      .replace(/^\/api\/files\//, '')
+      .replace(/^\//, '');
   }
 
   /**

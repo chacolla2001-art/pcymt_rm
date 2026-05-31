@@ -12,7 +12,10 @@
     "test:mobile": "cd apps/mobile-android && ./gradlew test",
     "test:all": "./scripts/run-all-tests.sh",
     "lint:backend": "npm run lint --prefix apps/backend",
-    "lint:frontend": "npm run lint --prefix apps/web-admin"
+    "lint:frontend": "npm run lint --prefix apps/web-admin",
+    "supabase:login": "./scripts/supabase-login.sh",
+    "supabase:setup": "./scripts/setup-supabase.sh",
+    "supabase:uploads": "./scripts/setup-supabase.sh --uploads-only"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
