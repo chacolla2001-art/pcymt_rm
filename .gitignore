@@ -1,0 +1,78 @@
+# Shared uploads (models, icons, profile photos)
+shared/uploads/
+
+# Legacy path (deprecated)
+uploads/
+
+# Environment variables
+.env
+*.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+.angular/
+*.tsbuildinfo
+
+# IDE & AI tooling
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+__MACOSX/
+Thumbs.db
+desktop.ini
+
+# Build logs (should not be committed)
+*.txt
+!docs/**/*.txt
+!shared/**/*.txt
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Android
+*.iml
+.gradle/
+local.properties
+key.properties
+apps/mobile-android/keystore/
+.idea/workspace.xml
+.idea/caches/
+.idea/libraries/
+app/build/
+*/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Cloud Anchor CLI secrets
+tools/cloud-anchor-cli/.token.json
+tools/cloud-anchor-cli/.env
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# Package manager
+.pnpm-store/
+.yarn/
+
+.nul
+nul

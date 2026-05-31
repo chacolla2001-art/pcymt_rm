@@ -1,0 +1,118 @@
+<header class="app-header">
+  <div class="header-left">
+    <!-- Botón de menú lateral -->
+    <button mat-icon-button class="menu-btn" (click)="toggleDrawer()" matTooltip="Menú principal">
+      <mat-icon>menu</mat-icon>
+    </button>
+
+    <div class="header-brand" (click)="openMainDashboard()">
+      <img src="assets/images/logo.png" alt="PCyMT Logo" class="header-logo">
+      <span class="header-title hide-mobile">Realidad Mixta</span>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <!-- Acciones rápidas -->
+    <div class="header-actions">
+      @if (!isFullscreen) {
+        <button mat-icon-button class="action-btn" (click)="openFullscreen()" matTooltip="Pantalla completa">
+          <mat-icon>fullscreen</mat-icon>
+        </button>
+      }
+      @if (isFullscreen) {
+        <button mat-icon-button class="action-btn" (click)="closeFullscreen()" matTooltip="Salir de pantalla completa">
+          <mat-icon>fullscreen_exit</mat-icon>
+        </button>
+      }
+
+      <button mat-icon-button [matMenuTriggerFor]="themeMenu" class="action-btn" matTooltip="Cambiar tema">
+        <mat-icon>{{ themeManager.getThemeModeIcon() }}</mat-icon>
+      </button>
+
+      <mat-menu #themeMenu="matMenu" class="theme-menu">
+        <button mat-menu-item (click)="setThemeMode('light')">
+          <mat-icon>light_mode</mat-icon>
+          <span>Claro</span>
+        </button>
+        <button mat-menu-item (click)="setThemeMode('dark')">
+          <mat-icon>dark_mode</mat-icon>
+          <span>Oscuro</span>
+        </button>
+        <button mat-menu-item (click)="setThemeMode('system')">
+          <mat-icon>contrast</mat-icon>
+          <span>Sistema</span>
+        </button>
+      </mat-menu>
+    </div>
+
+    <span class="header-separator"></span>
+
+    <!-- Menú de usuario -->
+    <button mat-button [matMenuTriggerFor]="belowMenu" class="user-menu-trigger">
+      <div class="user-menu-content">
+        <div class="user-avatar-button">
+          @if (profileImageUrl) {
+            <img [src]="profileImageUrl" alt="Avatar" class="avatar-mini" />
+          } @else {
+            <div class="avatar-placeholder">
+              {{ userFirstName.charAt(0).toUpperCase() }}
+            </div>
+          }
+        </div>
+        <div class="user-info hide-mobile">
+          <span class="user-name">{{ userFirstName }}</span>
+          <span class="user-role">{{ userRoleDisplay }}</span>
+        </div>
+        <mat-icon class="dropdown-icon hide-mobile">expand_more</mat-icon>
+      </div>
+    </button>
+  </div>
+
+  <mat-menu #belowMenu="matMenu" yPosition="below" class="user-profile-menu custom-menu">
+    <!-- Input oculto para seleccionar archivo -->
+    <input #fileInput type="file" accept="image/*" style="display: none" (change)="onFileSelected($event)">
+    
+    <!-- Cabecera del perfil -->
+    <div class="menu-profile-header" (click)="$event.stopPropagation()">
+      <div class="profile-avatar-container" (click)="fileInput.click()">
+        <img [src]="profileImageUrl || 'assets/images/default-profile.png'" alt="Foto de perfil" class="avatar" />
+        <div class="avatar-overlay">
+          <mat-icon>camera_alt</mat-icon>
+        </div>
+      </div>
+      <div class="profile-info">
+        <span class="profile-name">{{ userFirstName }}</span>
+        <span class="profile-role">{{ userRoleDisplay }}</span>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <!-- Opciones del menú -->
+    <div class="menu-options">
+      <button mat-menu-item class="menu-option" (click)="openDialogVerInfo()">
+        <mat-icon class="menu-icon">person_outline</mat-icon>
+        <div class="menu-option-content">
+          <span class="menu-option-title">Mi perfil</span>
+          <span class="menu-option-subtitle">Ver información personal</span>
+        </div>
+      </button>
+
+      <button mat-menu-item class="menu-option" (click)="openDialogChangePass()">
+        <mat-icon class="menu-icon">lock_outline</mat-icon>
+        <div class="menu-option-content">
+          <span class="menu-option-title">Seguridad</span>
+          <span class="menu-option-subtitle">Cambiar contraseña</span>
+        </div>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <!-- Cerrar sesión -->
+    <button mat-menu-item class="menu-option logout-option" (click)="logout()">
+      <mat-icon class="menu-icon logout-icon">logout</mat-icon>
+      <span class="menu-option-title">Cerrar sesión</span>
+    </button>
+  </mat-menu>
+</header>

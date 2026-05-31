@@ -1,0 +1,336 @@
+<!-- Contenedor principal del diálogo -->
+<div class="dialog-container" [ngClass]="data.customClass">
+
+  <!-- Cabecera del diálogo -->
+  <div class="dialog-header">
+    <div class="dialog-title-container">
+      <mat-icon *ngIf="data.titleIcon" class="dialog-title-icon">{{ data.titleIcon }}</mat-icon>
+      <div class="dialog-title-text">
+        <h2 mat-dialog-title>{{ data.titleText || 'Formulario' }}</h2>
+        <p *ngIf="data.subtitle" class="dialog-subtitle">{{ data.subtitle }}</p>
+      </div>
+    </div>
+    <button mat-icon-button class="dialog-close-btn" (click)="onCancel()" [disabled]="isSubmitting">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- Contenido del diálogo -->
+  <mat-dialog-content [formGroup]="form">
+
+    <!-- Iteración sobre cada grupo -->
+    <ng-container *ngFor="let groupKey of orderedGroups; let isFirst = first; trackBy: trackByGroup">
+
+      <!-- Cabecera del grupo (colapsable) -->
+      <div class="group-header" *ngIf="data.groups[groupKey]?.label?.trim()"
+           [class.collapsible]="data.groups[groupKey].collapsible"
+           (click)="toggleGroup(groupKey)">
+        <div class="group-title">
+          <mat-icon *ngIf="data.groups[groupKey].icon" class="group-icon">{{ data.groups[groupKey].icon }}</mat-icon>
+          <span class="group-label">{{ data.groups[groupKey].label }}</span>
+        </div>
+        <mat-icon *ngIf="data.groups[groupKey].collapsible" class="collapse-icon">
+          {{ collapsedGroups[groupKey] ? 'expand_more' : 'expand_less' }}
+        </mat-icon>
+      </div>
+
+      <!-- Descripción del grupo -->
+      <p *ngIf="data.groups[groupKey]?.description && !collapsedGroups[groupKey]" class="group-description">
+        {{ data.groups[groupKey].description }}
+      </p>
+
+      <!-- Contenedor de controles -->
+      <div class="form-controls-grid" [formGroupName]="groupKey"
+           [class.collapsed]="collapsedGroups[groupKey]"
+           [style.--columns]="data.groups[groupKey].columns || 1">
+
+        <ng-container *ngFor="let controlKey of getControlKeys(groupKey); trackBy: trackByControl">
+          <ng-container *ngIf="getConfig(groupKey, controlKey) as config">
+
+            <!-- Campo de texto / password / email / number / tel / url -->
+            <ng-container *ngIf="config.type === 'text'">
+              <div class="password-field-wrapper" [style.width]="getControlWidth(config)">
+                <mat-form-field appearance="outline" class="form-field" style="width:100%">
+                <mat-label>{{ config.label }}</mat-label>
+                <mat-icon *ngIf="config.prefixIcon" matPrefix>{{ config.prefixIcon }}</mat-icon>
+                <input matInput
+                       [formControlName]="controlKey"
+                       [type]="getInputType(groupKey, controlKey)"
+                       [placeholder]="config.placeholder || ''"
+                       [attr.maxlength]="config.maxLength"
+                       (keydown)="preventInvalidInput($event, config)" />
+                <mat-icon *ngIf="config.suffixIcon && config.inputType !== 'password'" matSuffix>{{ config.suffixIcon }}</mat-icon>
+                <!-- Password controls: visibility, generate, copy -->
+                <ng-container *ngIf="config.inputType === 'password'" matSuffix>
+                  <button mat-icon-button type="button"
+                          (click)="togglePasswordVisibility(controlKey)"
+                          [matTooltip]="passwordVisibility[controlKey] ? 'Ocultar' : 'Mostrar'">
+                    <mat-icon>{{ passwordVisibility[controlKey] ? 'visibility_off' : 'visibility' }}</mat-icon>
+                  </button>
+                  <button *ngIf="config.canGenerate" mat-icon-button type="button"
+                          (click)="fillGenerated(groupKey, controlKey)"
+                          matTooltip="Generar contraseña segura">
+                    <mat-icon>auto_fix_high</mat-icon>
+                  </button>
+                  <button *ngIf="config.canGenerate" mat-icon-button type="button"
+                          (click)="copyFieldValue(groupKey, controlKey)"
+                          matTooltip="Copiar contraseña">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </ng-container>
+                <mat-hint *ngIf="config.maxLength" align="end">{{ getCharCount(groupKey, controlKey) }}</mat-hint>
+                <mat-hint *ngIf="config.hint && !config.maxLength">{{ config.hint }}</mat-hint>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Este campo es requerido</mat-error>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'email')">Ingrese un email válido</mat-error>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'minlength')">Mínimo {{ config.minLength }} caracteres</mat-error>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'maxlength')">Máximo {{ config.maxLength }} caracteres</mat-error>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'pattern')">
+                  {{ config.inputType === 'password'
+                    ? 'Requiere mayúscula, minúscula, número y símbolo (@$!%*?&_#-.)'
+                    : 'Formato inválido' }}
+                </mat-error>
+              </mat-form-field>
+              <!-- Password strength indicator -->
+              <div *ngIf="config.inputType === 'password' && (config.showStrength || config.canGenerate)"
+                   class="password-strength-container">
+                <div class="strength-bars">
+                  <div *ngFor="let bar of [1,2,3,4]"
+                       class="strength-bar"
+                       [class.filled]="getPasswordStrength(groupKey, controlKey) >= bar"
+                       [ngClass]="getPasswordStrength(groupKey, controlKey) >= bar ? getPasswordStrengthClass(getPasswordStrength(groupKey, controlKey)) : ''">
+                  </div>
+                </div>
+                <span class="strength-label" [ngClass]="getPasswordStrengthClass(getPasswordStrength(groupKey, controlKey))">
+                  {{ getPasswordStrengthLabel(getPasswordStrength(groupKey, controlKey)) }}
+                </span>
+              </div>
+              </div>
+            </ng-container>
+
+            <!-- Campo TextArea -->
+            <ng-container *ngIf="config.type === 'textarea'">
+              <mat-form-field appearance="outline" class="form-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }}</mat-label>
+                <textarea matInput
+                          [formControlName]="controlKey"
+                          [rows]="config.rows || 4"
+                          [placeholder]="config.placeholder || ''"
+                          [attr.maxlength]="config.maxLength"></textarea>
+                <mat-hint *ngIf="config.maxLength" align="end">{{ getCharCount(groupKey, controlKey) }}</mat-hint>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Este campo es requerido</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- Campo Select -->
+            <ng-container *ngIf="config.type === 'select'">
+              <mat-form-field appearance="outline" class="form-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }}</mat-label>
+                <mat-icon *ngIf="config.prefixIcon" matPrefix>{{ config.prefixIcon }}</mat-icon>
+                <mat-select [formControlName]="controlKey" [placeholder]="config.placeholder || 'Seleccione...'">
+                  <mat-option *ngFor="let option of normalizeOptions(config.options || []); trackBy: trackByOption"
+                              [value]="option.value"
+                              [disabled]="option.disabled">
+                    <mat-icon *ngIf="option.icon">{{ option.icon }}</mat-icon>
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Seleccione una opción</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- Campo MultiSelect -->
+            <ng-container *ngIf="config.type === 'multiselect'">
+              <mat-form-field appearance="outline" class="form-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }}</mat-label>
+                <mat-select [formControlName]="controlKey" multiple [placeholder]="config.placeholder || 'Seleccione...'">
+                  <mat-option *ngFor="let option of normalizeOptions(config.options || []); trackBy: trackByOption"
+                              [value]="option.value"
+                              [disabled]="option.disabled">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-select>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Seleccione al menos una opción</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- Campo Autocomplete -->
+            <ng-container *ngIf="config.type === 'autocomplete'">
+              <mat-form-field appearance="outline" class="form-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }}</mat-label>
+                <input matInput
+                       [formControlName]="controlKey"
+                       [matAutocomplete]="auto"
+                       [placeholder]="config.placeholder || 'Escriba para buscar...'"
+                       (input)="onAutocompleteInput($event, groupKey, controlKey)" />
+                <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn">
+                  <mat-option *ngFor="let option of filteredOptions[groupKey + '.' + controlKey] || []; trackBy: trackByOption"
+                              [value]="option">
+                    {{ option.label }}
+                  </mat-option>
+                </mat-autocomplete>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Este campo es requerido</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- Campo Toggle (Switch) -->
+            <ng-container *ngIf="config.type === 'toggle'">
+              <div class="toggle-field" [style.width]="getControlWidth(config)">
+                <mat-slide-toggle [formControlName]="controlKey" color="primary">
+                  {{ config.label }}
+                </mat-slide-toggle>
+                <span *ngIf="config.hint" class="toggle-hint">{{ config.hint }}</span>
+              </div>
+            </ng-container>
+
+            <!-- Campo Checkbox -->
+            <ng-container *ngIf="config.type === 'checkbox'">
+              <div class="checkbox-field" [style.width]="getControlWidth(config)">
+                <mat-checkbox [formControlName]="controlKey" color="primary">
+                  {{ config.label }}
+                </mat-checkbox>
+              </div>
+            </ng-container>
+
+            <!-- Campo Radio -->
+            <ng-container *ngIf="config.type === 'radio'">
+              <div class="radio-field" [style.width]="getControlWidth(config)">
+                <label class="radio-label">{{ config.label }}</label>
+                <mat-radio-group [formControlName]="controlKey" class="radio-group">
+                  <mat-radio-button *ngFor="let option of normalizeOptions(config.options || []); trackBy: trackByOption"
+                                    [value]="option.value"
+                                    color="primary">
+                    {{ option.label }}
+                  </mat-radio-button>
+                </mat-radio-group>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Seleccione una opción</mat-error>
+              </div>
+            </ng-container>
+
+            <!-- Campo Date -->
+            <ng-container *ngIf="config.type === 'date'">
+              <mat-form-field appearance="outline" class="form-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }}</mat-label>
+                <input matInput [matDatepicker]="picker" [formControlName]="controlKey" [placeholder]="config.placeholder || ''">
+                <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+                <mat-datepicker #picker></mat-datepicker>
+                <mat-error *ngIf="hasError(groupKey, controlKey, 'required')">Seleccione una fecha</mat-error>
+              </mat-form-field>
+            </ng-container>
+
+            <!-- Campo Slider -->
+            <ng-container *ngIf="config.type === 'slider'">
+              <div class="slider-field" [style.width]="getControlWidth(config)">
+                <label class="slider-label">
+                  {{ config.label }}: <strong>{{ getControl(groupKey, controlKey)?.value }}</strong>
+                </label>
+                <mat-slider [min]="config.min || 0" [max]="config.max || 100" [step]="config.step || 1" discrete>
+                  <input matSliderThumb [formControlName]="controlKey">
+                </mat-slider>
+              </div>
+            </ng-container>
+
+            <!-- Campo Color -->
+            <ng-container *ngIf="config.type === 'color'">
+              <div class="color-field" [style.width]="getControlWidth(config)">
+                <label class="color-label">{{ config.label }}</label>
+                <div class="color-input-container">
+                  <input type="color" [formControlName]="controlKey" class="color-input">
+                  <span class="color-value">{{ getControl(groupKey, controlKey)?.value }}</span>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Campo File -->
+            <ng-container *ngIf="config.type === 'file'">
+              <div class="file-field" [style.width]="getControlWidth(config)">
+                <label class="file-label">{{ config.label }}</label>
+                <div class="file-drop-zone" (click)="fileInput.click()">
+                  <input type="file" hidden #fileInput
+                         [accept]="config.accept || '*/*'"
+                         [multiple]="config.multiple"
+                         (change)="onFileSelected($event, groupKey, controlKey)">
+                  <mat-icon class="file-icon">cloud_upload</mat-icon>
+                  <span class="file-text" *ngIf="!getFileName(groupKey, controlKey)">
+                    Haga clic o arrastre archivos aquí
+                  </span>
+                  <span class="file-name" *ngIf="getFileName(groupKey, controlKey)">
+                    {{ getFileName(groupKey, controlKey) }}
+                  </span>
+                </div>
+                <button *ngIf="getFileName(groupKey, controlKey)" mat-icon-button type="button"
+                        class="file-remove-btn" (click)="removeFile(groupKey, controlKey)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </ng-container>
+
+            <!-- Campo Image -->
+            <ng-container *ngIf="config.type === 'image'">
+              <div class="image-field" [style.width]="getControlWidth(config)">
+                <label class="image-label">{{ config.label }}</label>
+                <div class="image-upload-container">
+                  <div class="image-preview" *ngIf="imagePreview[groupKey + '.' + controlKey]">
+                    <img [src]="imagePreview[groupKey + '.' + controlKey]" alt="Preview">
+                    <button mat-icon-button class="image-remove-btn" (click)="removeFile(groupKey, controlKey)">
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </div>
+                  <div class="image-drop-zone" *ngIf="!imagePreview[groupKey + '.' + controlKey]" (click)="imgInput.click()">
+                    <input type="file" hidden #imgInput accept="image/*" (change)="onFileSelected($event, groupKey, controlKey)">
+                    <mat-icon>add_photo_alternate</mat-icon>
+                    <span>Subir imagen</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Campo JSON -->
+            <ng-container *ngIf="config.type === 'json'">
+              <mat-form-field appearance="outline" class="form-field json-field" [style.width]="getControlWidth(config)">
+                <mat-label>{{ config.label }} (JSON)</mat-label>
+                <textarea matInput
+                          [formControlName]="controlKey"
+                          [rows]="config.rows || 6"
+                          placeholder='{ "key": "value" }'
+                          class="json-textarea"></textarea>
+                <mat-hint>Ingrese un JSON válido</mat-hint>
+              </mat-form-field>
+            </ng-container>
+
+          </ng-container>
+        </ng-container>
+      </div>
+
+      <!-- Hint del grupo -->
+      <div *ngIf="data.groups[groupKey]?.hint && !collapsedGroups[groupKey]"
+           class="group-hint" [ngClass]="'hint-' + data.groups[groupKey].hint?.type">
+        <mat-icon>{{ getHintIcon(data.groups[groupKey].hint?.type) }}</mat-icon>
+        <span>{{ data.groups[groupKey].hint?.message }}</span>
+      </div>
+
+      <mat-divider *ngIf="groupKey !== orderedGroups[orderedGroups.length - 1]" class="group-divider"></mat-divider>
+    </ng-container>
+
+  </mat-dialog-content>
+
+  <!-- Acciones del diálogo -->
+  <mat-dialog-actions align="end">
+    <button mat-raised-button type="button" class="control-button" (click)="onCancel()" [disabled]="isSubmitting">
+      <mat-icon *ngIf="data.cancelButtonIcon">{{ data.cancelButtonIcon }}</mat-icon>
+      <mat-icon *ngIf="!data.cancelButtonIcon">close</mat-icon>
+      <span class="label">{{ data.hideSubmitButton ? 'Cerrar' : (data.cancelButtonText || 'Cancelar') }}</span>
+    </button>
+    <button *ngIf="!data.hideSubmitButton" mat-raised-button color="primary" type="button" class="control-button"
+            [disabled]="form.invalid || isSubmitting"
+            (click)="confirmSave()">
+      <mat-spinner *ngIf="isSubmitting" diameter="20" class="btn-spinner"></mat-spinner>
+      <mat-icon *ngIf="!isSubmitting && data.submitButtonIcon">{{ data.submitButtonIcon }}</mat-icon>
+      <mat-icon *ngIf="!isSubmitting && !data.submitButtonIcon">save</mat-icon>
+      <span class="label">{{ isSubmitting ? 'Guardando...' : (data.submitButtonText || 'Guardar') }}</span>
+    </button>
+  </mat-dialog-actions>
+
+</div>
+

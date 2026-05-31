@@ -1,0 +1,57 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark theme — PCyMT Brand Palette -->
+    <style name="Theme.PedroChacolla" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary: Beige Arena (luminoso en oscuro) -->
+        <item name="colorPrimary">@color/pcymt_primary_dark</item>
+        <item name="colorOnPrimary">@color/pcymt_on_primary_dark</item>
+        <item name="colorPrimaryContainer">@color/pcymt_primary_container_dark</item>
+        <item name="colorOnPrimaryContainer">@color/pcymt_on_primary_container_dark</item>
+
+        <!-- Secondary: Verde Salvia claro -->
+        <item name="colorSecondary">@color/pcymt_secondary_dark</item>
+        <item name="colorOnSecondary">@color/pcymt_on_secondary_dark</item>
+        <item name="colorSecondaryContainer">@color/pcymt_secondary_container_dark</item>
+        <item name="colorOnSecondaryContainer">@color/pcymt_on_secondary_container_dark</item>
+
+        <!-- Tertiary / CTA: Rojo Arcilla claro -->
+        <item name="colorTertiary">@color/pcymt_tertiary_dark</item>
+        <item name="colorOnTertiary">@color/pcymt_on_tertiary_dark</item>
+        <item name="colorTertiaryContainer">@color/pcymt_tertiary_container_dark</item>
+        <item name="colorOnTertiaryContainer">@color/pcymt_on_tertiary_container_dark</item>
+
+        <!-- Error -->
+        <item name="colorError">@color/pcymt_tertiary_dark</item>
+        <item name="colorOnError">@color/pcymt_on_tertiary_dark</item>
+
+        <!-- Surface / Background -->
+        <item name="android:colorBackground">@color/pcymt_background_dark</item>
+        <item name="colorSurface">@color/pcymt_surface_dark</item>
+        <item name="colorSurfaceVariant">@color/pcymt_surface_container_dark</item>
+        <item name="colorOutline">@color/pcymt_outline_dark</item>
+
+        <!-- Status bar / Navigation bar -->
+        <item name="android:statusBarColor">@color/pcymt_background_dark</item>
+        <item name="android:navigationBarColor">@color/pcymt_background_dark</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Base.Theme.PedroChacolla" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary: Beige Arena -->
+        <item name="colorPrimary">@color/pcymt_primary_dark</item>
+        <item name="colorOnPrimary">@color/pcymt_on_primary_dark</item>
+        <item name="colorPrimaryContainer">@color/pcymt_primary_container_dark</item>
+        <item name="colorOnPrimaryContainer">@color/pcymt_on_primary_container_dark</item>
+        <!-- Secondary: Verde Salvia claro -->
+        <item name="colorSecondary">@color/pcymt_secondary_dark</item>
+        <item name="colorOnSecondary">@color/pcymt_on_secondary_dark</item>
+        <item name="colorSecondaryContainer">@color/pcymt_secondary_container_dark</item>
+        <item name="colorOnSecondaryContainer">@color/pcymt_on_secondary_container_dark</item>
+        <!-- Tertiary / CTA: Rojo Arcilla claro -->
+        <item name="colorTertiary">@color/pcymt_tertiary_dark</item>
+        <item name="colorOnTertiary">@color/pcymt_on_tertiary_dark</item>
+        <!-- Surface -->
+        <item name="android:colorBackground">@color/pcymt_background_dark</item>
+        <item name="colorSurface">@color/pcymt_surface_dark</item>
+    </style>
+</resources>
+

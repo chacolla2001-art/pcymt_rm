@@ -1,0 +1,19 @@
+<svg width="200" height="300" viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="50" cy="141" rx="22" ry="6" fill="#0a140a" opacity="0.3"/>
+  <rect x="43" y="112" width="14" height="28" rx="2" fill="#795548"/>
+  <rect x="50" y="112" width="7" height="28" rx="2" fill="#6D4C41"/>
+  <path d="M44,114 Q50,111 56,114" stroke="#A1887F" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- capa baja -->
+  <polygon points="50,63 8,116 92,116" fill="#558B2F"/>
+  <polygon points="50,63 92,116 50,116" fill="#437022"/>
+  <polygon points="50,63 8,116 22,116" fill="#689F38" opacity="0.45"/>
+  <!-- capa media -->
+  <polygon points="50,42 18,87 82,87" fill="#7CB342"/>
+  <polygon points="50,42 82,87 50,87" fill="#618535"/>
+  <polygon points="50,42 18,87 30,87" fill="#8BC34A" opacity="0.4"/>
+  <!-- capa alta -->
+  <polygon points="50,22 28,58 72,58" fill="#9CCC65"/>
+  <polygon points="50,22 72,58 50,58" fill="#7EAA50"/>
+  <polygon points="50,22 28,58 36,58" fill="#AED581" opacity="0.45"/>
+  <polygon points="50,22 44,36 50,33 56,36" fill="#C5E1A5" opacity="0.55"/>
+</svg>

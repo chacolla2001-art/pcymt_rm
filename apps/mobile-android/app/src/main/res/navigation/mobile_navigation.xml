@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/navigation_stats">
+
+    <!-- Stats/Home Fragment - Shows user progress -->
+    <fragment
+        android:id="@+id/navigation_stats"
+        android:name="com.univalle.pedrochacolla.ui.home.StatsFragment"
+        android:label="Inicio"
+        tools:layout="@layout/fragment_collection" />
+
+    <!-- AR Camera Fragment -->
+    <fragment
+        android:id="@+id/navigation_ar"
+        android:name="com.univalle.pedrochacolla.ui.ar.ArFragment"
+        android:label="AR"
+        tools:layout="@layout/fragment_ar" />
+
+    <!-- AR Unsupported Device Fragment -->
+    <fragment
+        android:id="@+id/navigation_ar_unsupported"
+        android:name="com.univalle.pedrochacolla.ui.ar.ArUnsupportedFragment"
+        android:label="AR no disponible"
+        tools:layout="@layout/fragment_ar_unsupported" />
+
+    <!-- Assets Grid Fragment - Shows anchor points by section -->
+    <fragment
+        android:id="@+id/navigation_collection"
+        android:name="com.univalle.pedrochacolla.MainFragment"
+        android:label="Colección"
+        tools:layout="@layout/fragment_main" />
+
+    <!-- Map View Fragment -->
+    <fragment
+        android:id="@+id/navigation_map"
+        android:name="com.univalle.pedrochacolla.ui.dashboard.DashboardFragment"
+        android:label="Mapa"
+        tools:layout="@layout/fragment_dashboard" />
+
+    <!-- Profile Fragment -->
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.univalle.pedrochacolla.ui.notifications.ProfileFragment"
+        android:label="Perfil"
+        tools:layout="@layout/fragment_profile" />
+
+    <!-- AR Simple Fragment — Realidad Aumentada sin cloud anchors (mayor compatibilidad) -->
+    <fragment
+        android:id="@+id/navigation_ar_simple"
+        android:name="com.univalle.pedrochacolla.ui.ar.ArSimpleFragment"
+        android:label="RA"
+        tools:layout="@layout/fragment_ar_simple" />
+
+    <!-- AR Map Fragment — Modo Explorador estilo Pokémon Go para dispositivos de gama baja -->
+    <fragment
+        android:id="@+id/navigation_ar_map"
+        android:name="com.univalle.pedrochacolla.ui.armap.ArMapFragment"
+        android:label="Juku Go"
+        tools:layout="@layout/fragment_ar_map" />
+
+    <!-- Model Viewer Fragment — Visor 3D del animal (desde Modo Explorador) -->
+    <fragment
+        android:id="@+id/navigation_model_viewer"
+        android:name="com.univalle.pedrochacolla.ui.armap.ModelViewerFragment"
+        android:label="Modelo 3D"
+        tools:layout="@layout/fragment_model_viewer" />
+
+    <!-- Animal Detail Fragment — Rediseño estilo Pokemon GO (reemplaza al visor anterior) -->
+    <fragment
+        android:id="@+id/navigation_animal_detail"
+        android:name="com.univalle.pedrochacolla.ui.armap.AnimalDetailFragment"
+        android:label="Detalle del animal"
+        tools:layout="@layout/fragment_animal_detail" />
+
+</navigation>

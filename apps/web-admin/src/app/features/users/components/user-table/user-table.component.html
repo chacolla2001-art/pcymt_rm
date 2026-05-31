@@ -1,0 +1,131 @@
+@if (isLoading) {
+  <div class="spinner-container">
+    <mat-spinner diameter="60"></mat-spinner>
+  </div>
+} @else {
+  <div class="tools-container">
+    <!-- Search Controls -->
+    <div class="search-controls">
+      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="search-input">
+        <mat-label>Buscar usuario</mat-label>
+        <input #searchInput matInput placeholder="Nombre o correo..."
+               (keydown.enter)="applyFilter(searchInput.value)"
+               (input)="searchInput.value === '' && applyFilter('')">
+        <button *ngIf="searchInput.value" mat-icon-button matSuffix type="button"
+                (click)="searchInput.value = ''; applyFilter('')"
+                matTooltip="Limpiar búsqueda">
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-icon *ngIf="!searchInput.value" matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <button mat-stroked-button class="control-button" (click)="applyFilter(searchInput.value)">
+        <mat-icon>search</mat-icon>
+        <span class="label">Buscar</span>
+      </button>
+
+      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="status-filter">
+        <mat-label>Estado</mat-label>
+        <mat-select [(value)]="selectedStatus" (selectionChange)="applyStatusFilter()">
+          <mat-option value="all">Todos</mat-option>
+          <mat-option value="active">Activos</mat-option>
+          <mat-option value="inactive">Inactivos</mat-option>
+        </mat-select>
+      </mat-form-field>
+      
+      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="role-filter">
+        <mat-label>Rol</mat-label>
+        <mat-select [(value)]="selectedRole" (selectionChange)="applyRoleFilter()">
+          <mat-option *ngFor="let r of roleOptions" [value]="r.value">{{ r.label }}</mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button mat-raised-button color="primary" class="control-button new-btn" (click)="openDialog()">
+        <mat-icon>person_add</mat-icon>
+        <span class="label">Nuevo usuario</span>
+      </button>
+
+      @if (isFilteredById) {
+        <button mat-stroked-button color="accent" class="control-button" (click)="clearIdFilter()">
+          <mat-icon>filter_list_off</mat-icon>
+          <span class="label">Mostrar todos</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <table mat-table [dataSource]="dataSource" class="mat-elevation-z2 users-table">
+    @for (column of displayedColumns; track column) {
+      <ng-container [matColumnDef]="column">
+        <th mat-header-cell *matHeaderCellDef>{{ columnNames[column] ?? column }}</th>
+        <td mat-cell *matCellDef="let element">
+          @switch (column) {
+            @case ('actions') {
+              <div class="actions-cell">
+                <button mat-icon-button
+                        color="primary"
+                        class="action-btn"
+                        matTooltip="Editar rol y estado"
+                        matTooltipPosition="above"
+                        (click)="onEdit(element)">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-icon-button
+                        color="accent"
+                        class="action-btn"
+                        matTooltip="Cambiar contraseña"
+                        matTooltipPosition="above"
+                        (click)="onChangePassword(element)">
+                  <mat-icon>lock_reset</mat-icon>
+                </button>
+                <button mat-icon-button
+                        color="warn"
+                        class="action-btn action-btn-delete"
+                        matTooltip="Eliminar usuario"
+                        matTooltipPosition="above"
+                        (click)="onDelete(element)">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </div>
+            }
+            @case ('role') {
+              <div class="role-cell">
+                <mat-icon [class]="'role-icon role-' + element.role">{{ getRoleIcon(element.role) }}</mat-icon>
+                <span class="role-label">{{ element.role | titlecase }}</span>
+              </div>
+            }
+            @case ('is_active') {
+              <span [class]="'status-badge ' + (element.is_active ? 'status-active' : 'status-inactive')">
+                <mat-icon>{{ element.is_active ? 'check_circle' : 'cancel' }}</mat-icon>
+                {{ element.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+            }
+            @default {
+              {{ element[column] }}
+            }
+          }
+        </td>
+      </ng-container>
+    }
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"
+        [class.row-inactive]="!row.is_active">
+    </tr>
+  </table>
+
+  <div class="paginator-container">
+    <mat-paginator
+      #paginator
+      [length]="totalCount"
+      [pageSize]="pageSize"
+      [pageSizeOptions]="[5, 10, 20, 50]"
+      (page)="onPageChange($event)"
+      showFirstLastButtons
+      aria-label="Seleccionar página">
+    </mat-paginator>
+  </div>
+}

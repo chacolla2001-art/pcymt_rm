@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:minHeight="300dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Capas del mapa"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:paddingBottom="8dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Toca una capa para cargarla. Mantén presionado para eliminar."
+        android:textSize="12sp"
+        android:textColor="#888888"
+        android:paddingBottom="12dp" />
+
+    <ListView
+        android:id="@+id/layer_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#DDDDDD"
+        android:dividerHeight="1dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingTop="12dp"
+        android:gravity="end">
+
+        <Button
+            android:id="@+id/btn_close_dialog"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Cerrar"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/btn_save_layer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar capa actual" />
+    </LinearLayout>
+
+</LinearLayout>

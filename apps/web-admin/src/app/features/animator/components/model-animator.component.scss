@@ -1,0 +1,346 @@
+/* Model Animator Component Styles */
+
+:host {
+  display: block;
+  height: 100%;
+}
+
+.animator-container {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--sys-surface);
+}
+
+/* Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 200;
+}
+
+/* Left Sidebar */
+.sidebar {
+  width: 260px;
+  background-color: var(--sys-surface-container);
+  padding: 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--sys-outline-variant);
+  margin-left: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-field {
+  width: 100%;
+}
+
+.model-list {
+  flex: 1;
+  overflow-y: auto;
+
+  .mat-mdc-list-item {
+    cursor: pointer;
+    border-radius: 8px;
+    margin-bottom: 4px;
+
+    &:hover {
+      background-color: var(--sys-surface-container-high);
+    }
+
+    img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+  }
+}
+
+/* Sidebar Toggle Buttons */
+.sidebar-toggle-button,
+.sidebar-toggle-button-right {
+  position: absolute;
+  top: 12px;
+  z-index: 100;
+  background-color: var(--sys-surface-container) !important;
+}
+
+.sidebar-toggle-button {
+  left: 12px;
+}
+
+.sidebar-toggle-button-right {
+  right: 272px;
+  transition: right 0.3s ease;
+
+  &.collapsed {
+    right: 12px;
+  }
+}
+
+/* Canvas Area */
+.canvas-area {
+  flex: 1;
+  background-color: var(--sys-surface-variant);
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.3s ease;
+}
+
+/* Animation Toggle Group */
+.animation-toggle {
+  position: absolute;
+  top: 12px;
+  left: 320px;
+  z-index: 100;
+  background: var(--sys-surface-container);
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.toggle-creator-mode.mat-button-toggle-checked {
+  background-color: inherit !important;
+  color: inherit !important;
+}
+
+/* Right Sidebar - Animation Controls */
+.animation-sidebar {
+  width: 280px;
+  background: var(--sys-surface-container);
+  padding: 16px;
+  border-left: 1px solid var(--sys-outline-variant);
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  z-index: 50;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sidebar-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--sys-on-surface);
+}
+
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-btn {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 8px;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.animation-status-message {
+  padding: 8px 0;
+
+  mat-chip {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+mat-divider {
+  margin: 8px 0;
+}
+
+/* Timeline */
+.timeline-container {
+  position: absolute;
+  bottom: 0;
+  left: 308px;
+  right: 280px;
+  height: 88px;
+  background-color: var(--sys-surface-container);
+  border-top: 1px solid var(--sys-outline-variant);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  z-index: 100;
+}
+
+.timeline-track {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+  align-items: center;
+}
+
+.timeline-block {
+  display: flex;
+  align-items: center;
+  min-width: 60px;
+  height: 56px;
+  padding: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+
+  &.selected {
+    outline: 2px solid var(--sys-primary);
+    outline-offset: 2px;
+  }
+
+  &.editable {
+    cursor: ew-resize;
+  }
+}
+
+.block-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 8px 12px;
+  gap: 4px;
+}
+
+.clip-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--sys-on-surface);
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: var(--sys-on-surface-variant);
+}
+
+.resize-handle {
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  background-color: var(--sys-outline);
+  opacity: 0.5;
+  transition: opacity 0.2s;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.resize-handle--left {
+  border-radius: 4px 0 0 4px;
+}
+
+.resize-handle--right {
+  border-radius: 0 4px 4px 0;
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 220px;
+  }
+
+  .animation-sidebar {
+    width: 240px;
+  }
+
+  .timeline-container {
+    left: 268px;
+    right: 240px;
+  }
+
+  .animation-toggle {
+    left: 280px;
+  }
+
+  .sidebar-toggle-button-right {
+    right: 252px;
+  }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100%;
+    margin-left: 0;
+    z-index: 60;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .animation-sidebar {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .timeline-container {
+    left: 0;
+    right: 0;
+    height: 72px;
+  }
+
+  .animation-toggle {
+    left: 60px;
+    top: 8px;
+  }
+
+  .sidebar-toggle-button-right {
+    right: 12px;
+
+    &.collapsed {
+      right: 12px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    max-width: 260px;
+  }
+
+  .animation-sidebar {
+    max-width: 100%;
+    height: 50%;
+    top: auto;
+    bottom: 0;
+  }
+
+  .timeline-container {
+    height: 60px;
+    padding: 4px 8px;
+  }
+
+  .timeline-block {
+    min-width: 50px;
+    height: 44px;
+  }
+
+  .block-content {
+    padding: 4px 8px;
+  }
+
+  .clip-name {
+    font-size: 0.75rem;
+  }
+
+  .duration {
+    font-size: 0.625rem;
+  }
+}

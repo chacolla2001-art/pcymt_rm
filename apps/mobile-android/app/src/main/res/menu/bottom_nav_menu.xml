@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/navigation_map"
+        android:icon="@drawable/icon_map"
+        android:title="Mapa" />
+    <item
+        android:id="@+id/navigation_collection"
+        android:icon="@drawable/ic_collection"
+        android:title="Colección" />
+    <item
+        android:id="@+id/navigation_stats"
+        android:icon="@drawable/ic_home_black_24dp"
+        android:title="Inicio" />
+    <item
+        android:id="@+id/navigation_ar_map"
+        android:icon="@drawable/ic_explorer"
+        android:title="Juku Go" />
+    <item
+        android:id="@+id/navigation_profile"
+        android:icon="@drawable/icon_usuario"
+        android:title="Perfil" />
+
+</menu>

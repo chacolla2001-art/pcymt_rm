@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  PANTALLA DE LOGIN — ESTILO JUEGO                           ║
+    ║  Misma línea gráfica que la pantalla de inicio              ║
+    ╚══════════════════════════════════════════════════════════════╝
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.auth.LoginFragment">
+
+    <!-- Fondo del parque -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/background_game"
+        android:scaleType="centerCrop"
+        android:contentDescription="" />
+
+    <!-- Gradiente overlay oscuro (mismo que inicio) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/gradient_game_overlay" />
+
+    <!-- Contenido scrollable -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingTop="40dp"
+            android:paddingBottom="32dp"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <!-- ══ Logo ══ -->
+            <ImageView
+                android:id="@+id/imageView"
+                android:layout_width="150dp"
+                android:layout_height="110dp"
+                android:src="@drawable/logo_parque"
+                android:scaleType="centerInside"
+                android:contentDescription="Logo" />
+
+            <!-- ══ Título del juego ══ -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="JUKU GO"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-black"
+                android:textColor="#FFFFFFFF"
+                android:letterSpacing="0.10"
+                android:shadowColor="#DD000000"
+                android:shadowRadius="10"
+                android:shadowDx="2"
+                android:shadowDy="3" />
+
+            <!-- Subtítulo parque -->
+            <TextView
+                android:id="@+id/textView3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="24dp"
+                android:text="PARQUE DE LAS CULTURAS Y LA MADRE TIERRA"
+                android:textSize="9sp"
+                android:textColor="#FFFFFFFF"
+                android:fontFamily="sans-serif"
+                android:textStyle="bold"
+                android:letterSpacing="0.06"
+                android:gravity="center" />
+
+            <!-- ══ CARD: Formulario de login ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_game_card"
+                android:padding="16dp"
+                android:layout_marginBottom="10dp">
+
+                <!-- Heading -->
+                <TextView
+                    android:id="@+id/textView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="INICIAR SESIÓN"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="#FFD9B992"
+                    android:letterSpacing="0.06"
+                    android:layout_marginBottom="14dp" />
+
+                <!-- Email -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/et_email_login"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Correo electrónico"
+                    app:hintTextColor="#AAFFFFFF"
+                    android:theme="@style/ThemeOverlay.App.TextInput.Dark"
+                    app:boxStrokeColor="#66FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etEmailLoginInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textEmailAddress"
+                        android:imeOptions="actionNext"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Contraseña -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/et_password_login"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Contraseña"
+                    android:textColorHint="@color/white"
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="#AAFFFFFF"
+                    app:hintTextColor="#AAFFFFFF"
+                    android:theme="@style/ThemeOverlay.App.TextInput.Dark"
+                    app:boxStrokeColor="#66FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPasswordLoginInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:imeOptions="actionDone"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Botón Iniciar sesión -->
+                <LinearLayout
+                    android:id="@+id/btn_login"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/bg_btn_explorar"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:layout_marginTop="14dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="INGRESAR"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-black"
+                        android:textColor="#FFFFFFFF"
+                        android:letterSpacing="0.08" />
+
+                </LinearLayout>
+
+                <!-- Enlace Olvidé mi contraseña -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_forgot_password"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="4dp"
+                    android:text="¿Olvidaste tu contraseña?"
+                    android:textSize="12sp"
+                    android:textColor="#CCFFFFFF"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+            <!-- ══ CARD: Google / Registrarse ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_game_card"
+                android:padding="16dp">
+
+                <!-- Divisor -->
+                <TextView
+                    android:id="@+id/tv_or_divider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="────  O  ────"
+                    android:textColor="#88FFFFFF"
+                    android:textSize="12sp"
+                    android:layout_marginBottom="10dp" />
+
+                <!-- Botón Google -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_continue_google"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Continuar con Google"
+                    android:textColor="#FFFFFFFF"
+                    app:cornerRadius="12dp"
+                    app:icon="@drawable/logo_google"
+                    app:iconGravity="textStart"
+                    app:iconTint="@null"
+                    app:strokeColor="#55FFFFFF" />
+
+                <!-- Botón Registrarse -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_go_register"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="¿No tienes cuenta? Regístrate"
+                    android:textColor="#FFD9B992"
+                    app:cornerRadius="8dp" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+</FrameLayout>

@@ -1,0 +1,317 @@
+/* ==================== SETTINGS PAGE ==================== */
+.settings-page {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ==================== PAGE HEADER ==================== */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.header-icon {
+  font-size: 36px;
+  width: 36px;
+  height: 36px;
+  color: var(--sys-primary);
+  opacity: 0.85;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--sys-on-surface);
+  letter-spacing: -0.3px;
+}
+
+.page-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.88rem;
+  color: var(--sys-on-surface-variant);
+}
+
+/* ==================== LOADING ==================== */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+/* ==================== SETTINGS CARD ==================== */
+.settings-card {
+  border-radius: 16px !important;
+  overflow: hidden;
+
+  mat-card-header {
+    padding: 20px 24px 12px;
+  }
+
+  mat-card-content {
+    padding: 0 24px 16px;
+  }
+
+  mat-card-actions {
+    padding: 12px 24px 16px !important;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+}
+
+.card-icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.arcore-icon {
+  background-color: color-mix(in srgb, var(--sys-primary) 12%, transparent);
+  color: var(--sys-primary);
+}
+
+.lang-icon {
+  background-color: color-mix(in srgb, var(--sys-tertiary) 12%, transparent);
+  color: var(--sys-tertiary);
+}
+
+/* ==================== SETTING GROUP ==================== */
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setting-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--sys-on-surface);
+}
+
+.setting-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--sys-on-surface-variant);
+  padding: 4px 12px;
+  background: var(--sys-surface-container);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+
+  &.changed {
+    color: var(--sys-primary);
+    background: color-mix(in srgb, var(--sys-primary) 12%, transparent);
+  }
+}
+
+.setting-description {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--sys-on-surface-variant);
+  line-height: 1.4;
+  opacity: 0.8;
+}
+
+/* ==================== SLIDER ==================== */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.slider-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--sys-on-surface-variant);
+  opacity: 0.6;
+}
+
+.ttl-slider {
+  flex: 1;
+}
+
+/* ==================== PRESET BUTTONS ==================== */
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.preset-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px !important;
+  border-radius: 12px !important;
+  font-size: 0.82rem !important;
+  font-weight: 500;
+  height: auto !important;
+  min-height: 44px;
+  transition: all 0.2s ease;
+  border-color: var(--sys-outline-variant) !important;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    opacity: 0.7;
+  }
+
+  .preset-days {
+    margin-left: auto;
+    font-size: 0.72rem;
+    opacity: 0.5;
+    font-weight: 400;
+  }
+
+  &.active {
+    background-color: color-mix(in srgb, var(--sys-primary) 12%, transparent) !important;
+    border-color: var(--sys-primary) !important;
+    color: var(--sys-primary) !important;
+
+    mat-icon {
+      opacity: 1;
+      color: var(--sys-primary);
+    }
+
+    .preset-days {
+      opacity: 0.8;
+      color: var(--sys-primary);
+    }
+  }
+}
+
+/* ==================== CHANGE INDICATOR ==================== */
+.change-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--sys-primary);
+  margin-right: auto;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* ==================== SAVE BUTTON ==================== */
+.btn-spinner {
+  display: inline-block;
+  margin-right: 8px;
+
+  ::ng-deep circle {
+    stroke: currentColor !important;
+  }
+}
+
+/* ==================== LANGUAGE BUTTONS ==================== */
+.language-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.lang-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px !important;
+  border-radius: 14px !important;
+  height: auto !important;
+  min-height: 56px;
+  transition: all 0.2s ease;
+  border-color: var(--sys-outline-variant) !important;
+
+  .lang-flag {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
+  .lang-label {
+    font-size: 0.92rem;
+    font-weight: 500;
+  }
+
+  .lang-check {
+    margin-left: auto;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--sys-primary);
+  }
+
+  &.active {
+    background-color: color-mix(in srgb, var(--sys-primary) 12%, transparent) !important;
+    border-color: var(--sys-primary) !important;
+
+    .lang-label {
+      color: var(--sys-primary);
+      font-weight: 600;
+    }
+  }
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 600px) {
+  .settings-page {
+    gap: 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .presets-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .language-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-card {
+    mat-card-header {
+      padding: 16px 16px 8px;
+    }
+
+    mat-card-content {
+      padding: 0 16px 12px;
+    }
+
+    mat-card-actions {
+      padding: 8px 16px 12px !important;
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  .change-indicator {
+    margin-right: 0;
+    justify-content: center;
+  }
+}

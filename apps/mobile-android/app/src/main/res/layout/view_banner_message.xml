@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/custom_banner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp"
+    android:background="?attr/colorPrimary"
+    android:elevation="8dp"
+    android:visibility="gone"
+    android:layout_gravity="top">
+
+    <TextView
+        android:id="@+id/banner_message"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Mensaje"
+        android:textColor="@android:color/white"
+        android:layout_weight="1"
+        android:textSize="14sp" />
+
+    <ImageButton
+        android:id="@+id/banner_close"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:contentDescription="Cerrar banner"
+        app:tint="@android:color/white" />
+</LinearLayout>

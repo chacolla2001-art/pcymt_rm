@@ -1,0 +1,134 @@
+<div class="page-container">
+  <div class="page-header">
+    <button mat-icon-button (click)="goBack()" matTooltip="Volver al Dashboard">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <mat-icon class="header-icon">login</mat-icon>
+    <h1>Historial de Accesos</h1>
+    <span class="spacer"></span>
+    <mat-button-toggle-group [(value)]="selectedSessionRange" (change)="onSessionRangeChanged($event.value)" class="time-toggle">
+      <mat-button-toggle value="day">Día</mat-button-toggle>
+      <mat-button-toggle value="month">Mes</mat-button-toggle>
+      <mat-button-toggle value="year">Año</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <!-- Ranking de Usuarios Más Activos (integrado de top-users) -->
+  <div class="content-grid">
+    <mat-card appearance="outlined" class="ranking-detail-card">
+      <mat-card-header>
+        <mat-card-title>Ranking por Actividad</mat-card-title>
+        <mat-card-subtitle>Top usuarios con más interacciones en el parque</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ranking-list-detail">
+          @for (user of topUsers; track user.id; let i = $index) {
+            <div class="ranking-item" (click)="navigateToUser(user.id)">
+              <span class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
+              <div class="item-info">
+                <span class="item-name">{{ user.name || user.email }}</span>
+                <span class="item-detail">{{ getDisplayName(user) }}</span>
+                <mat-progress-bar mode="determinate" [value]="getRankingProgress(user.interactionCount)"></mat-progress-bar>
+              </div>
+              <span class="item-count">{{ user.interactionCount }}</span>
+              <mat-icon class="item-arrow">chevron_right</mat-icon>
+            </div>
+          }
+          @empty {
+            <div class="empty-state">
+              <mat-icon>info</mat-icon>
+              <p>Aún no hay actividad de usuarios</p>
+            </div>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header>
+        <mat-card-title>Distribución de Actividad</mat-card-title>
+        <mat-card-subtitle>Comparativa visual entre usuarios</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ranking-chart-container">
+          <canvas baseChart [data]="rankingBarChartData" [type]="'bar'"></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <!-- Gráfico de sesiones por período -->
+  <mat-card appearance="outlined" class="main-card">
+    <mat-card-content>
+      <!-- Period navigation -->
+      <div class="period-navigation">
+        <button mat-icon-button (click)="navigateSessionPeriod(-1)" matTooltip="Período anterior">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span class="period-label">{{ sessionPeriodLabel }}</span>
+        <button mat-icon-button (click)="navigateSessionPeriod(1)" matTooltip="Período siguiente">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        @if (sessionPeriodOffset !== 0) {
+          <button mat-stroked-button class="today-btn" (click)="resetSessionPeriod()">
+            <mat-icon>today</mat-icon> Actual
+          </button>
+        }
+        <span class="spacer"></span>
+        <button mat-icon-button (click)="downloadSessionData()" matTooltip="Descargar CSV">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+
+      <div class="stats-layout">
+        <!-- Panel lateral de filtros -->
+        <div class="filters-panel">
+          <h3 class="filter-section-title">Filtros</h3>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-width">
+            <mat-label>Buscar usuario</mat-label>
+            <input matInput [(ngModel)]="userSearch" (keyup.enter)="searchUsers()" placeholder="Usuario o email...">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+
+          @if (matchingUsers.length) {
+            <mat-nav-list class="compact-list">
+              @for (user of matchingUsers; track user.id) {
+                <mat-list-item (click)="selectUser(user)" [activated]="selectedUser?.id === user.id">
+                  <mat-icon matListItemIcon>person</mat-icon>
+                  <span matListItemTitle>{{ user.fullDisplayName || user.name }}</span>
+                </mat-list-item>
+              }
+            </mat-nav-list>
+          }
+
+          <div class="filter-section">
+            <h4 class="filter-title">Plataforma</h4>
+            <mat-button-toggle-group [(value)]="selectedPlatform" (change)="onPlatformChanged($event.value)" class="vertical-toggle">
+              <mat-button-toggle value="all"><mat-icon>devices</mat-icon> Todas</mat-button-toggle>
+              <mat-button-toggle value="web"><mat-icon>computer</mat-icon> Web</mat-button-toggle>
+              <mat-button-toggle value="mobile"><mat-icon>smartphone</mat-icon> Móvil</mat-button-toggle>
+            </mat-button-toggle-group>
+          </div>
+
+          @if (selectedUser) {
+            <div class="selected-user-chip">
+              <mat-icon>person</mat-icon>
+              <span>{{ selectedUser.name || selectedUser.email }}</span>
+              <button mat-icon-button (click)="clearUser()">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+
+        <!-- Gráfico principal -->
+        <div class="chart-main">
+          <div class="chart-container-large">
+            <canvas baseChart #sessionChart [data]="sessionTimeChartData" [type]="sessionTimeChartType"></canvas>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -1,0 +1,167 @@
+<div class="animator-container">
+
+  <!-- Loading Spinner -->
+  @if (isLoading) {
+    <div class="loading-overlay">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  }
+
+  <!-- Animation Clips Toggle Group -->
+  @if (hasModelLoaded && animationClips.length > 0) {
+    <mat-button-toggle-group
+      [value]="selectedAnimationName"
+      (change)="onAnimationToggleClicked($any($event.value))"
+      class="animation-toggle"
+      appearance="standard">
+      @for (clip of animationClips; track clip.name) {
+        <mat-button-toggle
+          [value]="clip.name"
+          [class.toggle-creator-mode]="isEditingMode"
+          [disableRipple]="isEditingMode"
+          [disabled]="isPlaying">
+          {{ clip.name }}
+        </mat-button-toggle>
+      }
+    </mat-button-toggle-group>
+  }
+
+  <!-- Left Sidebar Toggle -->
+  <button
+    mat-icon-button
+    class="sidebar-toggle-button"
+    (click)="toggleModelsSidebar()"
+    matTooltip="Toggle models">
+    <mat-icon>{{ showModelsSidebar ? 'chevron_left' : 'chevron_right' }}</mat-icon>
+  </button>
+
+  <!-- Left Sidebar - Model List -->
+  @if (showModelsSidebar) {
+    <aside class="sidebar">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Buscar modelo</mat-label>
+        <input matInput [(ngModel)]="searchQuery" (input)="filterAssets()" />
+        <mat-icon matPrefix>search</mat-icon>
+      </mat-form-field>
+
+      <mat-nav-list class="model-list">
+        @for (asset of filteredAssets; track asset.id) {
+          <mat-list-item (click)="onAssetSelected(asset)">
+            <img matListItemAvatar [src]="apiRoutes.getAssetUrl(asset.icon_url)" [alt]="asset.name" />
+            <span matListItemTitle>{{ asset.name }}</span>
+          </mat-list-item>
+        }
+      </mat-nav-list>
+    </aside>
+  }
+
+  <!-- Canvas Area -->
+  <div #canvasContainer class="canvas-area"></div>
+
+  <!-- Right Sidebar Toggle -->
+  @if (hasModelLoaded) {
+    <button
+      mat-icon-button
+      class="sidebar-toggle-button-right"
+      [class.collapsed]="!showAnimationSidebar"
+      (click)="toggleAnimationSidebar()"
+      matTooltip="Toggle animation controls">
+      <mat-icon>{{ showAnimationSidebar ? 'chevron_right' : 'chevron_left' }}</mat-icon>
+    </button>
+  }
+
+  <!-- Right Sidebar - Animation Controls -->
+  @if (hasModelLoaded && showAnimationSidebar) {
+    <aside class="animation-sidebar">
+      <h3 class="sidebar-title">Configurar animación</h3>
+
+      <!-- Edit Controls -->
+      <section class="control-section">
+        <button mat-stroked-button (click)="startCreatingSequence()" [disabled]="isCreateDisabled" class="control-btn">
+          <mat-icon>edit</mat-icon>
+          <span>Crear/Editar</span>
+        </button>
+
+        <button mat-stroked-button [disabled]="!isEditingMode || isPlaying" (click)="cancelEditingSequence()" class="control-btn">
+          <mat-icon>close</mat-icon>
+          <span>Cancelar</span>
+        </button>
+
+        <button mat-flat-button color="primary" [disabled]="!isEditingMode || isPlaying" (click)="saveAnimationSequence()" class="control-btn">
+          <mat-icon>save</mat-icon>
+          <span>Guardar</span>
+        </button>
+      </section>
+
+      <mat-divider></mat-divider>
+
+      <!-- Status -->
+      <div class="animation-status-message">
+        @if (animationSequence.length === 0) {
+          <mat-chip color="warn">No hay animaciones</mat-chip>
+        } @else {
+          <mat-chip color="primary">{{ animationSequence.length }} animaciones</mat-chip>
+        }
+      </div>
+
+      <!-- Playback Controls -->
+      <section class="control-section">
+        <button mat-flat-button color="primary" [disabled]="animationSequence.length === 0" (click)="playSequence()" class="control-btn">
+          <mat-icon>play_arrow</mat-icon>
+          <span>Reproducir</span>
+        </button>
+
+        <button mat-stroked-button [disabled]="!isPlaying" (click)="isPaused ? resumeSequence() : pauseSequence()" class="control-btn">
+          <mat-icon>{{ isPaused ? 'play_arrow' : 'pause' }}</mat-icon>
+          <span>{{ isPaused ? 'Reanudar' : 'Pausar' }}</span>
+        </button>
+
+        <button mat-stroked-button [disabled]="!isPlaying" (click)="stopSequence()" class="control-btn">
+          <mat-icon>stop</mat-icon>
+          <span>Detener</span>
+        </button>
+      </section>
+
+      <mat-divider></mat-divider>
+
+      <!-- Delete Control -->
+      <section class="control-section">
+        <button mat-stroked-button color="warn" [disabled]="!isEditingMode || !selectedTimelineBlock" (click)="deleteSelectedBlock()" class="control-btn">
+          <mat-icon>delete</mat-icon>
+          <span>Eliminar animación</span>
+        </button>
+      </section>
+    </aside>
+  }
+
+  <!-- Timeline -->
+  @if (showTimeline) {
+    <div class="timeline-container mat-elevation-z2">
+      <div class="timeline-track">
+        @for (block of animationSequence; track block.clip + '-' + $index) {
+          <mat-card
+            class="timeline-block"
+            [class.selected]="block === selectedTimelineBlock"
+            [class.editable]="isEditingMode"
+            (click)="selectTimelineBlock(block)"
+            [style.width.px]="block.duration * pixelPerSecond">
+
+            @if (isEditingMode) {
+              <div class="resize-handle resize-handle--left" (mousedown)="startResize($event, block, 'left')"></div>
+            }
+
+            <div class="block-content">
+              <span class="clip-name">{{ getClipName(block) }}</span>
+              <span class="duration">{{ block.duration.toFixed(1) }}s</span>
+            </div>
+
+            @if (isEditingMode) {
+              <div class="resize-handle resize-handle--right" (mousedown)="startResize($event, block, 'right')"></div>
+            }
+          </mat-card>
+        }
+      </div>
+    </div>
+  }
+
+</div>

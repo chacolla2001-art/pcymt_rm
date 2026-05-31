@@ -1,0 +1,318 @@
+/* ===== Login Container ===== */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 1rem;
+}
+
+/* ===== Card ===== */
+.login-card {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.login-card:hover {
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Accent bar: Marrón Tierra → Beige Arena → Verde Salvia */
+.login-card::before {
+  content: '';
+  display: block;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    #D9B992 0%,
+    #C9C99A 50%,
+    #A33B31 100%
+  );
+}
+
+.card-body {
+  padding: 2.5rem 2.25rem;
+}
+
+/* ===== Card Header ===== */
+.card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 2.5rem;
+  gap: 1rem;
+}
+
+/* Logo image in card */
+.card-logo {
+  max-height: 64px;
+  max-width: 100%;
+  width: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+}
+
+.card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.card-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.025em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.card-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  letter-spacing: 0.01em;
+}
+
+/* ===== Form ===== */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* Override Material Form Field styles for dark glassmorphic look */
+::ng-deep .login-form .mat-mdc-form-field-flex {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  border-radius: 0.75rem !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+::ng-deep .login-form .mat-mdc-text-field-wrapper {
+  background-color: transparent !important;
+}
+
+::ng-deep .login-form .mdc-text-field--outlined .mdc-notched-outline {
+  display: none !important;
+}
+
+::ng-deep .login-form .mat-mdc-form-field-icon-prefix,
+::ng-deep .login-form .mat-mdc-form-field-icon-suffix {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+::ng-deep .login-form input.mat-mdc-input-element {
+  color: #FFFFFF !important;
+}
+
+::ng-deep .login-form input.mat-mdc-input-element::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+::ng-deep .login-form .mdc-floating-label {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+::ng-deep .login-form .mat-mdc-form-field.mat-focused .mdc-floating-label {
+  color: #D9B992 !important;
+}
+
+::ng-deep .login-form .mat-mdc-form-field.mat-focused .mat-mdc-form-field-flex {
+  border-color: #D9B992 !important;
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ===== Error Banner ===== */
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #FFB4AB;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.75rem 1rem;
+  background: rgba(163, 59, 49, 0.15);
+  border-radius: 0.625rem;
+  border-left: 3px solid #FFB4AB;
+}
+
+.error-icon {
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  flex-shrink: 0;
+  color: #FFB4AB;
+}
+
+/* ===== Options Row ===== */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.remember-checkbox {
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+::ng-deep .remember-checkbox .mdc-checkbox__native-control:enabled:not(:checked):not(:indeterminate):not([data-indeterminate=true]) ~ .mdc-checkbox__background {
+  border-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+::ng-deep .remember-checkbox .mdc-checkbox__native-control:enabled:checked ~ .mdc-checkbox__background {
+  background-color: #D9B992 !important;
+  border-color: #D9B992 !important;
+}
+
+.forgot-link {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #D9B992;
+  padding: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.forgot-link:hover:not([disabled]) {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.forgot-link[disabled] {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ===== Submit Button: Rojo Arcilla CTA ===== */
+.login-button {
+  width: 100%;
+  height: 52px;
+  border-radius: 0.875rem !important;
+  margin-top: 1rem;
+  background: linear-gradient(
+    135deg,
+    #A33B31 0%,
+    #8B2E25 100%
+  ) !important;
+  color: #FFFFFF !important;
+  box-shadow:
+    0 4px 14px rgba(163, 59, 49, 0.40),
+    0 1px 4px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.3s ease !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Inner wrapper handles icon + label alignment */
+.btn-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0 1.5rem;
+}
+
+.login-button:hover:not([disabled]) {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 24px rgba(163, 59, 49, 0.6),
+    0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  background: linear-gradient(
+    135deg,
+    #B8453A 0%,
+    #9E352A 100%
+  ) !important;
+}
+
+.login-button:active:not([disabled]) {
+  transform: translateY(0);
+}
+
+.login-button[disabled] {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  transform: none !important;
+}
+
+/* Spinning loading icon */
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .card-body {
+    padding: 1.75rem 1.5rem 1.5rem;
+  }
+
+  .login-card {
+    border-radius: 1.25rem;
+  }
+
+  .form-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .forgot-link {
+    align-self: flex-end;
+  }
+}
+
+@media (max-width: 400px) {
+  .login-container {
+    padding: 0.75rem;
+  }
+
+  .card-body {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+  }
+
+  .login-button {
+    height: 48px;
+  }
+}

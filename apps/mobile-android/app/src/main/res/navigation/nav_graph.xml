@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/LoginFragment">
+
+    <fragment
+        android:id="@+id/LoginFragment"
+        android:name="com.univalle.pedrochacolla.ui.auth.LoginFragment"
+        android:label="@string/first_fragment_label"
+        tools:layout="@layout/fragment_login">
+
+        <action
+            android:id="@+id/action_LoginFragment_to_RegisterFragment"
+            app:destination="@id/RegisterFragment" />
+
+        <action
+            android:id="@+id/action_LoginFragment_to_ForgotPasswordFragment"
+            app:destination="@id/ForgotPasswordFragment" />
+
+        <action
+            android:id="@+id/action_LoginFragment_to_ForceChangePasswordFragment"
+            app:destination="@id/ForceChangePasswordFragment" />
+
+        <action
+            android:id="@+id/action_LoginFragment_to_EmailVerificationPendingFragment"
+            app:destination="@id/EmailVerificationPendingFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/RegisterFragment"
+        android:name="com.univalle.pedrochacolla.ui.auth.RegisterFragment"
+        android:label="@string/second_fragment_label"
+        tools:layout="@layout/fragment_register">
+
+        <action
+            android:id="@+id/action_RegisterFragment_to_LoginFragment"
+            app:destination="@id/LoginFragment" />
+
+        <action
+            android:id="@+id/action_RegisterFragment_to_EmailVerificationPendingFragment"
+            app:destination="@id/EmailVerificationPendingFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/ForgotPasswordFragment"
+        android:name="com.univalle.pedrochacolla.ui.auth.ForgotPasswordFragment"
+        android:label="Recuperar contraseña"
+        tools:layout="@layout/fragment_forgot_password">
+
+        <action
+            android:id="@+id/action_ForgotPasswordFragment_to_LoginFragment"
+            app:destination="@id/LoginFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/ForceChangePasswordFragment"
+        android:name="com.univalle.pedrochacolla.ui.auth.ForceChangePasswordFragment"
+        android:label="Cambiar contraseña"
+        tools:layout="@layout/fragment_force_change_password" />
+
+    <fragment
+        android:id="@+id/EmailVerificationPendingFragment"
+        android:name="com.univalle.pedrochacolla.ui.auth.EmailVerificationPendingFragment"
+        android:label="Verificar correo"
+        tools:layout="@layout/fragment_email_verification_pending">
+
+        <action
+            android:id="@+id/action_EmailVerificationPendingFragment_to_LoginFragment"
+            app:destination="@id/LoginFragment" />
+    </fragment>
+
+</navigation>

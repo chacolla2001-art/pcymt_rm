@@ -1,0 +1,126 @@
+<div class="settings-page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <mat-icon class="header-icon">settings</mat-icon>
+    <div>
+      <h1 class="page-title">{{ 'settings.title' | translate }}</h1>
+      <p class="page-subtitle">{{ 'settings.subtitle' | translate }}</p>
+    </div>
+  </div>
+
+  @if (loading) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+    </div>
+  } @else {
+
+    <!-- ARCore Cloud Anchors Section -->
+    <mat-card class="settings-card" appearance="outlined">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="card-icon arcore-icon">cloud</mat-icon>
+        <mat-card-title>{{ 'settings.arcore' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'settings.arcoreDesc' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="setting-group">
+          <div class="setting-label-row">
+            <label class="setting-label">{{ 'settings.ttlDays' | translate }}</label>
+            <span class="setting-value" [class.changed]="ttlChanged">
+              {{ ttlLabel }}
+            </span>
+          </div>
+          <p class="setting-description">{{ 'settings.ttlDaysDesc' | translate }}</p>
+
+          <!-- Slider -->
+          <div class="slider-container">
+            <mat-icon class="slider-icon">hourglass_empty</mat-icon>
+            <mat-slider
+              class="ttl-slider"
+              [min]="1"
+              [max]="365"
+              [step]="1"
+              [displayWith]="formatTtlSliderLabel"
+              discrete>
+              <input matSliderThumb [(ngModel)]="ttlDays" />
+            </mat-slider>
+            <mat-icon class="slider-icon">all_inclusive</mat-icon>
+          </div>
+
+          <!-- Preset Buttons -->
+          <div class="presets-grid">
+            @for (preset of ttlPresets; track preset.days) {
+              <button
+                mat-stroked-button
+                class="preset-btn"
+                [class.active]="isPresetActive(preset.days)"
+                (click)="setTtlPreset(preset.days)">
+                <mat-icon>{{ preset.icon }}</mat-icon>
+                <span>{{ preset.key | translate }}</span>
+                <small class="preset-days">{{ preset.days }}d</small>
+              </button>
+            }
+          </div>
+        </div>
+      </mat-card-content>
+
+      <mat-card-actions align="end">
+        @if (ttlChanged) {
+          <span class="change-indicator">
+            <mat-icon>info</mat-icon>
+            {{ 'settings.currentValue' | translate }}: {{ originalTtlDays }} → {{ 'settings.newValue' | translate }}: {{ ttlDays }}
+          </span>
+        }
+        <button
+          mat-flat-button
+          color="primary"
+          [disabled]="saving || !ttlChanged"
+          (click)="saveTtl()">
+          @if (saving) {
+            <mat-spinner diameter="20" class="btn-spinner"></mat-spinner>
+            {{ 'settings.saving' | translate }}
+          } @else {
+            <ng-container>
+              <mat-icon>save</mat-icon>
+              {{ 'settings.save' | translate }}
+            </ng-container>
+          }
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <!-- Language & Appearance Section -->
+    <mat-card class="settings-card" appearance="outlined">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="card-icon lang-icon">translate</mat-icon>
+        <mat-card-title>{{ 'settings.appearance' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'settings.appearanceDesc' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="setting-group">
+          <label class="setting-label">{{ 'settings.language' | translate }}</label>
+          <p class="setting-description">{{ 'settings.languageDesc' | translate }}</p>
+
+          <div class="language-grid">
+            @for (lang of i18n.languages; track lang.code) {
+              <button
+                mat-stroked-button
+                class="lang-btn"
+                [class.active]="i18n.currentLang === lang.code"
+                (click)="setLanguage(lang.code)">
+                <span class="lang-flag">{{ lang.flag }}</span>
+                <span class="lang-label">{{ lang.label }}</span>
+                @if (i18n.currentLang === lang.code) {
+                  <mat-icon class="lang-check">check_circle</mat-icon>
+                }
+              </button>
+            }
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+  }
+</div>

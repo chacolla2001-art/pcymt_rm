@@ -1,0 +1,23 @@
+<svg width="200" height="300" viewBox="0 0 100 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- sombra suelo -->
+  <ellipse cx="50" cy="141" rx="22" ry="6" fill="#0a140a" opacity="0.35"/>
+  <!-- tronco -->
+  <rect x="43" y="112" width="14" height="28" rx="2" fill="#6D4C41"/>
+  <rect x="50" y="112" width="7" height="28" rx="2" fill="#4E342E"/>
+  <path d="M44,114 Q50,111 56,114" stroke="#8D6E63" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- capa baja -->
+  <polygon points="50,63 8,116 92,116" fill="#2E7D32"/>
+  <polygon points="50,63 92,116 50,116" fill="#245E28"/>
+  <!-- highlight borde izq -->
+  <polygon points="50,63 8,116 22,116" fill="#388E3C" opacity="0.45"/>
+  <!-- capa media -->
+  <polygon points="50,42 18,87 82,87" fill="#388E3C"/>
+  <polygon points="50,42 82,87 50,87" fill="#2C7530"/>
+  <polygon points="50,42 18,87 30,87" fill="#43A047" opacity="0.4"/>
+  <!-- capa alta -->
+  <polygon points="50,22 28,58 72,58" fill="#43A047"/>
+  <polygon points="50,22 72,58 50,58" fill="#357A38"/>
+  <polygon points="50,22 28,58 36,58" fill="#56B85A" opacity="0.4"/>
+  <!-- luz punta -->
+  <polygon points="50,22 44,36 50,33 56,36" fill="#66BB6A" opacity="0.5"/>
+</svg>

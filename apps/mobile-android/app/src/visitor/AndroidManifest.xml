@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        Visitor variant: uses ARCore API key for multi-user Cloud Anchor resolution.
+        API key auth limits hosting TTL to 24h, but resolving has no TTL restriction.
+        Anchors created by the admin variant (keyless, 365d) are fully accessible.
+    -->
+    <application>
+        <meta-data
+            android:name="com.google.android.ar.API_KEY"
+            android:value="${ARCORE_API_KEY}" />
+    </application>
+</manifest>

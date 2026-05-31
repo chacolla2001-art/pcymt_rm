@@ -1,0 +1,47 @@
+# =====================================
+# SECURITY: Environment variables
+# =====================================
+# NEVER commit .env to version control!
+.env
+.env.local
+.env.*.local
+!.env.example
+runtime-config.json
+
+# Dependencias
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build / dist
+dist/
+build/
+
+# Archivos temporales
+.tmp/
+.cache/
+
+# Coverage (tests)
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs / Editores
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Multer / uploads (si usas subida de archivos)
+uploads/
+
+uploads.rar

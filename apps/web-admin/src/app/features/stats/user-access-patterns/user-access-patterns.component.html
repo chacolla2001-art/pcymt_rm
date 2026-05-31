@@ -1,0 +1,297 @@
+<div class="user-access-patterns">
+  <!-- Header -->
+  <div class="page-header">
+    <button mat-icon-button (click)="goBack()" matTooltip="Volver al dashboard">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div class="header-info">
+      <h2>
+        <mat-icon class="header-icon">calendar_month</mat-icon>
+        Accesos por Usuario
+      </h2>
+      <p class="subtitle">Calendario de actividad, historial de sesiones y patrones de acceso al sistema</p>
+    </div>
+  </div>
+
+  <!-- User Search -->
+  <mat-card class="search-card">
+    <mat-card-content>
+      <div class="search-row">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar usuario</mat-label>
+          <input matInput [(ngModel)]="userSearch"
+                 (keyup.enter)="searchUsers()"
+                 placeholder="Usuario o email...">
+          <mat-icon matPrefix>person_search</mat-icon>
+        </mat-form-field>
+        <button mat-raised-button color="primary" (click)="searchUsers()">
+          <mat-icon>search</mat-icon> Buscar
+        </button>
+      </div>
+
+      @if (matchingUsers.length > 0) {
+        <div class="search-results">
+          @for (user of matchingUsers; track user.id) {
+            <button mat-button class="user-result" (click)="selectUser(user)">
+              <mat-icon>person</mat-icon>
+              <div class="user-info">
+                <span class="user-name">{{ user.name || user.email }}</span>
+                <span class="user-ci">{{ user.email }}</span>
+              </div>
+            </button>
+          }
+        </div>
+      }
+
+      @if (selectedUser) {
+          <div class="selected-user-chip">
+          <mat-icon>person</mat-icon>
+          <span>{{ selectedUser.name || selectedUser.email }} &middot; {{ selectedUser.email }}</span>
+          <button mat-icon-button (click)="clearUser()" matTooltip="Quitar filtro de usuario">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  @if (selectedUser && !isLoading) {
+    <!-- All-time Summary -->
+    <div class="summary-grid">
+      <mat-card class="summary-card sessions">
+        <mat-icon>login</mat-icon>
+        <div class="summary-value">{{ allTimeSessions }}</div>
+        <div class="summary-label">Total Sesiones</div>
+      </mat-card>
+      <mat-card class="summary-card days">
+        <mat-icon>event_available</mat-icon>
+        <div class="summary-value">{{ allTimeActiveDays }}</div>
+        <div class="summary-label">Días Activos</div>
+      </mat-card>
+      <mat-card class="summary-card web">
+        <mat-icon>computer</mat-icon>
+        <div class="summary-value">{{ allTimeWebPercent }}%</div>
+        <div class="summary-label">Web ({{ allTimeWebSessions }})</div>
+        <mat-progress-bar mode="determinate" [value]="allTimeWebPercent"></mat-progress-bar>
+      </mat-card>
+      <mat-card class="summary-card mobile">
+        <mat-icon>phone_android</mat-icon>
+        <div class="summary-value">{{ allTimeMobilePercent }}%</div>
+        <div class="summary-label">Móvil ({{ allTimeMobileSessions }})</div>
+        <mat-progress-bar mode="determinate" [value]="allTimeMobilePercent"></mat-progress-bar>
+      </mat-card>
+    </div>
+
+    @if (firstAccessDate) {
+      <div class="first-access-info">
+        <mat-icon>schedule</mat-icon>
+        <span>Primer acceso: <strong>{{ firstAccessDate }}</strong></span>
+      </div>
+    }
+
+    <!-- Calendar + Monthly Stats -->
+    <div class="calendar-layout">
+      <!-- Calendar -->
+      <mat-card class="calendar-card">
+        <div class="calendar-header">
+          <button mat-icon-button (click)="navigateMonth(-1)" matTooltip="Mes anterior">
+            <mat-icon>chevron_left</mat-icon>
+          </button>
+          <h3 class="month-label">{{ monthLabel }}</h3>
+          <button mat-icon-button (click)="navigateMonth(1)" matTooltip="Mes siguiente">
+            <mat-icon>chevron_right</mat-icon>
+          </button>
+          <button mat-icon-button (click)="goToCurrentMonth()" matTooltip="Mes actual" class="today-btn">
+            <mat-icon>today</mat-icon>
+          </button>
+        </div>
+
+        <div class="calendar-grid">
+          <!-- Day headers -->
+          <div class="weekday-headers">
+            @for (day of weekDays; track day) {
+              <div class="weekday-header">{{ day }}</div>
+            }
+          </div>
+
+          <!-- Weeks -->
+          @for (week of calendarWeeks; track $index) {
+            <div class="calendar-week">
+              @for (day of week; track day.date.getTime()) {
+                <div class="calendar-day"
+                     [class.other-month]="!day.isCurrentMonth"
+                     [class.today]="day.isToday"
+                     [class.has-activity]="day.sessionCount > 0"
+                     [class.selected]="selectedDay?.date?.getTime() === day.date.getTime()"
+                     [class.level-1]="day.level === 1"
+                     [class.level-2]="day.level === 2"
+                     [class.level-3]="day.level === 3"
+                     [class.level-4]="day.level === 4"
+                     [matTooltip]="getDayTooltip(day)"
+                     (click)="onDayClicked(day)">
+                  <span class="day-number">{{ day.dayOfMonth }}</span>
+                  @if (day.sessionCount > 0 && day.isCurrentMonth) {
+                    <span class="day-count">{{ day.sessionCount }}</span>
+                  }
+                  @if (day.platforms.size > 0 && day.isCurrentMonth) {
+                    <div class="day-platforms">
+                      @if (day.platforms.has('web')) {
+                        <mat-icon class="platform-dot web">circle</mat-icon>
+                      }
+                      @if (day.platforms.has('mobile')) {
+                        <mat-icon class="platform-dot mobile">circle</mat-icon>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Legend -->
+        <div class="calendar-legend">
+          <span class="legend-label">Menos</span>
+          <div class="legend-box level-0"></div>
+          <div class="legend-box level-1"></div>
+          <div class="legend-box level-2"></div>
+          <div class="legend-box level-3"></div>
+          <div class="legend-box level-4"></div>
+          <span class="legend-label">Más</span>
+          <span class="legend-separator">|</span>
+          <mat-icon class="platform-dot web">circle</mat-icon>
+          <span class="legend-label">Web</span>
+          <mat-icon class="platform-dot mobile">circle</mat-icon>
+          <span class="legend-label">Móvil</span>
+        </div>
+      </mat-card>
+
+      <!-- Monthly stats sidebar -->
+      <div class="monthly-sidebar">
+        <mat-card class="month-stats-card">
+          <h4>Estadísticas del Mes</h4>
+          <div class="stat-row">
+            <span class="stat-label">Sesiones</span>
+            <span class="stat-value">{{ monthlyStats.totalSessions }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Días activos</span>
+            <span class="stat-value">{{ monthlyStats.activeDays }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Promedio/día</span>
+            <span class="stat-value">{{ monthlyStats.avgSessionsPerDay }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Racha más larga</span>
+            <span class="stat-value">{{ monthlyStats.longestStreak }} días</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Racha actual</span>
+            <span class="stat-value streak">{{ monthlyStats.currentStreak }} días</span>
+          </div>
+
+          <mat-divider></mat-divider>
+
+          <h4>Plataforma (mes)</h4>
+          <div class="platform-bars">
+            <div class="platform-bar">
+              <div class="bar-label">
+                <mat-icon>computer</mat-icon> Web
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill web"
+                     [style.width.%]="monthlyStats.totalSessions > 0 ? (monthlyStats.webSessions / monthlyStats.totalSessions) * 100 : 0">
+                </div>
+              </div>
+              <span class="bar-count">{{ monthlyStats.webSessions }}</span>
+            </div>
+            <div class="platform-bar">
+              <div class="bar-label">
+                <mat-icon>phone_android</mat-icon> Móvil
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill mobile"
+                     [style.width.%]="monthlyStats.totalSessions > 0 ? (monthlyStats.mobileSessions / monthlyStats.totalSessions) * 100 : 0">
+                </div>
+              </div>
+              <span class="bar-count">{{ monthlyStats.mobileSessions }}</span>
+            </div>
+          </div>
+        </mat-card>
+
+        <!-- Download -->
+        <button mat-stroked-button class="download-btn" (click)="downloadData()">
+          <mat-icon>download</mat-icon> Descargar Historial
+        </button>
+      </div>
+    </div>
+
+    <!-- Selected day detail -->
+    @if (selectedDay) {
+      <mat-card class="day-detail-card">
+        <div class="day-detail-header">
+          <h4>
+            <mat-icon>event</mat-icon>
+            Sesiones del {{ formatDate(selectedDay.date) }}
+          </h4>
+          <button mat-icon-button (click)="clearSelectedDay()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+        <div class="sessions-list">
+          @for (session of daySessions; track session.id) {
+            <div class="session-row">
+              <mat-icon class="platform-icon" [class.web]="session.platform === 'web'" [class.mobile]="session.platform === 'mobile'">
+                {{ getPlatformIcon(session.platform) }}
+              </mat-icon>
+              <div class="session-info">
+                <span class="session-time">{{ formatTime(session.login_at) }} — {{ session.logout_at ? formatTime(session.logout_at) : 'Activa' }}</span>
+                <span class="session-meta">{{ getPlatformLabel(session.platform) }} &middot; {{ formatDuration(session) }} &middot; {{ session.role }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-card>
+    }
+
+    <!-- Recent sessions -->
+    <mat-card class="recent-sessions-card">
+      <h4>
+        <mat-icon>history</mat-icon>
+        Últimas 10 Sesiones
+      </h4>
+      @if (recentSessions.length > 0) {
+        <div class="sessions-list">
+          @for (session of recentSessions; track session.id) {
+            <div class="session-row">
+              <mat-icon class="platform-icon" [class.web]="session.platform === 'web'" [class.mobile]="session.platform === 'mobile'">
+                {{ getPlatformIcon(session.platform) }}
+              </mat-icon>
+              <div class="session-info">
+                <span class="session-time">{{ formatDate(session.login_at) }} — {{ formatTime(session.login_at) }}</span>
+                <span class="session-meta">{{ getPlatformLabel(session.platform) }} &middot; {{ formatDuration(session) }} &middot; {{ session.role }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="empty-state">
+          <mat-icon>info</mat-icon>
+          <p>No hay sesiones registradas</p>
+        </div>
+      }
+    </mat-card>
+  } @else if (isLoading) {
+    <div class="loading-state">
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <p>Cargando datos de acceso...</p>
+    </div>
+  } @else {
+    <div class="placeholder-state">
+      <mat-icon>calendar_month</mat-icon>
+      <h3>Seleccione un usuario</h3>
+      <p>Busque por CI para ver el calendario de actividad, estadísticas de acceso y patrones de uso del sistema.</p>
+    </div>
+  }
+</div>

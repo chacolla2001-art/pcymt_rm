@@ -1,0 +1,167 @@
+<div class="layout-wrapper">
+  <!-- Header - Fixed at top -->
+  <main-header></main-header>
+
+  <!-- Main content with drawer -->
+  <mat-drawer-container class="main-container" [hasBackdrop]="isMobile">
+
+    <!-- Sidenav lateral -->
+    <mat-drawer #drawer class="sidenav" [mode]="isMobile ? 'over' : 'side'">
+      <nav class="sidenav-nav">
+
+        <!-- Dashboard -->
+        <div class="nav-section">
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('dashboard')"
+            (click)="navigateTo('dashboard')">
+            <mat-icon class="nav-icon">dashboard</mat-icon>
+            <span class="nav-label">{{ 'nav.dashboard' | translate }}</span>
+          </button>
+        </div>
+
+        <!-- Sección de gestión -->
+        <div class="nav-section">
+          <span class="nav-section-title">{{ 'nav.management' | translate }}</span>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('users')"
+            (click)="navigateTo('users')">
+            <mat-icon class="nav-icon">group</mat-icon>
+            <span class="nav-label">{{ 'nav.users' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('virtual-assets')"
+            (click)="navigateTo('virtual-assets')">
+            <mat-icon class="nav-icon">view_in_ar</mat-icon>
+            <span class="nav-label">{{ 'nav.virtualAssets' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('anchor-points')"
+            (click)="navigateTo('anchor-points')">
+            <mat-icon class="nav-icon">place</mat-icon>
+            <span class="nav-label">{{ 'nav.anchorPoints' | translate }}</span>
+          </button>
+        </div>
+
+        <!-- Sección de herramientas -->
+        <div class="nav-section">
+          <span class="nav-section-title">{{ 'nav.tools' | translate }}</span>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('map')"
+            (click)="navigateTo('map')">
+            <mat-icon class="nav-icon">map</mat-icon>
+            <span class="nav-label">{{ 'nav.parkMap' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('animator')"
+            (click)="navigateTo('animator')">
+            <mat-icon class="nav-icon">animation</mat-icon>
+            <span class="nav-label">{{ 'nav.animator' | translate }}</span>
+          </button>
+
+
+
+        </div>
+
+        <!-- Sección de estadísticas -->
+        <div class="nav-section">
+          <span class="nav-section-title">{{ 'nav.statistics' | translate }}</span>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('stats/session-history')"
+            (click)="navigateTo('stats/session-history')">
+            <mat-icon class="nav-icon">login</mat-icon>
+            <span class="nav-label">{{ 'nav.sessionHistory' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('stats/interaction-stats')"
+            (click)="navigateTo('stats/interaction-stats')">
+            <mat-icon class="nav-icon">analytics</mat-icon>
+            <span class="nav-label">{{ 'nav.interactions' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('stats/zone-visits')"
+            (click)="navigateTo('stats/zone-visits')">
+            <mat-icon class="nav-icon">donut_large</mat-icon>
+            <span class="nav-label">{{ 'nav.zoneVisits' | translate }}</span>
+          </button>
+        </div>
+
+        <!-- Estadísticas por usuario -->
+        <div class="nav-section">
+          <span class="nav-section-title">{{ 'nav.byUser' | translate }}</span>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('stats/user-interactions')"
+            (click)="navigateTo('stats/user-interactions')">
+            <mat-icon class="nav-icon">person_search</mat-icon>
+            <span class="nav-label">{{ 'nav.userInteractions' | translate }}</span>
+          </button>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('stats/user-access')"
+            (click)="navigateTo('stats/user-access')">
+            <mat-icon class="nav-icon">calendar_month</mat-icon>
+            <span class="nav-label">{{ 'nav.userAccess' | translate }}</span>
+          </button>
+        </div>
+
+        <!-- Configuración -->
+        <div class="nav-section">
+          <span class="nav-section-title">{{ 'nav.system' | translate }}</span>
+
+          <button
+            mat-button
+            class="nav-item"
+            [class.active]="isRouteActive('settings')"
+            (click)="navigateTo('settings')">
+            <mat-icon class="nav-icon">settings</mat-icon>
+            <span class="nav-label">{{ 'nav.settings' | translate }}</span>
+          </button>
+        </div>
+
+      </nav>
+    </mat-drawer>
+
+    <!-- Contenido principal - ROUTER OUTLET -->
+    <mat-drawer-content class="main-content">
+      <div class="content-wrapper">
+        <!-- All feature components now loaded via routing -->
+        <router-outlet></router-outlet>
+      </div>
+      <!-- Footer - Hidden on map page to maximize map space -->
+      @if (!isMapRoute) {
+        <main-footer></main-footer>
+      }
+    </mat-drawer-content>
+
+  </mat-drawer-container>
+</div>

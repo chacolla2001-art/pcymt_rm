@@ -1,0 +1,288 @@
+@use '@angular/material' as mat;
+
+// ==================== THEME DEFINITIONS ====================
+// Base palettes for component structure (overridden below by brand tokens)
+
+// Light theme
+$light-theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$orange-palette,
+    tertiary: mat.$red-palette,
+    use-system-variables: true,
+  ),
+  typography: (
+    use-system-variables: true,
+  ),
+));
+
+// Dark theme
+$dark-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$orange-palette,
+    tertiary: mat.$red-palette,
+    use-system-variables: true,
+  ),
+  typography: (
+    use-system-variables: true,
+  ),
+));
+
+// ==================== APPLY THEMES ====================
+
+html {
+  @include mat.core();
+  @include mat.all-component-themes($light-theme);
+  @include mat.system-level-colors($light-theme);
+  @include mat.system-level-typography($light-theme);
+}
+
+html.dark-theme {
+  @include mat.all-component-colors($dark-theme);
+  @include mat.system-level-colors($dark-theme);
+}
+
+// ==================== BRAND COLOR OVERRIDES ====================
+// Parque de las Culturas y de la Madre Tierra — PCyMT palette
+// Applied AFTER Material so they take precedence over --mat-sys-* defaults
+
+:root,
+html:not(.dark-theme) {
+  // ── Primary: Marrón Tierra #634F46 ──
+  --mat-sys-primary: #634F46;
+  --mat-sys-on-primary: #FDFBF7;
+  --mat-sys-primary-container: #D9B992;
+  --mat-sys-on-primary-container: #1C1C1C;
+  --mat-sys-inverse-primary: #D9B992;
+
+  // ── Secondary: Verde Salvia #C9C99A ──
+  --mat-sys-secondary: #7A7A4A;
+  --mat-sys-on-secondary: #FDFBF7;
+  --mat-sys-secondary-container: #C9C99A;
+  --mat-sys-on-secondary-container: #1C1C1C;
+
+  // ── Tertiary / CTA: Rojo Arcilla #A33B31 ──
+  --mat-sys-tertiary: #A33B31;
+  --mat-sys-on-tertiary: #FDFBF7;
+  --mat-sys-tertiary-container: #F2C4BF;
+  --mat-sys-on-tertiary-container: #3B0F0B;
+
+  // ── Error ──
+  --mat-sys-error: #A33B31;
+  --mat-sys-on-error: #FDFBF7;
+  --mat-sys-error-container: #F2C4BF;
+  --mat-sys-on-error-container: #3B0F0B;
+
+  // ── Background & Surface: Blanco Crema #FDFBF7 ──
+  --mat-sys-background: #FDFBF7;
+  --mat-sys-on-background: #1C1C1C;
+  --mat-sys-surface: #FDFBF7;
+  --mat-sys-on-surface: #1C1C1C;
+  --mat-sys-surface-variant: #EDE8E0;
+  --mat-sys-on-surface-variant: #4A3F38;
+  --mat-sys-surface-container-lowest: #FFFFFF;
+  --mat-sys-surface-container-low: #F7F3EE;
+  --mat-sys-surface-container: #EDE8E0;
+  --mat-sys-surface-container-high: #E5DDD4;
+  --mat-sys-surface-container-highest: #DDD4C9;
+  --mat-sys-surface-bright: #FDFBF7;
+  --mat-sys-surface-dim: #D9D0C6;
+  --mat-sys-surface-tint: #634F46;
+  --mat-sys-inverse-surface: #312920;
+  --mat-sys-inverse-on-surface: #F7F3EE;
+
+  // ── Outline: mid-tone warm ──
+  --mat-sys-outline: #8A7060;
+  --mat-sys-outline-variant: #C9B9AA;
+
+  // ── Misc ──
+  --mat-sys-shadow: #000000;
+  --mat-sys-scrim: #000000;
+}
+
+html.dark-theme {
+  // ── Primary light for dark bg ──
+  --mat-sys-primary: #D9B992;
+  --mat-sys-on-primary: #1C1C1C;
+  --mat-sys-primary-container: #4A3428;
+  --mat-sys-on-primary-container: #F2DFC8;
+  --mat-sys-inverse-primary: #634F46;
+
+  // ── Secondary ──
+  --mat-sys-secondary: #C9C99A;
+  --mat-sys-on-secondary: #1C1C1C;
+  --mat-sys-secondary-container: #3D3D1A;
+  --mat-sys-on-secondary-container: #E8E8C0;
+
+  // ── Tertiary / CTA ──
+  --mat-sys-tertiary: #F2C4BF;
+  --mat-sys-on-tertiary: #3B0F0B;
+  --mat-sys-tertiary-container: #7A2A22;
+  --mat-sys-on-tertiary-container: #FFDAD4;
+
+  // ── Error ──
+  --mat-sys-error: #F2C4BF;
+  --mat-sys-on-error: #3B0F0B;
+  --mat-sys-error-container: #7A2A22;
+  --mat-sys-on-error-container: #FFDAD4;
+
+  // ── Background & Surface ──
+  --mat-sys-background: #1C1714;
+  --mat-sys-on-background: #EDE8E0;
+  --mat-sys-surface: #1C1714;
+  --mat-sys-on-surface: #EDE8E0;
+  --mat-sys-surface-variant: #4A3F38;
+  --mat-sys-on-surface-variant: #C9B9AA;
+  --mat-sys-surface-container-lowest: #140F0D;
+  --mat-sys-surface-container-low: #231D1A;
+  --mat-sys-surface-container: #28201D;
+  --mat-sys-surface-container-high: #332923;
+  --mat-sys-surface-container-highest: #3E312A;
+  --mat-sys-surface-bright: #3E312A;
+  --mat-sys-surface-dim: #1C1714;
+  --mat-sys-surface-tint: #D9B992;
+  --mat-sys-inverse-surface: #EDE8E0;
+  --mat-sys-inverse-on-surface: #312920;
+
+  // ── Outline ──
+  --mat-sys-outline: #9E897A;
+  --mat-sys-outline-variant: #4A3F38;
+
+  // ── Misc ──
+  --mat-sys-shadow: #000000;
+  --mat-sys-scrim: #000000;
+}
+
+// ==================== CSS VARIABLE ALIASES ====================
+// Map --mat-sys-* to --sys-* for component compatibility
+
+:root {
+  // Primary
+  --sys-primary: var(--mat-sys-primary);
+  --sys-on-primary: var(--mat-sys-on-primary);
+  --sys-primary-container: var(--mat-sys-primary-container);
+  --sys-on-primary-container: var(--mat-sys-on-primary-container);
+
+  // Secondary
+  --sys-secondary: var(--mat-sys-secondary);
+  --sys-on-secondary: var(--mat-sys-on-secondary);
+  --sys-secondary-container: var(--mat-sys-secondary-container);
+  --sys-on-secondary-container: var(--mat-sys-on-secondary-container);
+
+  // Tertiary
+  --sys-tertiary: var(--mat-sys-tertiary);
+  --sys-on-tertiary: var(--mat-sys-on-tertiary);
+  --sys-tertiary-container: var(--mat-sys-tertiary-container);
+  --sys-on-tertiary-container: var(--mat-sys-on-tertiary-container);
+
+  // Error
+  --sys-error: var(--mat-sys-error);
+  --sys-on-error: var(--mat-sys-on-error);
+  --sys-error-container: var(--mat-sys-error-container);
+  --sys-on-error-container: var(--mat-sys-on-error-container);
+
+  // Surface
+  --sys-surface: var(--mat-sys-surface);
+  --sys-on-surface: var(--mat-sys-on-surface);
+  --sys-surface-variant: var(--mat-sys-surface-variant);
+  --sys-on-surface-variant: var(--mat-sys-on-surface-variant);
+  --sys-surface-container: var(--mat-sys-surface-container);
+  --sys-surface-container-low: var(--mat-sys-surface-container-low);
+  --sys-surface-container-high: var(--mat-sys-surface-container-high);
+  --sys-surface-container-highest: var(--mat-sys-surface-container-highest);
+  --sys-surface-container-lowest: var(--mat-sys-surface-container-lowest);
+  --sys-surface-bright: var(--mat-sys-surface-bright);
+  --sys-surface-dim: var(--mat-sys-surface-dim);
+  --sys-surface-tint: var(--mat-sys-surface-tint);
+
+  // Background
+  --sys-background: var(--mat-sys-background);
+  --sys-on-background: var(--mat-sys-on-background);
+
+  // Outline
+  --sys-outline: var(--mat-sys-outline);
+  --sys-outline-variant: var(--mat-sys-outline-variant);
+
+  // Inverse
+  --sys-inverse-surface: var(--mat-sys-inverse-surface);
+  --sys-inverse-on-surface: var(--mat-sys-inverse-on-surface);
+  --sys-inverse-primary: var(--mat-sys-inverse-primary);
+
+  // Misc
+  --sys-scrim: var(--mat-sys-scrim);
+  --sys-shadow: var(--mat-sys-shadow);
+}
+
+// ==================== GLOBAL RESET ====================
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: var(--sys-background);
+  color: var(--sys-on-background);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// ==================== SCROLLBAR THEMING ====================
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--sys-surface-container);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sys-outline-variant);
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--sys-outline);
+  }
+}
+
+// ==================== LINK STYLING ====================
+
+a {
+  color: var(--sys-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// ==================== SELECTION STYLING ====================
+
+::selection {
+  background-color: var(--sys-primary-container);
+  color: var(--sys-on-primary-container);
+}
+
+// ==================== RESPONSIVE UTILITIES ====================
+
+@media (max-width: 600px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+.show-mobile {
+  display: none !important;
+
+  @media (max-width: 600px) {
+    display: block !important;
+  }
+}

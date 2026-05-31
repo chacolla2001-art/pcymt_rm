@@ -1,0 +1,45 @@
+.viewer-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--sys-surface);
+}
+
+.canvas-container {
+  width: 100%;
+  height: calc(100vh - 80px);
+  display: block;
+  background-color: var(--sys-surface-variant);
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+  background-color: var(--sys-surface-container);
+}
+
+.close-button {
+  gap: 8px;
+}
+
+/* ========== RESPONSIVE STYLES ========== */
+
+@media (max-width: 768px) {
+  .canvas-container {
+    height: calc(100vh - 72px);
+    border-radius: 0;
+  }
+  
+  .actions {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .canvas-container {
+    height: calc(100vh - 64px);
+  }
+}

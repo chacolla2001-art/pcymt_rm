@@ -1,0 +1,261 @@
+// Variables locales
+$alert-min-width: 320px;
+$alert-max-width: 450px;
+$alert-border-radius: 12px;
+$alert-padding: 16px;
+
+// Contenedor principal
+.alert-container {
+  position: relative;
+  min-width: $alert-min-width;
+  max-width: $alert-max-width;
+  border-radius: $alert-border-radius;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+// Animación de entrada
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Barra de progreso
+.alert-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.3);
+
+  .progress-bar {
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    transition: width 50ms linear;
+  }
+}
+
+// Cuerpo de la alerta
+.alert-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: $alert-padding;
+  padding-top: 20px; // Espacio para la barra de progreso
+}
+
+// Wrapper del icono
+.alert-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+
+  .alert-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: white;
+  }
+}
+
+// Contenido de texto
+.alert-content {
+  flex: 1;
+  min-width: 0;
+
+  .alert-title {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    color: white;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .alert-message {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.95);
+    word-wrap: break-word;
+  }
+}
+
+// Botón de cerrar
+.alert-close {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: -8px -8px 0 0;
+
+  &:hover {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// ========== Variantes de color ==========
+// Colores explícitos para asegurar semántica correcta
+// independientemente del tema Material customizado.
+
+.alert-success {
+  background-color: #e8f5e9;
+  color: #1b5e20;
+
+  .alert-icon-wrapper {
+    background-color: #2e7d32;
+    .alert-icon { color: #ffffff; }
+  }
+  .alert-content .alert-title,
+  .alert-content .alert-message { color: #1b5e20; }
+  .alert-close { color: #2e7d32 !important; }
+  .alert-progress { background-color: rgba(46, 125, 50, 0.15); }
+  .alert-progress .progress-bar { background-color: #2e7d32; }
+}
+
+.alert-warning {
+  background-color: #fff3e0;
+  color: #e65100;
+
+  .alert-icon-wrapper {
+    background-color: #f57c00;
+    .alert-icon { color: #ffffff; }
+  }
+  .alert-content .alert-title,
+  .alert-content .alert-message { color: #bf360c; }
+  .alert-close { color: #e65100 !important; }
+  .alert-progress { background-color: rgba(245, 124, 0, 0.15); }
+  .alert-progress .progress-bar { background-color: #f57c00; }
+}
+
+.alert-error {
+  background-color: #ffebee;
+  color: #b71c1c;
+
+  .alert-icon-wrapper {
+    background-color: #c62828;
+    .alert-icon { color: #ffffff; }
+  }
+  .alert-content .alert-title,
+  .alert-content .alert-message { color: #b71c1c; }
+  .alert-close { color: #c62828 !important; }
+  .alert-progress { background-color: rgba(198, 40, 40, 0.15); }
+  .alert-progress .progress-bar { background-color: #c62828; }
+}
+
+.alert-info {
+  background-color: #e3f2fd;
+  color: #0d47a1;
+
+  .alert-icon-wrapper {
+    background-color: #1565c0;
+    .alert-icon { color: #ffffff; }
+  }
+  .alert-content .alert-title,
+  .alert-content .alert-message { color: #0d47a1; }
+  .alert-close { color: #1565c0 !important; }
+  .alert-progress { background-color: rgba(21, 101, 192, 0.15); }
+  .alert-progress .progress-bar { background-color: #1565c0; }
+}
+
+// Modo oscuro
+@media (prefers-color-scheme: dark) {
+  .alert-success {
+    background-color: #1b5e20;
+    color: #c8e6c9;
+    .alert-icon-wrapper { background-color: #388e3c; }
+    .alert-content .alert-title, .alert-content .alert-message { color: #c8e6c9; }
+    .alert-close { color: #a5d6a7 !important; }
+  }
+  .alert-warning {
+    background-color: #bf360c;
+    color: #ffe0b2;
+    .alert-icon-wrapper { background-color: #e64a19; }
+    .alert-content .alert-title, .alert-content .alert-message { color: #ffe0b2; }
+    .alert-close { color: #ffccbc !important; }
+  }
+  .alert-error {
+    background-color: #7f0000;
+    color: #ffcdd2;
+    .alert-icon-wrapper { background-color: #c62828; }
+    .alert-content .alert-title, .alert-content .alert-message { color: #ffcdd2; }
+    .alert-close { color: #ef9a9a !important; }
+  }
+  .alert-info {
+    background-color: #0d47a1;
+    color: #bbdefb;
+    .alert-icon-wrapper { background-color: #1565c0; }
+    .alert-content .alert-title, .alert-content .alert-message { color: #bbdefb; }
+    .alert-close { color: #90caf9 !important; }
+  }
+}
+
+// ========== Estilos globales del snackbar ==========
+
+::ng-deep .mat-mdc-snack-bar-container {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin: 16px !important;
+
+  .mdc-snackbar__surface {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-width: auto !important;
+  }
+}
+
+// Responsivo
+@media (max-width: 480px) {
+  .alert-container {
+    min-width: 280px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .alert-body {
+    padding: 12px;
+    padding-top: 16px;
+    gap: 10px;
+  }
+
+  .alert-icon-wrapper {
+    width: 36px;
+    height: 36px;
+
+    .alert-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .alert-content {
+    .alert-title {
+      font-size: 13px;
+    }
+
+    .alert-message {
+      font-size: 13px;
+    }
+  }
+}

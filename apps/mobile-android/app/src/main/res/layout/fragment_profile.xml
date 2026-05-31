@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  PANTALLA MI PERFIL — ESTILO JUEGO                          ║
+    ║  Misma línea gráfica que la pantalla de inicio              ║
+    ╚══════════════════════════════════════════════════════════════╝
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app   ="http://schemas.android.com/apk/res-auto"
+    xmlns:tools ="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.notifications.NotificationsFragment">
+
+    <!-- Fondo del parque -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/background_game"
+        android:scaleType="centerCrop"
+        android:contentDescription="" />
+
+    <!-- Gradiente overlay oscuro (mismo que inicio) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/gradient_game_overlay" />
+
+    <!-- Contenido scrollable -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="64dp"
+            android:paddingBottom="32dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp">
+
+            <!-- ══ CABECERA: Avatar + Título ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingBottom="16dp">
+
+                <!-- Título MI PERFIL -->
+                <TextView
+                    android:id="@+id/textView6"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="MI PERFIL"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="#FFFFFFFF"
+                    android:letterSpacing="0.08"
+                    android:shadowColor="#CC000000"
+                    android:shadowRadius="8"
+                    android:shadowDy="3" />
+
+                <!-- Aviso google (oculto por defecto) — aquí para no mover IDs -->
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/tv_google_notice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Tu cuenta usa autenticación de Google. No es posible cambiar la contraseña."
+                    android:textSize="12sp"
+                    android:textColor="#CCFFFFFF"
+                    android:textAlignment="center"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- ══ CARD: Información de usuario ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_game_card"
+                android:padding="14dp"
+                android:layout_marginBottom="10dp">
+
+                <!-- Encabezado sección -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        android:id="@+id/tv_section_info"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="INFORMACIÓN DE USUARIO"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFD9B992"
+                        android:letterSpacing="0.06" />
+
+                </LinearLayout>
+
+                <!-- Nombre (solo lectura) -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_username"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Nombre"
+                    android:enabled="false"
+                    app:hintTextColor="#AAFFFFFF"
+                    app:boxStrokeColor="#44FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_profile_username"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPersonName"
+                        android:focusable="false"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Email (solo lectura) -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_email"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Correo electrónico"
+                    android:enabled="false"
+                    app:hintTextColor="#AAFFFFFF"
+                    app:boxStrokeColor="#44FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_profile_email"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textEmailAddress"
+                        android:focusable="false"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+
+            <!-- ══ CARD: Cambiar contraseña ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_game_card"
+                android:padding="14dp"
+                android:layout_marginBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="10dp">
+
+                    <TextView
+                        android:id="@+id/tv_section_password"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="CAMBIAR CONTRASEÑA"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFD9B992"
+                        android:letterSpacing="0.06" />
+
+                </LinearLayout>
+
+                <!-- Contraseña actual -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_current_password"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Contraseña actual"
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="#AAFFFFFF"
+                    app:hintTextColor="#AAFFFFFF"
+                    android:theme="@style/ThemeOverlay.App.TextInput.Dark"
+                    app:boxStrokeColor="#66FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_current_password"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Nueva contraseña -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_password"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:hint="Nueva contraseña"
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="#AAFFFFFF"
+                    app:hintTextColor="#AAFFFFFF"
+                    android:theme="@style/ThemeOverlay.App.TextInput.Dark"
+                    app:boxStrokeColor="#66FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Confirmar contraseña -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_repeat_password"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Confirmar nueva contraseña"
+                    app:endIconMode="password_toggle"
+                    app:endIconTint="#AAFFFFFF"
+                    app:hintTextColor="#AAFFFFFF"
+                    android:theme="@style/ThemeOverlay.App.TextInput.Dark"
+                    app:boxStrokeColor="#66FFFFFF"
+                    app:boxStrokeWidth="1dp"
+                    android:textColorHint="@color/white"
+                    app:boxBackgroundColor="#22FFFFFF">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editTextText2"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="#FFFFFFFF"
+                        android:textColorHint="#88FFFFFF" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+            </LinearLayout>
+
+            <!-- ══ BOTÓN Cambiar contraseña ══ -->
+            <LinearLayout
+                android:id="@+id/btn_profile_saveinfo"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_btn_explorar"
+                android:clickable="true"
+                android:focusable="true"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GUARDAR CONTRASEÑA"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="#FFFFFFFF"
+                    android:letterSpacing="0.06" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_logout"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="1dp"
+                android:layout_marginBottom="8dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_btn_nav"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_power"
+                    android:scaleType="centerInside"
+                    android:contentDescription=""
+                    app:tint="#FFD9B992" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="CERRAR SESIÓN"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFFFF"
+                    android:letterSpacing="0.05" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/btn_delete_account"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_btn_logout"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_delete"
+                    android:scaleType="centerInside"
+                    android:contentDescription=""
+                    app:tint="#FFFFFFFF" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="ELIMINAR CUENTA"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFFFF"
+                    android:letterSpacing="0.05" />
+
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Botón Volver (top-left flotante) -->
+    <ImageButton
+        android:id="@+id/btnBack"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_back_circle"
+        android:src="@drawable/ic_arrow_back"
+        android:scaleType="centerInside"
+        android:padding="8dp"
+        android:contentDescription="Volver" />
+
+</FrameLayout>

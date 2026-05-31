@@ -1,0 +1,672 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".ui.ar.ArFragment">
+
+    <!-- ═══════════════ AR Scene View ═══════════════ -->
+
+    <io.github.sceneview.ar.ARSceneView
+        android:id="@+id/sceneView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ═══════════════ Camera Flash Overlay ═══════════════ -->
+
+    <View
+        android:id="@+id/flash_overlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/white"
+        android:alpha="0"
+        android:elevation="100dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ═══════════════ TOP LEFT: Exit AR ═══════════════ -->
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btn_return_nav"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="Salir de AR"
+        android:src="@drawable/ic_close"
+        app:fabSize="mini"
+        app:backgroundTint="#99000000"
+        app:tint="@android:color/white"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ═══════════════ TOP RIGHT: Screenshot ═══════════════ -->
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btn_take_photo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="Tomar foto"
+        android:src="@drawable/ic_camera"
+        app:fabSize="mini"
+        app:backgroundTint="#99000000"
+        app:tint="@android:color/white"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ═══════════════ SURFACE QUALITY BAR (shown during placement) ═══════════════ -->
+
+    <LinearLayout
+        android:id="@+id/surfaceQualityContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="10dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/btn_return_nav"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvSurfaceQualityLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Calidad de superficie"
+            android:textColor="#CCFFFFFF"
+            android:textSize="11sp" />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/surfaceQualityProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:trackThickness="6dp"
+            app:trackCornerRadius="3dp"
+            app:indicatorColor="#4CAF50"
+            app:trackColor="#33FFFFFF"
+            android:progress="0"
+            android:max="100" />
+
+        <TextView
+            android:id="@+id/tvSurfaceQualityHint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- ═══════════════ VPS SCAN INDICATOR (shown during quality capture) ═══════════════ -->
+
+    <LinearLayout
+        android:id="@+id/vpsIndicatorContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/surfaceQualityContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Row: icon + title + percentage -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="🗺️ Mapa VPS"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvVpsPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0%"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Progress bar -->
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/vpsReadinessProgress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            app:trackThickness="8dp"
+            app:trackCornerRadius="4dp"
+            app:indicatorColor="#FF5722"
+            app:trackColor="#33FFFFFF"
+            android:progress="0"
+            android:max="100" />
+
+        <!-- Status badge + hint -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/tvVpsStatusBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp"
+                android:text="Insuficiente"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_rounded_dark"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tvVpsHint"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Mueve el teléfono alrededor del animal"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- ═══════════════ WALL MODE TOGGLE (standalone, always visible during editing) ═══════════════ -->
+
+    <LinearLayout
+        android:id="@+id/wallModeContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/vpsIndicatorContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🧱 Modo pared"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="El animal está pegado a una pared o rincón"
+                android:textColor="#99FFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchWallMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="false" />
+    </LinearLayout>
+
+    <!-- ═══════════════ DEPTH STATUS CHIP ═══════════════ -->
+
+    <com.google.android.material.chip.Chip
+        android:id="@+id/chipDepthStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="16dp"
+        android:text="Profundidad: activa"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        app:chipBackgroundColor="#664CAF50"
+        app:chipCornerRadius="12dp"
+        app:chipMinHeight="24dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@+id/btn_take_photo"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ═══════════════ TRANSFORM INFO (scale & rotation display) ═══════════════ -->
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/tv_transform_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:text=""
+        android:textAlignment="center"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/surfaceQualityContainer"
+        tools:text="Escala: 1.00  |  Rotación: 0°" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/et_instructions_anchor"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="48dp"
+        android:layout_marginEnd="48dp"
+        android:layout_marginTop="8dp"
+        android:padding="12dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:text=""
+        android:textAlignment="center"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tv_transform_info"
+        tools:text="Pulsa sobre una superficie" />
+
+    <!-- ═══════════════ HAND SCAN (center, for anchor search) ═══════════════ -->
+
+    <ImageView
+        android:id="@+id/icon_scan_hand"
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        android:contentDescription="Escanear entorno"
+        android:src="@drawable/ic_hand_scan"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.30" />
+
+    <!-- ═══════════════ ANIMAL PICKER (shown during EditingAnchor) ═══════════════ -->
+
+    <LinearLayout
+        android:id="@+id/animal_picker_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/wallModeContainer">
+
+        <!-- Button to open animal selection dialog -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_select_animal"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Seleccionar animal"
+            android:textColor="#FFFFFF"
+            app:strokeColor="#66FFFFFF"
+            app:iconTint="#FFFFFF"
+            app:icon="@drawable/ic_collection"
+            app:iconGravity="start" />
+
+        <!-- Selected animal display (shown after selection) -->
+        <LinearLayout
+            android:id="@+id/selected_animal_layout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_selected_animal_icon"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:scaleType="centerInside"
+                android:contentDescription="Animal seleccionado" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/tv_selected_animal_name"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_change_animal"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Cambiar"
+                android:textColor="#CCFFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Upload anchor button (shown after animal selection) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_upload_anchor"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/ar_upload_anchor"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- ═══════════════ RIGHT SIDE: Transform FABs ═══════════════ -->
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_menu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:contentDescription="Menú de transformación"
+        android:src="@android:drawable/ic_dialog_dialer"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/btn_host_anchor"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_scale_up"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:contentDescription="Aumentar tamaño"
+        android:src="@android:drawable/ic_input_add"
+        android:visibility="gone"
+        app:fabSize="mini"
+        app:layout_constraintBottom_toTopOf="@+id/fab_scale_down"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_scale_down"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:contentDescription="Reducir tamaño"
+        android:src="@android:drawable/ic_delete"
+        android:visibility="gone"
+        app:fabSize="mini"
+        app:layout_constraintBottom_toTopOf="@+id/fab_rotate_left"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_rotate_left"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:contentDescription="Rotar izquierda"
+        android:src="@android:drawable/ic_media_previous"
+        android:visibility="gone"
+        app:fabSize="mini"
+        app:layout_constraintBottom_toTopOf="@+id/fab_rotate_right"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_rotate_right"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:contentDescription="Rotar derecha"
+        android:src="@android:drawable/ic_media_next"
+        android:visibility="gone"
+        app:fabSize="mini"
+        app:layout_constraintBottom_toTopOf="@+id/fab_menu"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ═══════════════ BOTTOM: Main Buttons ═══════════════ -->
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_host_anchor"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="16dp"
+        android:text="@string/ar_place_anchor"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_resolve_anchors"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="16dp"
+        android:text="Buscar anclas"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- "Atrás" (go back one AR state) - separate from exit button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btn_back_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="16dp"
+        android:contentDescription="@string/ar_back"
+        android:src="@drawable/ic_arrow_back"
+        android:visibility="gone"
+        app:fabSize="normal"
+        app:backgroundTint="@color/red"
+        app:tint="@android:color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Cancel search -->
+    <Button
+        android:id="@+id/btn_cancel_search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="8dp"
+        android:text="Cancelar"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/btn_resolve_anchors"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- ═══════════════ LOADING OVERLAY ═══════════════ -->
+
+    <FrameLayout
+        android:id="@+id/loadingView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#40000000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.google.android.material.progressindicator.CircularProgressIndicator
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            app:indicatorSize="64dp"
+            app:trackColor="#3FFFFFFF" />
+    </FrameLayout>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         GAME DISCOVERY OVERLAY
+         Inspirado en Pokémon GO / Genshin Impact:
+           • ¡NUEVO!       → fondo dorado, dim, pulso, haptic, dismiss manual
+           • YA EN TU ÁLBUM → fondo verde, sin dim, barra de cuenta atrás 2 s
+         ═══════════════════════════════════════════════════════════ -->
+
+    <!-- Dim de fondo: solo visible en descubrimiento NUEVO -->
+    <View
+        android:id="@+id/discoveryDimOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#BB000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Tarjeta de descubrimiento — sube desde el fondo -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/discoveryCard"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="28dp"
+        android:layout_marginEnd="28dp"
+        android:layout_marginBottom="88dp"
+        android:visibility="gone"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="24dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="22dp">
+
+            <!-- Badge de estado: ★ ¡NUEVO! ★  o  ✓ YA EN TU ÁLBUM -->
+            <TextView
+                android:id="@+id/tvDiscoveryBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="7dp"
+                android:paddingBottom="7dp"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textAllCaps="true"
+                android:letterSpacing="0.12"
+                android:text="★  ¡NUEVO!  ★"
+                android:textColor="#1C1400" />
+
+            <!-- Ícono del animal -->
+            <ImageView
+                android:id="@+id/ivDiscoveryIcon"
+                android:layout_width="84dp"
+                android:layout_height="84dp"
+                android:layout_marginTop="16dp"
+                android:contentDescription="Ícono del animal"
+                android:scaleType="centerInside" />
+
+            <!-- Nombre común -->
+            <TextView
+                android:id="@+id/tvDiscoveryName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textSize="23sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:gravity="center"
+                android:text="Oso Andino" />
+
+            <!-- Nombre científico (italic) -->
+            <TextView
+                android:id="@+id/tvDiscoverySubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textSize="13sp"
+                android:textColor="#AAFFFFFF"
+                android:fontFamily="serif"
+                android:textStyle="italic"
+                android:gravity="center"
+                android:text="Tremarctos ornatus" />
+
+            <!-- Barra de cuenta atrás (solo YA EN TU ÁLBUM) -->
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/discoveryProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:visibility="gone"
+                app:trackThickness="3dp"
+                app:indicatorColor="#4CAF50"
+                app:trackColor="#22FFFFFF"
+                android:progress="100"
+                android:max="100" />
+
+            <!-- Hint de dismiss (solo ¡NUEVO!) -->
+            <TextView
+                android:id="@+id/tvDiscoveryDismiss"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textSize="11sp"
+                android:textColor="#55FFFFFF"
+                android:gravity="center"
+                android:text="Toca para continuar"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

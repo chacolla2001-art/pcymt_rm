@@ -1,0 +1,155 @@
+# ╔═════════════════════════════════════════════════════════════════╗
+# ║                                                                 ║
+# ║  📱  ANDROID APP - Configuración de Entorno                    ║
+# ║                                                                 ║
+# ║  📋 Pasos para comenzar:                                        ║
+# ║  1. Copiar: cp local.properties.example local.properties       ║
+# ║  2. Configurar las 4 variables OBLIGATORIAS (⚠️)                ║
+# ║  3. Abrir proyecto en Android Studio                            ║
+# ║  4. Compilar: ./gradlew assembleDebug                           ║
+# ║                                                                 ║
+# ║  📖 Documentación completa: README.md#capítulo-5                ║
+# ║                                                                 ║
+# ╚═════════════════════════════════════════════════════════════════╝
+
+
+# ┌─────────────────────────────────────────────────────────────────┐
+# │                                                                 │
+# │  ⚡ INICIO RÁPIDO - Configuración Mínima para Desarrollo       │
+# │                                                                 │
+# │  Estas son las variables que DEBES configurar                   │
+# │                                                                 │
+# └─────────────────────────────────────────────────────────────────┘
+
+# ⚠️  OBLIGATORIO - Ruta del Android SDK
+# Windows: C:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
+# Mac:     /Users/TU_USUARIO/Library/Android/sdk
+# Linux:   /home/TU_USUARIO/Android/Sdk
+
+sdk.dir=C\:\\Users\\TU_USUARIO\\AppData\\Local\\Android\\Sdk
+
+
+# ⚠️  OBLIGATORIO - URL del Backend API
+# 💡 Para emulador Android: usa 10.0.2.2 (apunta a localhost de tu PC)
+# 💡 Para dispositivo físico: usa tu IP local (ej: 192.168.1.100)
+# 💡 Para Genymotion: usa 10.0.3.2
+
+BASE_URL=http://10.0.2.2:5000
+
+# ⚠️  OPCIONAL - Máximo de anchors por sesión AR (default: 5)
+MAX_ANCHORS_PER_SESSION=5
+
+# ⚠️  OBLIGATORIO - ARCore Cloud Anchors API Key
+# Necesario para la variant "visitor" (multi-usuario con API Key)
+# La variant "admin" (keyless) no usa esta key
+# 📖 Obtener en: https://console.cloud.google.com → APIs & Services → Credentials
+
+ARCORE_API_KEY=tu-arcore-api-key
+
+
+# ⚠️  OBLIGATORIO - Google OAuth (Debug)
+# El Client ID de tu proyecto de Google Cloud
+# 📖 Obtener en: https://console.cloud.google.com
+
+WEB_CLIENT_ID=tu-debug-client-id.apps.googleusercontent.com
+
+
+# ═════════════════════════════════════════════════════════════════
+#  ✅ ¡Listo! Ya puedes compilar: ./gradlew assembleDebug
+# ═════════════════════════════════════════════════════════════════
+
+
+
+
+# ┌─────────────────────────────────────────────────────────────────┐
+# │                                                                 │
+# │  💡 AYUDA - URLs según tipo de dispositivo                      │
+# │                                                                 │
+# └─────────────────────────────────────────────────────────────────┘
+
+# Emulador Android:          BASE_URL=http://10.0.2.2:5000
+# Dispositivo físico (WiFi): BASE_URL=http://192.168.x.x:5000
+# Emulador Genymotion:       BASE_URL=http://10.0.3.2:5000
+#
+# Para saber tu IP local:
+# Windows: ipconfig
+# Mac/Linux: ifconfig
+
+
+
+
+# ╔═════════════════════════════════════════════════════════════════╗
+# ║                                                                 ║
+# ║  🌐  CONFIGURACIÓN DE PRODUCCIÓN (Release/Play Store)           ║
+# ║                                                                 ║
+# ║  ⚠️  Para APK de producción, usa credenciales de release       ║
+# ║  Descomenta (remover ##!) y configura las siguientes vars      ║
+# ║                                                                 ║
+# ╚═════════════════════════════════════════════════════════════════╝
+
+
+# ┌─────────────────────────────────────────────────────────────────┐
+# │                                                                 │
+# │  ⚠️  PRODUCCIÓN - Variables OBLIGATORIAS                        │
+# │                                                                 │
+# └─────────────────────────────────────────────────────────────────┘
+
+# ⚠️  OBLIGATORIO - URL del Backend API (HTTPS)
+# Debe ser tu dominio de producción
+
+##! BASE_URL=https://api.tudominio.com
+
+
+# ⚠️  OBLIGATORIO - Google OAuth (Release)
+# Client ID asociado al keystore de release
+# 📖 Obtener SHA-1: keytool -list -v -keystore keystore/pcymt-release.keystore
+
+##! WEB_CLIENT_ID=produccion-client-id.apps.googleusercontent.com
+
+
+
+
+# ┌─────────────────────────────────────────────────────────────────┐
+# │                                                                 │
+# │  🔐 FIRMA DE APK - Solo para Producción                        │
+# │                                                                 │
+# └─────────────────────────────────────────────────────────────────┘
+
+# Para builds de release, crear archivo separado: key.properties
+#
+# key.properties contendrá:
+#   storeFile=keystore/pcymt-release.keystore
+#   storePassword=TU_STORE_PASSWORD
+#   keyAlias=pcymt-key
+#   keyPassword=TU_KEY_PASSWORD
+#
+# ⚠️  CRÍTICO: NUNCA commitear key.properties
+# 📖 Ver README.md Capítulo 8: Firma de APK
+
+
+
+
+# ╔═════════════════════════════════════════════════════════════════╗
+# ║                                                                 ║
+# ║  📌 NOTAS IMPORTANTES                                           ║
+# ║                                                                 ║
+# ║  🔐 Seguridad:                                                  ║
+# ║     • NUNCA commitear local.properties                          ║
+# ║     • Usar diferentes OAuth Client IDs para debug/release       ║
+# ║     • Restringir Maps API Key en producción                     ║
+# ║                                                                 ║
+# ║  💡 Símbolos:                                                   ║
+# ║     #   = Comentario informativo                                ║
+# ║     ##! = Descomentar y configurar (remover ##!)                ║
+# ║     ⚠️  = Variable obligatoria                                  ║
+# ║                                                                 ║
+# ║  🔧 Builds:                                                     ║
+# ║     • Debug:   ./gradlew assembleDebug                          ║
+# ║     • Release: ./gradlew assembleRelease                        ║
+# ║     • Bundle:  ./gradlew bundleRelease                          ║
+# ║                                                                 ║
+# ║  📖 Más ayuda:                                                  ║
+# ║     • README.md Capítulo 5: Configuración                       ║
+# ║     • README.md Capítulo 8: Firma de APK                        ║
+# ║                                                                 ║
+# ╚═════════════════════════════════════════════════════════════════╝

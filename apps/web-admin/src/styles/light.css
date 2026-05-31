@@ -1,0 +1,46 @@
+/* Tema Claro - Paleta PCyMT (Parque de las Culturas y de la Madre Tierra) */
+:root, :host {
+  --sys-background: #FDFBF7;
+  --sys-on-background: #1C1C1C;
+  --sys-surface: #FDFBF7;
+  --sys-surface-dim: #D9D0C6;
+  --sys-surface-bright: #FDFBF7;
+  --sys-surface-container-lowest: #FFFFFF;
+  --sys-surface-container-low: #F7F3EE;
+  --sys-surface-container: #EDE8E0;
+  --sys-surface-container-high: #E5DDD4;
+  --sys-surface-container-highest: #DDD4C9;
+  --sys-on-surface: #1C1C1C;
+  --sys-surface-variant: #EDE8E0;
+  --sys-on-surface-variant: #4A3F38;
+  --sys-inverse-surface: #312920;
+  --sys-inverse-on-surface: #F7F3EE;
+  --sys-outline: #8A7060;
+  --sys-outline-variant: #C9B9AA;
+  --sys-shadow: #000000;
+  --sys-scrim: #000000;
+  --sys-surface-tint: #634F46;
+  /* Primary: Marrón Tierra */
+  --sys-primary: #634F46;
+  --sys-on-primary: #FDFBF7;
+  --sys-primary-container: #D9B992;
+  --sys-on-primary-container: #1C1C1C;
+  --sys-inverse-primary: #D9B992;
+  /* Secondary: Verde Salvia */
+  --sys-secondary: #7A7A4A;
+  --sys-on-secondary: #FDFBF7;
+  --sys-secondary-container: #C9C99A;
+  --sys-on-secondary-container: #1C1C1C;
+  /* Tertiary / CTA: Rojo Arcilla */
+  --sys-tertiary: #A33B31;
+  --sys-on-tertiary: #FDFBF7;
+  --sys-tertiary-container: #F2C4BF;
+  --sys-on-tertiary-container: #3B0F0B;
+  /* Error */
+  --sys-error: #A33B31;
+  --sys-on-error: #FDFBF7;
+  --sys-error-container: #F2C4BF;
+  --sys-on-error-container: #3B0F0B;
+  --sys-neutral: #8A7060;
+  --sys-neutral-variant: #8A7060;
+}

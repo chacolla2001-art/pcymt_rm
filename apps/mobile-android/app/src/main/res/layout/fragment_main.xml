@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  PANTALLA COLECCIÓN — ESTILO JUEGO                          ║
+    ║  Misma línea gráfica que la pantalla de inicio              ║
+    ╚══════════════════════════════════════════════════════════════╝
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/fragment_main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".MainFragment">
+
+    <!-- Fondo del parque -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:src="@drawable/background_game"
+        android:scaleType="centerCrop"
+        android:contentDescription="" />
+
+    <!-- Gradiente overlay oscuro -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/gradient_game_overlay" />
+
+    <!-- Botón Volver (top-left) -->
+    <ImageButton
+        android:id="@+id/btnBackCollection"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_back_circle"
+        android:src="@drawable/ic_arrow_back"
+        android:scaleType="centerInside"
+        android:padding="8dp"
+        android:contentDescription="Volver" />
+
+    <!-- Contenido: header + lista -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="64dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="8dp">
+
+        <!-- ── Encabezado ── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/bg_game_card"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="COLECCIÓN DE ANIMALES"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-black"
+                android:textColor="#FFFFFFFF"
+                android:letterSpacing="0.06"
+                android:shadowColor="#CC000000"
+                android:shadowRadius="6"
+                android:shadowDy="2"
+                android:paddingBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tvSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Selecciona una figura para ver en donde se encuentra. Las figuras en gris aún no las has descubierto."
+                android:textSize="12sp"
+                android:textColor="#CCFFFFFF"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <!-- Banner: Juego Completado (visible cuando se encontraron todos) -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/layoutCompleted"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#CC1B4B2B">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="24dp">
+
+                <ImageView
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:src="@drawable/jukumario"
+                    android:contentDescription="Juego Completado"
+                    android:scaleType="centerInside" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎉 ¡Juego Completado!"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFD9B992"
+                    android:gravity="center"
+                    android:layout_marginTop="12dp" />
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="¡Encontraste todas las figuras del parque!\nEres un verdadero jugador de Juku Go."
+                    android:textSize="13sp"
+                    android:textColor="#CCFFFFFF"
+                    android:gravity="center"
+                    android:layout_marginTop="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnResetProgress"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Reiniciar Progreso"
+                    android:layout_marginTop="16dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    app:strokeColor="#FFD9B992"
+                    android:textColor="#FFD9B992" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Lista de secciones sobre card (mismo estilo que el encabezado) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_game_card"
+            android:padding="4dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSections"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="4dp"
+                android:paddingBottom="8dp"
+                android:scrollbars="none" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

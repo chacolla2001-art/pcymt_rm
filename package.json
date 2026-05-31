@@ -1,0 +1,20 @@
+{
+  "name": "pcymt-rm",
+  "version": "2.0.0",
+  "private": true,
+  "description": "PCyMT RM — Plataforma de Conservación y Mitigación del Tráfico de Especies con Realidad Mixta",
+  "scripts": {
+    "dev:backend": "npm run dev --prefix apps/backend",
+    "dev:frontend": "npm start --prefix apps/web-admin",
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "test:backend": "npm test --prefix apps/backend",
+    "test:frontend": "npm test --prefix apps/web-admin",
+    "test:mobile": "cd apps/mobile-android && ./gradlew test",
+    "test:all": "./scripts/run-all-tests.sh",
+    "lint:backend": "npm run lint --prefix apps/backend",
+    "lint:frontend": "npm run lint --prefix apps/web-admin"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

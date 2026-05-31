@@ -1,0 +1,25 @@
+<div class="alert-container" [ngClass]="colorClass">
+  <!-- Barra de progreso -->
+  <div class="alert-progress" *ngIf="data.showProgress !== false">
+    <div class="progress-bar" [style.width.%]="progress"></div>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="alert-body">
+    <!-- Icono -->
+    <div class="alert-icon-wrapper">
+      <mat-icon class="alert-icon">{{ icon }}</mat-icon>
+    </div>
+
+    <!-- Texto -->
+    <div class="alert-content">
+      <span class="alert-title">{{ title }}</span>
+      <p class="alert-message">{{ data.message }}</p>
+    </div>
+
+    <!-- Botón cerrar -->
+    <button mat-icon-button class="alert-close" (click)="close()" aria-label="Cerrar alerta">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+</div>

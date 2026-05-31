@@ -1,0 +1,199 @@
+/* ==================== LAYOUT WRAPPER ==================== */
+.layout-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--sys-background);
+}
+
+/* Ensure header and footer are visible */
+::ng-deep main-header {
+  display: block;
+  position: relative;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+::ng-deep main-footer {
+  display: block;
+  position: relative;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+/* ── Fullscreen map mode: hide header, footer, sidenav ── */
+:host-context(.map-fullscreen) {
+  ::ng-deep main-header { display: none !important; }
+  ::ng-deep main-footer { display: none !important; }
+  .sidenav { display: none !important; }
+  .main-container ::ng-deep .mat-drawer { display: none !important; }
+  .main-container ::ng-deep .mat-drawer-backdrop { display: none !important; }
+}
+
+/* ==================== CONTENEDOR PRINCIPAL ==================== */
+.main-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: var(--sys-surface);
+  overflow: hidden;
+}
+
+/* ==================== SIDENAV ==================== */
+.sidenav {
+  width: 248px;
+  background-color: var(--sys-surface-container-low);
+  border-right: 1px solid var(--sys-outline-variant);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Contenido scrolleable de navegación ── */
+.sidenav-nav {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  /* Scrollbar sutil */
+  scrollbar-width: thin;
+  scrollbar-color: var(--sys-outline-variant) transparent;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb {
+    background: var(--sys-outline-variant);
+    border-radius: 2px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ==================== SECCIONES DE NAVEGACIÓN ==================== */
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--sys-on-surface-variant);
+  padding: 16px 14px 6px;
+  opacity: 0.6;
+}
+
+/* ==================== ITEMS DE NAVEGACIÓN ==================== */
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+  gap: 12px;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--sys-on-surface-variant);
+  background-color: transparent;
+  transition: all 0.15s ease;
+  text-align: left !important;
+  letter-spacing: 0.1px;
+  position: relative;
+}
+
+/* Override Angular Material MDC button internal alignment */
+::ng-deep .nav-item .mdc-button__label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: flex-start;
+  text-align: left;
+  overflow: hidden;
+}
+
+.nav-item:hover {
+  background-color: var(--sys-surface-container-high);
+  color: var(--sys-on-surface);
+}
+
+.nav-item.active {
+  background-color: var(--sys-primary-container);
+  color: var(--sys-on-primary-container);
+  font-weight: 600;
+
+  .nav-icon {
+    color: var(--sys-on-primary-container);
+  }
+}
+
+.nav-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--sys-on-surface-variant);
+  transition: color 0.15s ease;
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* ==================== CONTENIDO PRINCIPAL ==================== */
+.main-content {
+  background-color: var(--sys-surface);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wrapper {
+  flex: 1;
+  width: 100%;
+  overflow: auto;
+  padding: 0;
+}
+
+.content-view {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+/* ==================== ANIMACIONES ==================== */
+.fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .sidenav {
+    width: 272px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sidenav {
+    width: 100vw;
+    max-width: 288px;
+  }
+}

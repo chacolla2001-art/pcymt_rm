@@ -1,0 +1,27 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/custom_banner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp"
+    android:background="?attr/colorPrimary"
+    android:orientation="horizontal"
+    android:elevation="4dp"
+    android:visibility="gone"
+    android:gravity="center_vertical">
+
+    <TextView
+        android:id="@+id/banner_message"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="¡Conexión perdida!"
+        android:textColor="@android:color/black"
+        android:gravity="center_vertical" />
+
+    <Button
+        android:id="@+id/banner_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Reintentar"
+        style="@style/Widget.MaterialComponents.Button.TextButton" />
+</LinearLayout>

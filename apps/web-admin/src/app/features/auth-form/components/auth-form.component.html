@@ -1,0 +1,75 @@
+<div class="login-container">
+  <!-- Card -->
+  <div class="login-card">
+
+    <!-- Card body (separate from ::before accent bar) -->
+    <div class="card-body">
+
+      <!-- Header: logo + titles -->
+      <div class="card-header">
+        <img src="assets/images/logo.png" alt="PCyMT" class="card-logo" />
+        <div class="card-titles">
+          <h1 class="card-title">Bienvenido</h1>
+          <p class="card-subtitle">Ingresa tus credenciales para continuar</p>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-width">
+          <mat-label>Correo Electrónico</mat-label>
+          <input matInput type="email" formControlName="email" placeholder="ejemplo&#64;correo.com" autocomplete="email">
+          <mat-icon matPrefix>email</mat-icon>
+          @if (loginForm.get('email')?.errors?.['required']) {
+            <mat-error>El correo electrónico es obligatorio.</mat-error>
+          }
+          @if (loginForm.get('email')?.errors?.['email']) {
+            <mat-error>Introduce un correo válido.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-width">
+          <mat-label>Contraseña</mat-label>
+          <input matInput [type]="passwordVisible ? 'text' : 'password'" formControlName="password" placeholder="Introduce tu contraseña" autocomplete="current-password">
+          <mat-icon matPrefix>lock</mat-icon>
+          <button mat-icon-button matSuffix type="button" (click)="togglePasswordVisibility()" [attr.aria-label]="'Toggle password visibility'">
+            <mat-icon>{{ passwordVisible ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
+          @if (loginForm.get('password')?.errors?.['required']) {
+            <mat-error>La contraseña es obligatoria.</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Server error banner -->
+        @if (loginError) {
+          <div class="error-banner" role="alert">
+            <mat-icon class="error-icon">error_outline</mat-icon>
+            <span>{{ loginError }}</span>
+          </div>
+        }
+
+        <!-- Remember me + forgot password -->
+        <div class="form-options">
+          <mat-checkbox formControlName="rememberMe" class="remember-checkbox">
+            Recordar usuario
+          </mat-checkbox>
+          <button type="button" class="forgot-link" [disabled]="isLoading"
+            (click)="router.navigate(['/recover-password'])">
+            ¿Olvidaste tu contraseña?
+          </button>
+        </div>
+
+        <!-- Submit -->
+        <button mat-raised-button type="submit" class="login-button"
+          [disabled]="loginForm.invalid || isLoading">
+          <span class="btn-inner">
+            <mat-icon [class.spin-icon]="isLoading">{{ isLoading ? 'sync' : 'login' }}</mat-icon>
+            <span>{{ isLoading ? 'Iniciando sesión…' : 'Iniciar Sesión' }}</span>
+          </span>
+        </button>
+
+      </form>
+    </div><!-- /card-body -->
+  </div><!-- /login-card -->
+</div>

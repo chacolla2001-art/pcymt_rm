@@ -1,0 +1,218 @@
+<div class="user-interaction-stats">
+  <!-- Header -->
+  <div class="page-header">
+    <button mat-icon-button (click)="goBack()" matTooltip="Volver al dashboard">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div class="header-info">
+      <h2>
+        <mat-icon class="header-icon">person_search</mat-icon>
+        Interacciones por Usuario
+      </h2>
+      <p class="subtitle">Consulta detallada de las interacciones de cada usuario con los animales virtuales del parque</p>
+    </div>
+  </div>
+
+  <!-- User Search -->
+  <mat-card class="search-card">
+    <mat-card-content>
+      <div class="search-row">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar usuario</mat-label>
+          <input matInput [(ngModel)]="userSearch"
+                 (keyup.enter)="searchUsers()"
+                 placeholder="Usuario o email...">
+          <mat-icon matPrefix>person_search</mat-icon>
+        </mat-form-field>
+        <button mat-raised-button color="primary" (click)="searchUsers()">
+          <mat-icon>search</mat-icon> Buscar
+        </button>
+      </div>
+
+      <!-- Search results -->
+      @if (matchingUsers.length > 0) {
+        <div class="search-results">
+          @for (user of matchingUsers; track user.id) {
+            <button mat-button class="user-result" (click)="selectUser(user)">
+              <mat-icon>person</mat-icon>
+                <div class="user-info">
+                <span class="user-name">{{ user.name || user.email }}</span>
+                <span class="user-ci">{{ user.email }}</span>
+              </div>
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Selected user -->
+      @if (selectedUser) {
+        <div class="selected-user-chip">
+          <mat-icon>person</mat-icon>
+          <span>{{ selectedUser.name || selectedUser.email }} &middot; {{ selectedUser.email }}</span>
+          <button mat-icon-button (click)="clearUser()" matTooltip="Quitar filtro de usuario">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  @if (selectedUser) {
+    <!-- Summary cards -->
+    <div class="summary-grid">
+      <mat-card class="summary-card total">
+        <mat-icon>touch_app</mat-icon>
+        <div class="summary-value">{{ totalInteractions }}</div>
+        <div class="summary-label">Total Interacciones</div>
+      </mat-card>
+      <mat-card class="summary-card interacted">
+        <mat-icon>visibility</mat-icon>
+        <div class="summary-value">{{ uniqueAssetsInteracted }}</div>
+        <div class="summary-label">Animales Visitados</div>
+      </mat-card>
+      <mat-card class="summary-card missing">
+        <mat-icon>visibility_off</mat-icon>
+        <div class="summary-value">{{ missingAssetsCount }}</div>
+        <div class="summary-label">Animales Sin Visitar</div>
+      </mat-card>
+      <mat-card class="summary-card completion">
+        <mat-icon>emoji_events</mat-icon>
+        <div class="summary-value">{{ completionPercentage }}%</div>
+        <div class="summary-label">Completitud</div>
+        <mat-progress-bar mode="determinate" [value]="completionPercentage"></mat-progress-bar>
+      </mat-card>
+    </div>
+
+    <!-- Highlights -->
+    <div class="highlights-row">
+      <mat-card class="highlight-card">
+        <mat-icon class="highlight-icon favorite">star</mat-icon>
+        <div>
+          <div class="highlight-label">Más Interactuado</div>
+          <div class="highlight-value">{{ mostInteractedAsset }}</div>
+        </div>
+      </mat-card>
+      <mat-card class="highlight-card">
+        <mat-icon class="highlight-icon least">trending_down</mat-icon>
+        <div>
+          <div class="highlight-label">Menos Interactuado</div>
+          <div class="highlight-value">{{ leastInteractedAsset }}</div>
+        </div>
+      </mat-card>
+    </div>
+
+    <!-- Filters and Table -->
+    <mat-card class="table-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>table_chart</mat-icon>
+          Detalle de Interacciones
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <!-- Filters -->
+        <div class="table-filters">
+          <mat-form-field appearance="outline" class="filter-search">
+            <mat-label>Buscar animal</mat-label>
+            <input matInput (input)="onAssetSearch($event)" placeholder="Nombre del animal...">
+            <mat-icon matPrefix>search</mat-icon>
+          </mat-form-field>
+
+          <div class="status-filters">
+            <button mat-stroked-button
+                    [class.active]="statusFilter === 'all'"
+                    (click)="onStatusFilterChange('all')">
+              Todos ({{ userAssetInteractions.length }})
+            </button>
+            <button mat-stroked-button
+                    [class.active]="statusFilter === 'interacted'"
+                    (click)="onStatusFilterChange('interacted')">
+              <mat-icon>check_circle</mat-icon> Visitados ({{ uniqueAssetsInteracted }})
+            </button>
+            <button mat-stroked-button
+                    [class.active]="statusFilter === 'missing'"
+                    (click)="onStatusFilterChange('missing')">
+              <mat-icon>cancel</mat-icon> Sin visitar ({{ missingAssetsCount }})
+            </button>
+          </div>
+
+          <button mat-icon-button matTooltip="Descargar CSV" (click)="downloadData()">
+            <mat-icon>download</mat-icon>
+          </button>
+        </div>
+
+        <!-- Table -->
+        @if (isLoading) {
+          <div class="loading-state">
+            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+            <p>Cargando interacciones...</p>
+          </div>
+        } @else if (filteredInteractions.length > 0) {
+          <div class="table-container">
+            <table matSort (matSortChange)="onSortChange($event)"
+                   matSortActive="totalInteractions" matSortDirection="desc">
+              <thead>
+                <tr>
+                  <th class="col-rank">#</th>
+                  <th mat-sort-header="assetName" class="col-asset">Animal</th>
+                  <th mat-sort-header="section" class="col-section">Sección</th>
+                  <th mat-sort-header="totalInteractions" class="col-total">Total</th>
+                  <th mat-sort-header="viewCount" class="col-views">Vistas</th>
+                  <th mat-sort-header="clickCount" class="col-clicks">Clics</th>
+                  <th mat-sort-header="lastInteraction" class="col-date">Última vez</th>
+                  <th class="col-status">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of filteredInteractions; track row.assetId; let i = $index) {
+                  <tr [class.missing-row]="row.status === 'missing'"
+                      (click)="navigateToAsset(row.assetId)"
+                      class="clickable-row">
+                    <td class="col-rank">{{ i + 1 }}</td>
+                    <td class="col-asset">
+                      <div class="asset-cell">
+                        <span class="asset-name">{{ row.assetName }}</span>
+                      </div>
+                    </td>
+                    <td class="col-section">
+                      <span class="section-chip">{{ row.section }}</span>
+                    </td>
+                    <td class="col-total">
+                      <strong>{{ row.totalInteractions }}</strong>
+                    </td>
+                    <td class="col-views">{{ row.viewCount }}</td>
+                    <td class="col-clicks">{{ row.clickCount }}</td>
+                    <td class="col-date">{{ row.lastInteraction }}</td>
+                    <td class="col-status">
+                      @if (row.status === 'interacted') {
+                        <span class="status-badge interacted">
+                          <mat-icon>check_circle</mat-icon> Visitado
+                        </span>
+                      } @else {
+                        <span class="status-badge missing">
+                          <mat-icon>cancel</mat-icon> Sin visitar
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">
+            <mat-icon>info</mat-icon>
+            <p>No se encontraron datos para mostrar</p>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+  } @else {
+    <!-- Placeholder -->
+    <div class="placeholder-state">
+      <mat-icon>person_search</mat-icon>
+      <h3>Seleccione un usuario</h3>
+      <p>Busque por CI para ver las interacciones detalladas del usuario con los animales virtuales del parque.</p>
+    </div>
+  }
+</div>

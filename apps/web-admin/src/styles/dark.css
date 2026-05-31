@@ -1,0 +1,46 @@
+/* Tema Oscuro - Paleta PCyMT (Parque de las Culturas y de la Madre Tierra) */
+:root, :host {
+  --sys-background: #1C1714;
+  --sys-on-background: #EDE8E0;
+  --sys-surface: #1C1714;
+  --sys-surface-dim: #1C1714;
+  --sys-surface-bright: #3E312A;
+  --sys-surface-container-lowest: #140F0D;
+  --sys-surface-container-low: #231D1A;
+  --sys-surface-container: #28201D;
+  --sys-surface-container-high: #332923;
+  --sys-surface-container-highest: #3E312A;
+  --sys-on-surface: #EDE8E0;
+  --sys-surface-variant: #4A3F38;
+  --sys-on-surface-variant: #C9B9AA;
+  --sys-inverse-surface: #EDE8E0;
+  --sys-inverse-on-surface: #312920;
+  --sys-outline: #9E897A;
+  --sys-outline-variant: #4A3F38;
+  --sys-shadow: #000000;
+  --sys-scrim: #000000;
+  --sys-surface-tint: #D9B992;
+  /* Primary: Beige Arena (luminoso en oscuro) */
+  --sys-primary: #D9B992;
+  --sys-on-primary: #1C1C1C;
+  --sys-primary-container: #4A3428;
+  --sys-on-primary-container: #F2DFC8;
+  --sys-inverse-primary: #634F46;
+  /* Secondary: Verde Salvia claro */
+  --sys-secondary: #C9C99A;
+  --sys-on-secondary: #1C1C1C;
+  --sys-secondary-container: #3D3D1A;
+  --sys-on-secondary-container: #E8E8C0;
+  /* Tertiary / CTA: Rojo Arcilla claro */
+  --sys-tertiary: #F2C4BF;
+  --sys-on-tertiary: #3B0F0B;
+  --sys-tertiary-container: #7A2A22;
+  --sys-on-tertiary-container: #FFDAD4;
+  /* Error */
+  --sys-error: #F2C4BF;
+  --sys-on-error: #3B0F0B;
+  --sys-error-container: #7A2A22;
+  --sys-on-error-container: #FFDAD4;
+  --sys-neutral: #9E897A;
+  --sys-neutral-variant: #9E897A;
+}

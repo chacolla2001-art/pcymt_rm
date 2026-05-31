@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Trophy badge ring for FOUND animals — green border circle -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="#CC0E1F0B" />
+    <stroke android:width="3dp" android:color="#FF34C759" />
+</shape>
