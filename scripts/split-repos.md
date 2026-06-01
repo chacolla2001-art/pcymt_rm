@@ -1,6 +1,23 @@
 # Separar el monorepo en repositorios independientes
 
-Objetivo: un repo por app para que **Vercel** (y GitHub Actions) desplieguen con solo conectar el repo en el dashboard.
+Objetivo: un repo por app para que **Vercel** despliegue con solo conectar el repo en el dashboard.
+
+## Estado (Jun 2026)
+
+| Repo | URL | Deploy |
+|------|-----|--------|
+| `pcymt-rm-api` | https://github.com/chacolla2001-art/pcymt-rm-api | CI → Vercel ✅ |
+| `pcymt-rm-web` | https://github.com/chacolla2001-art/pcymt-rm-web | CI → Vercel ✅ |
+| `pcymt-rm-android` | https://github.com/chacolla2001-art/pcymt-rm-android | APK manual |
+| Monorepo | https://github.com/chacolla2001-art/pcymt_rm | CI → ambos ✅ |
+
+**Script automático:** `./scripts/split-repos.sh` (desde la raíz del monorepo)
+
+## Conectar Vercel ↔ GitHub (opcional, sin Actions)
+
+1. Instalar [GitHub App de Vercel](https://github.com/apps/vercel) en la cuenta `chacolla2001-art`
+2. En cada proyecto Vercel → Settings → Git → Connect `pcymt-rm-api` / `pcymt-rm-web`
+3. `rootDirectory` debe estar vacío (`.`) — ya configurado
 
 ## Repos recomendados
 
