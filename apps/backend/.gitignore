@@ -46,3 +46,4 @@ uploads/
 
 uploads.rar
 .vercel
+.env*

@@ -6,18 +6,18 @@ Objetivo: un repo por app para que **Vercel** despliegue con solo conectar el re
 
 | Repo | URL | Deploy |
 |------|-----|--------|
-| `pcymt-rm-api` | https://github.com/chacolla2001-art/pcymt-rm-api | CI → Vercel ✅ |
-| `pcymt-rm-web` | https://github.com/chacolla2001-art/pcymt-rm-web | CI → Vercel ✅ |
+| `pcymt-rm-api` | https://github.com/chacolla2001-art/pcymt-rm-api | **Manual** (ver `scripts/deploy-vercel-manual.md`) |
+| `pcymt-rm-web` | https://github.com/chacolla2001-art/pcymt-rm-web | **Manual** |
 | `pcymt-rm-android` | https://github.com/chacolla2001-art/pcymt-rm-android | APK manual |
-| Monorepo | https://github.com/chacolla2001-art/pcymt_rm | CI → ambos ✅ |
+| Monorepo | https://github.com/chacolla2001-art/pcymt_rm | **Manual** desde `apps/backend` y `apps/web-admin` |
 
-**Script automático:** `./scripts/split-repos.sh` (desde la raíz del monorepo)
+**No hay GitHub Actions de deploy a Vercel.** Solo tests en CI (`backend-ci`, `frontend-ci`).
 
-## Conectar Vercel ↔ GitHub (opcional, sin Actions)
+**Script para crear repos separados:** `./scripts/split-repos.sh`
 
-1. Instalar [GitHub App de Vercel](https://github.com/apps/vercel) en la cuenta `chacolla2001-art`
-2. En cada proyecto Vercel → Settings → Git → Connect `pcymt-rm-api` / `pcymt-rm-web`
-3. `rootDirectory` debe estar vacío (`.`) — ya configurado
+## Deploy manual
+
+Ver guía completa: [`scripts/deploy-vercel-manual.md`](./deploy-vercel-manual.md)
 
 ## Repos recomendados
 
@@ -57,13 +57,9 @@ git push -u origin main
 
 ## Vercel (después del split)
 
-1. [vercel.com/new](https://vercel.com/new) → Importar `pcymt-rm-api`
-2. Framework: **Other** (Express serverless) o usar `vercel.json` existente
-3. Repetir con `pcymt-rm-web` (Angular)
-4. Variables de entorno: copiar desde proyectos actuales `pcymt-rm-api` / `pcymt-rm-web`
-
-Con Git conectado, cada `git push` a `main` despliega automáticamente sin GitHub Actions extra.
+Deploy **manual** desde cada repo clonado o desde el monorepo (`apps/backend`, `apps/web-admin`).  
+Guía: [`deploy-vercel-manual.md`](./deploy-vercel-manual.md)
 
 ## Alternativa sin split
 
-Mantener monorepo y conectar **un proyecto Vercel por carpeta** (`Root Directory`: `apps/backend`, `apps/web-admin`) en [github.com/apps/vercel](https://github.com/apps/vercel).
+Mantener monorepo y desplegar manualmente desde `apps/backend` y `apps/web-admin`.
