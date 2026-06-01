@@ -233,6 +233,16 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+mat-icon {
+  font-family: 'Material Icons', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+}
+
 // ==================== SCROLLBAR THEMING ====================
 
 ::-webkit-scrollbar {

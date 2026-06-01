@@ -24,8 +24,9 @@ const DEFAULT_OPTIONS = {
  */
 const apiLimiter = rateLimit({
   ...DEFAULT_OPTIONS,
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: 15 * 60 * 1000,
+  max: 500,
+  skip: (req) => Boolean(req.headers.authorization),
 });
 
 /**

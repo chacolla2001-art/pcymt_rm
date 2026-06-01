@@ -327,6 +327,12 @@ export class ApiRoutesService {
     // Normalizar paths antiguos: /uploads/file.png → /api/files/file.png
     let normalizedPath = path.replace(/^\/uploads\//, '/api/files/');
 
+    // Retrocompat: iconos sueltos → carpeta model-icons
+    normalizedPath = normalizedPath.replace(
+      /^\/api\/files\/(bear|cattle|chicken|cow|dog|horse|leopard|lizard|pig|tiger|viper|reptile)\.png$/,
+      '/api/files/model-icons/$1.png',
+    );
+
     // Asegurar que empiece con /
     if (!normalizedPath.startsWith('/')) {
       normalizedPath = `/${normalizedPath}`;

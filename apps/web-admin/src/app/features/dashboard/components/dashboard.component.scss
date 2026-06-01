@@ -3,19 +3,12 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  padding: 1.5rem;
-  max-width: 1600px;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  width: 100%;
+  max-width: min(1600px, 100%);
+  min-height: calc(100vh - 120px);
   margin: 0 auto;
-
-  @media (max-width: 768px) {
-    padding: 1rem;
-    gap: 1rem;
-  }
-
-  @media (max-width: 480px) {
-    padding: 0.75rem;
-    gap: 0.75rem;
-  }
+  box-sizing: border-box;
 }
 
 // ── Welcome Banner ──────────────────────────────────────────
@@ -420,6 +413,14 @@
     color: var(--sys-on-primary);
     font-weight: 600;
     font-size: 0.875rem;
+  }
+
+  .ranking-asset-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--sys-surface-container);
   }
 }
 

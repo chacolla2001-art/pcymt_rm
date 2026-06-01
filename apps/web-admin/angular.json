@@ -43,6 +43,7 @@
               }
             ],
             "styles": [
+              "node_modules/material-icons/iconfont/material-icons.css",
               "src/tailwind.css",
               "src/styles.scss"
             ],

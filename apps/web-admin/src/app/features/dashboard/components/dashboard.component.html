@@ -115,7 +115,11 @@
         <mat-nav-list class="ranking-list">
           @for (asset of topVirtualAssets; track asset.id; let i = $index) {
             <mat-list-item (click)="navigateToVirtualAsset(asset.id)" class="clickable-item">
-              <span matListItemIcon class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
+              @if (asset.icon_url) {
+                <img matListItemAvatar [src]="apiRoutes.getAssetUrl(asset.icon_url)" [alt]="asset.name" class="ranking-asset-icon" />
+              } @else {
+                <span matListItemIcon class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
+              }
               <span matListItemTitle>{{ asset.name }}</span>
               <span matListItemMeta class="interaction-count">{{ asset.interactionCount }} visitas</span>
             </mat-list-item>

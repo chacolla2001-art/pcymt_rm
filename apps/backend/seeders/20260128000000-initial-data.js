@@ -17,6 +17,9 @@ module.exports = {
     // ============================================
     // 1. VIRTUAL ASSETS - 12 modelos con sus iconos
     // ============================================
+    // Iconos en shared/uploads/model-icons/
+    const icon = (file) => `/api/files/model-icons/${file}.png`;
+
     const virtualAssets = [
       {
         id: "660e8400-e29b-41d4-a716-446655440001",
@@ -26,7 +29,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Bosque nublado andino",
         model_url: "/api/files/bear.glb",
-        icon_url: "/api/files/bear.png",
+        icon_url: icon("bear"),
         display_order: 1,
       },
       {
@@ -37,7 +40,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Valles interandinos",
         model_url: "/api/files/cattle.glb",
-        icon_url: "/api/files/cattle.png",
+        icon_url: icon("cattle"),
         display_order: 2,
       },
       {
@@ -48,7 +51,7 @@ module.exports = {
         category: "Ave",
         habitat: "Valles templados",
         model_url: "/api/files/chicken.glb",
-        icon_url: "/api/files/chicken.png",
+        icon_url: icon("chicken"),
         display_order: 3,
       },
       {
@@ -59,7 +62,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Valles de Cochabamba",
         model_url: "/api/files/cow.glb",
-        icon_url: "/api/files/cow.png",
+        icon_url: icon("cow"),
         display_order: 4,
       },
       {
@@ -70,7 +73,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Valles y comunidades",
         model_url: "/api/files/dog.glb",
-        icon_url: "/api/files/dog.png",
+        icon_url: icon("dog"),
         display_order: 5,
       },
       {
@@ -81,7 +84,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Valles y llanos",
         model_url: "/api/files/horse.glb",
-        icon_url: "/api/files/horse.png",
+        icon_url: icon("horse"),
         display_order: 6,
       },
       {
@@ -92,7 +95,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Selva amazónica",
         model_url: "/api/files/leopard.glb",
-        icon_url: "/api/files/leopard.png",
+        icon_url: icon("leopard"),
         display_order: 7,
       },
       {
@@ -103,7 +106,7 @@ module.exports = {
         category: "Reptil",
         habitat: "Llanos orientales",
         model_url: "/api/files/lizard.glb",
-        icon_url: "/api/files/lizard.png",
+        icon_url: icon("lizard"),
         display_order: 8,
       },
       {
@@ -114,7 +117,7 @@ module.exports = {
         category: "Mito",
         habitat: "Lago Titicaca",
         model_url: "/api/files/mermaid.glb",
-        icon_url: "/api/files/mermaid.png",
+        icon_url: icon("reptile"),
         display_order: 9,
       },
       {
@@ -125,7 +128,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Valles templados",
         model_url: "/api/files/pig.glb",
-        icon_url: "/api/files/pig.png",
+        icon_url: icon("pig"),
         display_order: 10,
       },
       {
@@ -136,7 +139,7 @@ module.exports = {
         category: "Mamífero",
         habitat: "Bosques y montañas",
         model_url: "/api/files/tiger.glb",
-        icon_url: "/api/files/tiger.png",
+        icon_url: icon("tiger"),
         display_order: 11,
       },
       {
@@ -147,7 +150,7 @@ module.exports = {
         category: "Reptil",
         habitat: "Llanos y Chaco",
         model_url: "/api/files/viper.glb",
-        icon_url: "/api/files/viper.png",
+        icon_url: icon("viper"),
         display_order: 12,
       },
     ];
@@ -170,18 +173,18 @@ module.exports = {
 
     // Asignar avatares de los virtual assets a usuarios
     const avatarIcons = [
-      "/api/files/bear.png",      // Oso Andino
-      "/api/files/cattle.png",    // Toro
-      "/api/files/chicken.png",   // Gallina
-      "/api/files/cow.png",       // Vaca
-      "/api/files/dog.png",       // Perro
-      "/api/files/horse.png",     // Caballo
-      "/api/files/leopard.png",   // Jaguar
-      "/api/files/lizard.png",    // Lagarto
-      "/api/files/mermaid.png",   // Sirena
-      "/api/files/pig.png",       // Chancho
-      "/api/files/tiger.png",     // Puma
-      "/api/files/viper.png",     // Víbora
+      icon("bear"),
+      icon("cattle"),
+      icon("chicken"),
+      icon("cow"),
+      icon("dog"),
+      icon("horse"),
+      icon("leopard"),
+      icon("lizard"),
+      icon("reptile"),
+      icon("pig"),
+      icon("tiger"),
+      icon("viper"),
     ];
 
     await queryInterface.bulkInsert("users", users.map((u, i) => ({

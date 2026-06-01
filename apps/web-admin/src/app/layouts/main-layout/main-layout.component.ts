@@ -106,7 +106,9 @@ export class MainLayoutComponent {
    */
   navigateTo(route: string): void {
     this.router.navigate([`/${route}`]);
-    this.drawer.close();
+    if (this.isMobile) {
+      this.drawer.close();
+    }
   }
 
   /**

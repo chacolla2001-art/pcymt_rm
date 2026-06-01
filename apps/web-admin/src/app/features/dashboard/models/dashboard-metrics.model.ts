@@ -33,6 +33,7 @@ export interface TopVirtualAsset {
   id: string;
   name: string;
   interactionCount: number;
+  icon_url?: string;
 }
 
 /** Usuario con más interacciones */

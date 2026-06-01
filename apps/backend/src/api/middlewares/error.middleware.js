@@ -38,7 +38,7 @@ const errorMiddleware = (err, req, res, _next) => {
   }
 
   // Handle Sequelize validation errors
-  if (err.name === 'SequelizeValidationError') {
+  if (err.name === 'SequelizeValidationError' && Array.isArray(err.errors)) {
     const errors = err.errors.map((e) => ({
       field: e.path,
       message: e.message,
@@ -58,7 +58,7 @@ const errorMiddleware = (err, req, res, _next) => {
   }
 
   // Handle Sequelize unique constraint errors
-  if (err.name === 'SequelizeUniqueConstraintError') {
+  if (err.name === 'SequelizeUniqueConstraintError' && Array.isArray(err.errors)) {
     const errors = err.errors.map((e) => ({
       field: e.path,
       message: e.message,
@@ -94,6 +94,22 @@ const errorMiddleware = (err, req, res, _next) => {
       success: false,
       message: 'Token has expired',
       code: 'TOKEN_EXPIRED',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Database connection / pool errors
+  const connectionErrors = [
+    'SequelizeConnectionError',
+    'SequelizeConnectionAcquireTimeoutError',
+    'SequelizeConnectionRefusedError',
+    'SequelizeHostNotFoundError',
+  ];
+  if (connectionErrors.includes(err.name)) {
+    return res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({
+      success: false,
+      message: 'Database temporarily unavailable',
+      code: 'DATABASE_UNAVAILABLE',
       timestamp: new Date().toISOString(),
     });
   }

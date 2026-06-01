@@ -62,7 +62,7 @@ class FileController {
       }
 
       if (this._localFileExists(resolvedPath)) {
-        return this._sendLocalFile(res, resolvedPath, sanitizedName);
+        return this._sendLocalFile(res, resolvedPath, sanitizedName, next);
       }
 
       return res.status(404).json({
@@ -115,7 +115,7 @@ class FileController {
       }
 
       if (this._localFileExists(resolvedPath)) {
-        return this._sendLocalFile(res, resolvedPath, sanitizedName);
+        return this._sendLocalFile(res, resolvedPath, sanitizedName, next);
       }
 
       return res.status(404).json({
@@ -171,9 +171,17 @@ class FileController {
     });
   }
 
-  _sendLocalFile(res, resolvedPath, filename) {
+  _sendLocalFile(res, resolvedPath, filename, next) {
     this._applyFileHeaders(res, filename);
-    return res.sendFile(resolvedPath);
+    return res.sendFile(resolvedPath, (err) => {
+      if (err && !res.headersSent) {
+        if (next) {
+          next(err);
+        } else {
+          res.status(404).json({ success: false, message: 'File not found' });
+        }
+      }
+    });
   }
 
   /**

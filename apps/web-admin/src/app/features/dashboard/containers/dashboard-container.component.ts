@@ -28,9 +28,9 @@ import { DashboardComponent } from '../components/dashboard.component';
   `,
   styles: [`
     .container-wrapper {
-      padding: 20px;
-      height: 100%;
-      overflow: auto;
+      width: 100%;
+      min-height: 100%;
+      box-sizing: border-box;
     }
   `]
 })export class DashboardContainerComponent {
