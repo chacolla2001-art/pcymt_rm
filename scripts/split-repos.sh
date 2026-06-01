@@ -12,7 +12,7 @@ if [[ ! -x "$FILTER_REPO" ]]; then
 fi
 
 mkdir -p "$WORKDIR"
-git clone "$ROOT" "$WORKDIR/source"
+git clone --no-local "$ROOT" "$WORKDIR/source"
 cd "$WORKDIR/source"
 
 split_and_push() {
@@ -21,7 +21,7 @@ split_and_push() {
   local paths=("$@")
   local dest="$WORKDIR/$name"
 
-  git clone "$WORKDIR/source" "$dest"
+  git clone --no-local "$WORKDIR/source" "$dest"
   cd "$dest"
 
   local args=()
