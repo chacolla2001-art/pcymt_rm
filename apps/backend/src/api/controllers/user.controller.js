@@ -1,7 +1,16 @@
 const { ResponseUtil } = require('../../shared/utils');
 const { SYSTEM_USER } = require('../../shared/constants');
+const { WEB_ALLOWED_ROLES } = require('../../shared/constants/roles');
+const { resolveAvatarUrlOrThrow } = require('../../shared/constants/predefinedAvatars');
+const {
+  assertValidStoredAvatarUrl,
+  formatAvatarForResponse,
+  mapUserAvatarFields,
+} = require('../../shared/utils/avatar.util');
+const { ForbiddenError } = require('../../shared/errors');
 
-// Default pagination settings
+const isStaffRole = (role) => WEB_ALLOWED_ROLES.includes(role);
+
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -10,16 +19,37 @@ const MAX_LIMIT = 100;
  * User Controller - HTTP request handlers
  */
 class UserController {
-  constructor(userService, fileUploadService, authService) {
+  /**
+   * @param {import('../../domain/services/user.service')} userService
+   * @param {import('../../domain/services/auth.service')} authService
+   * @param {import('../../domain/services/profilePicture.service')} profilePictureService
+   */
+  constructor(userService, authService, profilePictureService) {
     this.userService = userService;
-    this.uploadService = fileUploadService;
     this.authService = authService;
+    this.profilePictureService = profilePictureService;
   }
 
-  /**
-   * Get all users with optional pagination and search
-   * GET /api/users?page=1&limit=20&search=carlos&is_active=true
-   */
+  async #applyAvatarChange(userId, newAvatarUrl, changedBy, previousAvatarUrl) {
+    const safeUrl = assertValidStoredAvatarUrl(newAvatarUrl);
+    const user = await this.userService.update(userId, { avatar_url: safeUrl }, changedBy);
+
+    if (previousAvatarUrl && previousAvatarUrl !== safeUrl) {
+      await this.profilePictureService.deleteIfCustom(previousAvatarUrl);
+    }
+
+    return user;
+  }
+
+  async #cleanupAvatarOnDelete(userId) {
+    try {
+      const user = await this.userService.getById(userId);
+      await this.profilePictureService.deleteIfCustom(user.avatar_url);
+    } catch {
+      // user may already be soft-deleted; non-fatal
+    }
+  }
+
   getAll = async (req, res, next) => {
     try {
       const { is_active, search, role } = req.query;
@@ -44,49 +74,51 @@ class UserController {
     }
   };
 
-  /**
-   * Get user by ID
-   * GET /api/users/:id
-   */
   getById = async (req, res, next) => {
     try {
-      const user = await this.userService.getById(req.params.id);
-      return ResponseUtil.success(res, user, 'User retrieved successfully');
+      const targetId = req.params.id;
+      const requester = req.user;
+
+      if (requester.id !== targetId && !isStaffRole(requester.role)) {
+        throw new ForbiddenError('You can only view your own profile');
+      }
+
+      const user = await this.userService.getById(targetId);
+      return ResponseUtil.success(res, mapUserAvatarFields(user), 'User retrieved successfully');
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * Create new user
-   * POST /api/users/register
-   */
   create = async (req, res, next) => {
     try {
-      const profilePictureUrl = req.file
-        ? this.uploadService.getPublicUrl(req.file.filename)
-        : null;
+      let avatarFromBody = null;
+      if (req.body.avatar_url || req.body.profile_picture_url) {
+        avatarFromBody = assertValidStoredAvatarUrl(
+          req.body.avatar_url || req.body.profile_picture_url,
+        );
+      }
 
       const userData = {
         ...req.body,
-        // Canonical field in DB/API contract
-        avatar_url: profilePictureUrl || req.body.avatar_url || req.body.profile_picture_url || null,
+        avatar_url: avatarFromBody || null,
       };
       delete userData.profile_picture_url;
 
-      // If this registration request came from the auth router (/api/auth/register)
-      // return an auth-style response (tokens + user) so mobile can receive
-      // the same payload as a login. We use the plaintext password from the
-      // original request body to perform the login immediately after creation.
       const isAuthRegister = (
         (req.baseUrl && req.baseUrl.includes('/auth')) ||
         (req.originalUrl && req.originalUrl.includes('/auth/register'))
       );
 
       const changedBy = req.user?.id || SYSTEM_USER;
-      const user = await this.userService.create(userData, changedBy, {
+      let user = await this.userService.create(userData, changedBy, {
         sendRegistrationEmail: !isAuthRegister,
       });
+
+      if (req.file) {
+        const avatarUrl = await this.profilePictureService.uploadForUser(user.id, req.file);
+        user = await this.userService.update(user.id, { avatar_url: avatarUrl }, changedBy);
+      }
 
       if (isAuthRegister && this.authService) {
         const protocol = req.get('x-forwarded-proto') || req.protocol;
@@ -116,45 +148,70 @@ class UserController {
         }, 'User created. Please verify your email to continue');
       }
 
-      return ResponseUtil.created(res, user, 'User created successfully');
+      return ResponseUtil.created(res, mapUserAvatarFields(user), 'User created successfully');
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * Update user
-   * PUT /api/users/:id
-   */
   update = async (req, res, next) => {
     try {
-      const profilePictureUrl = req.file
-        ? this.uploadService.getPublicUrl(req.file.filename)
-        : undefined;
+      const targetId = req.params.id;
+      const requester = req.user;
+      const isStaff = isStaffRole(requester.role);
 
-      const userData = {
+      if (requester.id !== targetId && !isStaff) {
+        throw new ForbiddenError('You can only update your own profile');
+      }
+
+      const existing = await this.userService.getById(targetId);
+      const previousAvatarUrl = existing.avatar_url;
+
+      let profilePictureUrl;
+      if (req.file) {
+        profilePictureUrl = await this.profilePictureService.uploadForUser(targetId, req.file);
+      }
+
+      let userData = {
         ...req.body,
-        avatar_url: profilePictureUrl || req.body.avatar_url || req.body.profile_picture_url,
+        avatar_url: profilePictureUrl ?? req.body.avatar_url ?? req.body.profile_picture_url,
       };
       delete userData.profile_picture_url;
 
-      const changedBy = req.user?.id || SYSTEM_USER;
-      const user = await this.userService.update(req.params.id, userData, changedBy);
+      if (userData.avatar_url !== undefined) {
+        userData.avatar_url = assertValidStoredAvatarUrl(userData.avatar_url);
+      }
 
-      return ResponseUtil.success(res, user, 'User updated successfully');
+      if (!isStaff) {
+        userData = {
+          avatar_url: userData.avatar_url,
+        };
+      }
+
+      const changedBy = requester?.id || SYSTEM_USER;
+      const user = await this.userService.update(targetId, userData, changedBy);
+
+      if (
+        profilePictureUrl
+        && previousAvatarUrl
+        && previousAvatarUrl !== profilePictureUrl
+      ) {
+        await this.profilePictureService.deleteIfCustom(previousAvatarUrl);
+      }
+
+      return ResponseUtil.success(res, mapUserAvatarFields(user), 'User updated successfully');
     } catch (error) {
       next(error);
     }
   };
 
-  /**
-   * Delete user (soft delete)
-   * DELETE /api/users/:id
-   */
   delete = async (req, res, next) => {
     try {
+      const userId = req.params.id;
       const changedBy = req.user?.id || SYSTEM_USER;
-      await this.userService.delete(req.params.id, changedBy);
+
+      await this.#cleanupAvatarOnDelete(userId);
+      await this.userService.delete(userId, changedBy);
 
       return ResponseUtil.success(res, null, 'User deleted successfully');
     } catch (error) {
@@ -162,13 +219,10 @@ class UserController {
     }
   };
 
-  /**
-   * Delete the authenticated user's own account
-   * DELETE /api/users/me
-   */
   deleteOwnAccount = async (req, res, next) => {
     try {
       const userId = req.user?.id;
+      await this.#cleanupAvatarOnDelete(userId);
       await this.userService.deleteOwnAccount(userId, req.body || {});
       return ResponseUtil.success(res, null, 'Account deleted successfully');
     } catch (error) {
@@ -176,10 +230,6 @@ class UserController {
     }
   };
 
-  /**
-   * Toggle user active status
-   * PATCH /api/users/:id/toggle-active
-   */
   toggleActive = async (req, res, next) => {
     try {
       const { is_active } = req.body;
@@ -192,10 +242,6 @@ class UserController {
     }
   };
 
-  /**
-   * Recover password
-   * POST /api/users/recover-password
-   */
   recoverPassword = async (req, res, next) => {
     try {
       await this.userService.recoverPassword(req.body.email);
@@ -205,10 +251,6 @@ class UserController {
     }
   };
 
-  /**
-   * Verify password
-   * POST /api/users/verify-password
-   */
   verifyPassword = async (req, res, next) => {
     try {
       const { email, password } = req.body;
@@ -224,10 +266,6 @@ class UserController {
     }
   };
 
-  /**
-   * Change password
-   * POST /api/users/change-password
-   */
   changePassword = async (req, res, next) => {
     try {
       const { email, currentPassword, newPassword } = req.body;
@@ -240,10 +278,6 @@ class UserController {
     }
   };
 
-  /**
-   * Check if email exists
-   * POST /api/users/check-email
-   */
   checkEmail = async (req, res, next) => {
     try {
       const exists = await this.userService.emailExists(req.body.email);
@@ -253,10 +287,6 @@ class UserController {
     }
   };
 
-  /**
-   * Admin set (reset) password for any user — no current password required
-   * PATCH /api/users/:id/set-password
-   */
   adminSetPassword = async (req, res, next) => {
     try {
       const { newPassword } = req.body;
@@ -269,30 +299,62 @@ class UserController {
     }
   };
 
-  /**
-   * Update profile picture
-   * PATCH /api/users/:id/profile-picture
-   */
   updateProfilePicture = async (req, res, next) => {
     try {
+      const userId = req.params.id;
+      const requester = req.user;
+
+      if (requester.id !== userId && !isStaffRole(requester.role)) {
+        throw new ForbiddenError('You can only update your own profile picture');
+      }
+
       if (!req.file) {
         return ResponseUtil.error(res, 'No image provided', 400);
       }
 
-      const avatarUrl = this.uploadService.getPublicUrl(req.file.filename);
-      const changedBy = req.user?.id || SYSTEM_USER;
+      const existing = await this.userService.getById(userId);
+      const previousAvatarUrl = existing.avatar_url;
+      const avatarUrl = await this.profilePictureService.uploadForUser(userId, req.file);
+      const changedBy = requester?.id || SYSTEM_USER;
 
-      await this.userService.update(
-        req.params.id,
-        { avatar_url: avatarUrl },
-        changedBy,
-      );
+      await this.#applyAvatarChange(userId, avatarUrl, changedBy, previousAvatarUrl);
 
-      // Keep legacy response key while exposing canonical field.
+      const formatted = formatAvatarForResponse(avatarUrl);
       return ResponseUtil.success(
         res,
-        { avatar_url: avatarUrl, profile_picture_url: avatarUrl },
+        { avatar_url: formatted, profile_picture_url: formatted },
         'Profile picture updated',
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  setAvatar = async (req, res, next) => {
+    try {
+      const userId = req.params.id;
+      const requester = req.user;
+
+      if (requester.id !== userId && !isStaffRole(requester.role)) {
+        throw new ForbiddenError('You can only change your own avatar');
+      }
+
+      const avatarUrl = resolveAvatarUrlOrThrow(req.body.avatar_id);
+      const changedBy = requester?.id || SYSTEM_USER;
+      const existing = await this.userService.getById(userId);
+
+      const user = await this.#applyAvatarChange(
+        userId,
+        avatarUrl,
+        changedBy,
+        existing.avatar_url,
+      );
+
+      const formatted = formatAvatarForResponse(user.avatar_url);
+      return ResponseUtil.success(
+        res,
+        { avatar_url: formatted, profile_picture_url: formatted },
+        'Avatar updated',
       );
     } catch (error) {
       next(error);

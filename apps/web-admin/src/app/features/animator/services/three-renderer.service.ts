@@ -52,7 +52,7 @@ export class ThreeRendererService {
   /**
    * Inicializa la escena Three.js
    */
-  initialize(container: HTMLElement): void {
+  initialize(container: HTMLElement, clearColor?: number): void {
     this.dispose();
 
     // Escena
@@ -76,7 +76,7 @@ export class ThreeRendererService {
     this.renderer = new THREE.WebGLRenderer({
       antialias: DEFAULT_RENDERER_CONFIG.antialias,
     });
-    this.renderer.setClearColor(DEFAULT_RENDERER_CONFIG.clearColor);
+    this.renderer.setClearColor(clearColor ?? DEFAULT_RENDERER_CONFIG.clearColor);
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.shadowMap.enabled = DEFAULT_RENDERER_CONFIG.shadowMapEnabled;
     container.appendChild(this.renderer.domElement);

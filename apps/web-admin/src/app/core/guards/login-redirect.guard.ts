@@ -11,7 +11,10 @@ export const LoginRedirectGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   if (authService.isUserAuthenticated()) {
-    return router.createUrlTree(['/main']);
+    if (authService.isStaffUser()) {
+      return router.createUrlTree(['/dashboard']);
+    }
+    return router.createUrlTree(['/access-denied']);
   }
 
   return true;

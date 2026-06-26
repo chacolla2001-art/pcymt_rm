@@ -2,7 +2,7 @@
 
 > **Propósito:** Este archivo proporciona a cualquier asistente de IA el contexto completo del proyecto para que pueda entender la arquitectura, dominio, convenciones y relaciones entre componentes sin necesidad de explorar cada archivo individualmente.
 >
-> **Última actualización:** Marzo 2026
+> **Última actualización:** Junio 2026
 >
 > **Estructura monorepo:** `apps/backend`, `apps/web-admin`, `apps/mobile-android`, `tools/cloud-anchor-cli`, `shared/`
 
@@ -633,3 +633,32 @@ cd apps/mobile-android
 13. **RemoteAnchorResolver** en la app móvil optimiza batching de API calls (de 2N+1 a solo 3 llamadas).
 14. **TokenAuthenticator** en la app móvil hace refresh automático de tokens expirados sin intervención del usuario.
 15. **Map3DRendererService** existe en el frontend pero NO está activamente integrado en la UI del mapa (preparado para futuro).
+16. **Despliegue producción:** API `https://pcymt-rm-api.vercel.app`, web admin `https://pcymt-rm-web.vercel.app` (Vercel serverless + PostgreSQL/Supabase).
+17. **Avatares predefinidos:** catálogo en `GET /api/config` → `avatars[]`; persistencia vía `PATCH /api/users/:id/avatar` con `avatar_id` (whitelist en `predefinedAvatars.js`).
+18. **Auditoría viva del proyecto:** ver [`docs/project-audit.md`](docs/project-audit.md) — fortalezas, deuda, prioridades (actualizar tras cada milestone).
+
+---
+
+## 17. Estado actual y deuda conocida (Jun 2026)
+
+Resumen ejecutivo; detalle en [`docs/project-audit.md`](docs/project-audit.md).
+
+### Frontend web
+- **Hecho:** panel admin, mapa canvas, stats, `StaffGuard`, i18n (dashboard/stats/settings/map/animator/anchors), lazy Chart.js, franja ecosistemas sidenav.
+- **Pendiente:** i18n virtual-asset-table; PWA en admin interno; E2E Playwright opcional.
+
+### Backend
+- **Hecho:** API REST, RBAC `staffOnly`, uploads Supabase (`HybridStorageService`), `app_settings`, avatares, config pública.
+- **Pendiente:** tests integración alineados con `/api/*`; Redis/cache sin cablear (opcional).
+
+### Mobile Android
+- **Hecho:** 3 modos AR, onboarding Juku Go, ParkMapView + `shared/data`, avatares, copy educativo post-encuentro, colores ecosistemas.
+- **Pendiente:** refactor fragments AR grandes (>1400 LOC).
+
+### Cross-cutting
+- ~~**Riesgo #1:** usuario `user` en panel web~~ → mitigado con `StaffGuard` + backend.
+- ~~**Riesgo #2:** uploads Vercel~~ → mitigado con Supabase write en prod.
+- **Fortaleza:** dominio del parque bien modelado; datos compartidos en `shared/data/`.
+- **Plan:** [`docs/reengineering-plan.md`](docs/reengineering-plan.md) (fases 1–8 completadas Jun 2026).
+- **Calidad:** [`docs/smoke-test.md`](docs/smoke-test.md), [`docs/memoria-arquitectura.md`](docs/memoria-arquitectura.md).
+- **Fortaleza #2:** AR/cloud anchors + fallback RA simple = buena cobertura de dispositivos.

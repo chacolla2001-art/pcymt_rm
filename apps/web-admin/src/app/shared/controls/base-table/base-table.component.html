@@ -1,22 +1,18 @@
-@if (isLoading) {
-  <div class="spinner-container">
-    <mat-spinner diameter="60"></mat-spinner>
-  </div>
-} @else {
+@if (!isLoading) {
   <div class="tools-container">
     <!-- Search Controls -->
     <div class="search-controls">
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="search-input">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-input">
         <mat-label>Buscar</mat-label>
         <input #searchInput matInput [placeholder]="searchPlaceholder" (keydown.enter)="applyFilter(searchInput.value)">
       </mat-form-field>
 
-      <button mat-raised-button class="control-button" (click)="applyFilter(searchInput.value)">
+      <button mat-stroked-button class="control-button" (click)="applyFilter(searchInput.value)">
         <mat-icon>search</mat-icon>
         <span class="label">Buscar</span>
       </button>
 
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="status-filter">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-filter">
         <mat-label>Estados</mat-label>
         <mat-select [(value)]="selectedStatus" (selectionChange)="applyStatusFilter()">
           <mat-option value="all">Todos</mat-option>
@@ -28,14 +24,14 @@
 
     <!-- Action Buttons -->
     @if (currentLoadType !== 'anchorPoints') {
-      <button mat-raised-button color="primary" class="control-button" (click)="openDialog()">
+      <button mat-flat-button color="primary" class="control-button" (click)="openDialog()">
         <mat-icon>add</mat-icon>
         <span class="label">Nuevo registro</span>
       </button>
     }
 
     @if (isFilteredById) {
-      <button mat-raised-button color="accent" class="control-button" (click)="clearIdFilter()">
+      <button mat-stroked-button color="primary" class="control-button" (click)="clearIdFilter()">
         <mat-icon>filter_list_off</mat-icon>
         <span class="label">Mostrar todos</span>
       </button>
@@ -57,6 +53,14 @@
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
     <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    <tr class="mat-mdc-no-data-row" *matNoDataRow>
+      <td class="mat-mdc-cell" [attr.colspan]="displayedColumns.length">
+        <div class="table-empty-state">
+          <mat-icon>search_off</mat-icon>
+          <p>No se encontraron registros con los filtros actuales.</p>
+        </div>
+      </td>
+    </tr>
   </table>
 
   <div class="paginator-container">

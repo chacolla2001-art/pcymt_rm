@@ -4,7 +4,11 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
 import { Subject, takeUntil } from 'rxjs';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
+import { AMBIENT_SCENARIOS } from '../data/ambient-scenarios';
+import { WIND_DIRECTION_PRESETS } from '../utils/map-ambient-wind';
 
 import { StickerLayerService } from '../services/sticker-layer.service';
 import {
@@ -13,6 +17,12 @@ import {
   StickerLayer
 } from '../models/sticker.model';
 import { TilesetConfig } from './tileset-panel.component';
+import type { ParkSectionRecord } from '../data/park-geometry';
+import type { SpatialReference, SpatialReferenceCategory, SpatialReferenceMarkerStyle } from '../data/spatial-reference';
+import { SPATIAL_REFERENCE_MARKER_STYLES, spatialReferenceSummary } from '../data/spatial-reference';
+import { resolveSectionFillOpacities } from '../utils/section-color.util';
+import { PARK_MAP_VIS } from '../utils/map-park-visual-scale';
+import type { MapCheckpointSummary } from '../models/map-layer-config.model';
 
 /** Event fired by the panel to control the map from outside */
 export type MapControlEvent =
@@ -21,7 +31,8 @@ export type MapControlEvent =
   | { type: 'rotateLeft' }
   | { type: 'rotateRight' }
   | { type: 'reset' }
-  | { type: 'optionChange'; option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers'; value: boolean }
+  | { type: 'optionChange'; option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers' | 'showGroundTextures'; value: boolean }
+  | { type: 'groundTilePxChange'; value: number }
   | { type: 'canvasGridCellSize'; cellW: number; cellH: number }
   | { type: 'canvasGridOpacity'; value: number }
   | { type: 'canvasGridColor'; value: string }
@@ -39,7 +50,45 @@ export type MapControlEvent =
   | { type: 'selectMovableLayer'; layer: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers' }
   | { type: 'loadTileset'; tileset: { name: string; thumbnailUrl: string; imageUrl: string; config: TilesetConfig } }
   | { type: 'refImage'; dataUrl: string | null }
-  | { type: 'refImageOpacity'; value: number };
+  | { type: 'refImageOpacity'; value: number }
+  | { type: 'toggleSectionEditor' }
+  | { type: 'setSectionEditorIndex'; index: number }
+  | { type: 'setSectionEditorVertex'; vertexIndex: number | null }
+  | { type: 'setSectionEditorAddVertex'; enabled: boolean }
+  | { type: 'updateSectionVertex'; sectionIndex: number; vertexIndex: number; lat: number; lng: number }
+  | { type: 'deleteSectionVertex'; sectionIndex: number; vertexIndex: number }
+  | { type: 'exportSectionsJson' }
+  | { type: 'resetSections' }
+  | { type: 'updateSectionColor'; sectionIndex: number; hex: string }
+  | { type: 'updateSectionFillOpacity'; sectionIndex: number; which: 'dark' | 'light'; opacity: number }
+  | { type: 'sceneOptionChange'; option: 'showRainEffect' | 'showFogEffect' | 'showMotesEffect' | 'showCloudShadows' | 'showLeavesEffect' | 'showTreesEffect' | 'showLightningEffect' | 'showNightMistEffect'; value: boolean }
+  | { type: 'spatialRefsOptionChange'; value: boolean }
+  | { type: 'rainIntensityChange'; value: number }
+  | { type: 'rainSizeChange'; value: number }
+  | { type: 'fogIntensityChange'; value: number }
+  | { type: 'fogSizeChange'; value: number }
+  | { type: 'motesIntensityChange'; value: number }
+  | { type: 'motesSizeChange'; value: number }
+  | { type: 'cloudShadowIntensityChange'; value: number }
+  | { type: 'cloudShadowSizeChange'; value: number }
+  | { type: 'leavesIntensityChange'; value: number }
+  | { type: 'leavesSizeChange'; value: number }
+  | { type: 'treesIntensityChange'; value: number }
+  | { type: 'treesSizeChange'; value: number }
+  | { type: 'nightMistIntensityChange'; value: number }
+  | { type: 'ambientWindDirectionChange'; deg: number }
+  | { type: 'ambientWindStrengthChange'; value: number }
+  | { type: 'rainSectionChange'; sectionIndex: number }
+  | { type: 'applyAmbientScenario'; scenarioId: string }
+  | { type: 'spatialAnimSpeedChange'; value: number }
+  | { type: 'selectSpatialReferenceIndex'; index: number }
+  | { type: 'updateSpatialReference'; index: number; patch: Partial<SpatialReference> }
+  | { type: 'setSpatialReferencePlaceIndex'; index: number }
+  | { type: 'exportSpatialReferencesJson' }
+  | { type: 'saveCheckpoint'; label?: string }
+  | { type: 'restoreCheckpoint'; id: string }
+  | { type: 'deleteCheckpoint'; id: string }
+  | { type: 'renameCheckpoint'; id: string; label: string };
 
 /** Current map view info emitted by MapControlComponent */
 export interface MapViewInfo {
@@ -50,6 +99,9 @@ export interface MapViewInfo {
   showSections: boolean;
   showLabels: boolean;
   showCanvasGrid: boolean;
+  showTilemap: boolean;
+  showGroundTextures: boolean;
+  groundTilePx: number;
   showBoundary: boolean;
   showMarkers: boolean;
   canvasGridCellW: number;
@@ -75,7 +127,7 @@ export interface MapViewInfo {
 @Component({
   selector: 'app-sticker-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatIconModule, TranslatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <!-- Collapse / expand toggle — overlaid on map -->
@@ -160,6 +212,25 @@ export interface MapViewInfo {
             </button>
             <span class="layer-label">Secciones</span>
           </div>
+          <div class="layer-row">
+            <button class="vis-btn" [class.hidden-layer]="!localOpts.showGroundTextures"
+              (click)="toggleOpt('showGroundTextures'); $event.stopPropagation()" title="Texturas del suelo por ecosistema">
+              <svg *ngIf="localOpts.showGroundTextures" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg *ngIf="!localOpts.showGroundTextures" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+            <span class="layer-label">Texturas suelo</span>
+          </div>
+          <div class="param-row" *ngIf="localOpts.showGroundTextures">
+            <label>Grano textura</label>
+            <input type="range" [min]="groundTileMin" [max]="groundTileMax" step="1" [ngModel]="localGroundTilePx"
+              (ngModelChange)="onGroundTilePxChange($event)">
+            <span class="param-val">{{ localGroundTilePx }}px</span>
+          </div>
           <div class="layer-row" [class.selected]="activeMovableLayer === 'markers'" (click)="selectMovableLayer('markers')">
             <button class="vis-btn" [class.hidden-layer]="!localOpts.showMarkers"
               (click)="toggleOpt('showMarkers'); $event.stopPropagation()" title="Mostrar/ocultar marcadores">
@@ -219,6 +290,428 @@ export interface MapViewInfo {
             </div>
             <button class="layer-ctrl-btn danger" (click)="onClearAllStickers()" title="Eliminar stickers de la capa activa">
               🗑️ Limpiar capa
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDITOR DE SECCIONES -->
+      <div class="section section-editor-block">
+        <div class="section-header" (click)="toggleSection('sectionEditor')">
+          <span class="section-chevron" [class.open]="openSections.sectionEditor">▸</span>
+          <span class="section-title">Editor de secciones</span>
+          <button class="section-toggle-btn" [class.active]="sectionEditorActive"
+            (click)="toggleSectionEditor(); $event.stopPropagation()"
+            title="Editar polígonos Tierras Altas / Medias / Bajas">
+            {{ sectionEditorActive ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content scrollable section-editor-content" *ngIf="openSections.sectionEditor">
+          <p class="section-hint" *ngIf="!sectionEditorActive">
+            Activa el editor para mover vértices en el mapa y ajustar las 3 zonas del parque.
+          </p>
+
+          <ng-container *ngIf="sectionEditorActive">
+            <div class="section-pick-grid">
+              <button type="button" class="section-pick-btn"
+                *ngFor="let s of editableSections; let i = index"
+                [class.active]="i === activeSectionIndex"
+                [style.borderColor]="i === activeSectionIndex ? s.chartColor : null"
+                (click)="onSectionIndexChange(i)">
+                <span class="section-pick-swatch" [style.background]="s.chartColor"></span>
+                <span class="section-pick-label">{{ s.name }}</span>
+              </button>
+            </div>
+
+            <div class="param-row" *ngIf="activeSection as sec">
+              <label>Color zona</label>
+              <input type="color" class="color-pick" [ngModel]="sec.chartColor"
+                (ngModelChange)="onSectionColorChange($event)">
+              <span class="param-val color-hex">{{ sec.chartColor }}</span>
+            </div>
+
+            <div class="param-row" *ngIf="activeSection as sec">
+              <label>Relleno mapa (oscuro)</label>
+              <input type="range" class="opacity-slider" min="0" max="100" step="1"
+                [ngModel]="sectionFillOpacityPercent(sec, 'dark')"
+                (ngModelChange)="onSectionFillOpacityChange('dark', $event)">
+              <span class="opacity-val">{{ sectionFillOpacityPercent(sec, 'dark') }}%</span>
+            </div>
+
+            <div class="param-row" *ngIf="activeSection as sec">
+              <label>Relleno mapa (claro)</label>
+              <input type="range" class="opacity-slider" min="0" max="100" step="1"
+                [ngModel]="sectionFillOpacityPercent(sec, 'light')"
+                (ngModelChange)="onSectionFillOpacityChange('light', $event)">
+              <span class="opacity-val">{{ sectionFillOpacityPercent(sec, 'light') }}%</span>
+            </div>
+            <p class="section-hint section-card-hint" *ngIf="activeSection">
+              Relleno del polígono en el mapa (vista jugador). 0% = solo contorno. Exporta para sincronizar móvil.
+            </p>
+            <p class="section-hint section-card-hint" *ngIf="activeSection">
+              Ficha educativa en el mapa → texto e imagen de la sección activa.
+            </p>
+
+            <div class="section-editor-actions">
+              <button class="tool-btn" [class.active]="addVertexMode" (click)="toggleAddVertexMode()"
+                title="Click en el mapa para añadir vértice">
+                <span class="tool-icon">＋</span><span>Añadir</span>
+              </button>
+              <button class="tool-btn danger" (click)="deleteSelectedVertex()"
+                [disabled]="selectedVertexIndex === null || activePolygon.length <= 3"
+                title="Eliminar vértice seleccionado (Del)">
+                <span class="tool-icon">✕</span><span>Borrar</span>
+              </button>
+            </div>
+
+            <div class="vertices-header">
+              <span>Vértices ({{ activePolygon.length }})</span>
+              <span class="vertices-hint">8 decimales WGS84</span>
+            </div>
+
+            <div class="vertex-list">
+              <div class="vertex-item" *ngFor="let v of activePolygon; let vi = index"
+                [class.selected]="vi === selectedVertexIndex"
+                (click)="selectVertex(vi)">
+                <span class="vertex-index">#{{ vi + 1 }}</span>
+                <div class="vertex-coords">
+                  <label>lat</label>
+                  <input class="coord-input" type="number" step="0.00000001"
+                    [ngModel]="v.lat" (ngModelChange)="onVertexFieldChange(vi, 'lat', $event)"
+                    (click)="$event.stopPropagation()">
+                  <label>lng</label>
+                  <input class="coord-input" type="number" step="0.00000001"
+                    [ngModel]="v.lng" (ngModelChange)="onVertexFieldChange(vi, 'lng', $event)"
+                    (click)="$event.stopPropagation()">
+                </div>
+              </div>
+            </div>
+
+            <div class="tool-divider"></div>
+            <div class="tool-grid cols-2">
+              <button class="tool-btn" (click)="exportSections()" title="Descargar park-sections.json">
+                <span class="tool-icon">⬇</span><span>Exportar</span>
+              </button>
+              <button class="tool-btn danger" (click)="resetSections()" title="Restaurar polígonos del repo">
+                <span class="tool-icon">⟲</span><span>Restaurar</span>
+              </button>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- ESCENA AMBIENTAL (solo lluvia) -->
+      <div class="section section-editor-block">
+        <div class="section-header" (click)="toggleSection('scene')">
+          <span class="section-chevron" [class.open]="openSections.scene">▸</span>
+          <span class="section-title">Escena ambiental</span>
+        </div>
+        <div class="section-content scrollable" *ngIf="openSections.scene">
+          <p class="section-hint">Efectos en el plano del mapa (rotan con la vista). Comparten la zona ambiental.</p>
+
+          <p class="ambient-subtitle">Escenarios demo</p>
+          <p class="section-hint compact">Un clic: efectos, colores, zona y encuadre listos para apreciar cada ambiente.</p>
+          <div class="scenario-grid">
+            <button type="button" class="scenario-btn"
+              *ngFor="let sc of ambientScenarios"
+              [class.active]="sceneOpts.activeScenarioId === sc.id"
+              [title]="sc.description"
+              (click)="applyAmbientScenario(sc.id)">
+              <span class="scenario-emoji">{{ sc.emoji }}</span>
+              <span class="scenario-label">{{ sc.label }}</span>
+            </button>
+          </div>
+
+          <p class="ambient-subtitle">Lluvia</p>
+          <div class="param-row">
+            <label>Lluvia en el mapa</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showRainEffect"
+              (click)="toggleRainEffect()">
+              {{ sceneOpts.showRainEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+
+          <div class="param-row">
+            <label>Intensidad lluvia</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.rainIntensityPercent"
+              (ngModelChange)="onRainIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.rainIntensityPercent }}%</span>
+          </div>
+
+          <div class="param-row">
+            <label>Tamaño gotas</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="2"
+              [ngModel]="sceneOpts.rainSizePercent"
+              (ngModelChange)="onRainSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.rainSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Niebla</p>
+          <div class="param-row">
+            <label>Niebla en mapa</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showFogEffect"
+              (click)="toggleFogEffect()">
+              {{ sceneOpts.showFogEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Intensidad niebla</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.fogIntensityPercent"
+              (ngModelChange)="onFogIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.fogIntensityPercent }}%</span>
+          </div>
+          <div class="param-row">
+            <label>Tamaño niebla</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="2"
+              [ngModel]="sceneOpts.fogSizePercent"
+              (ngModelChange)="onFogSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.fogSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Partículas flotantes</p>
+          <div class="param-row">
+            <label>Polen / luz</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showMotesEffect"
+              (click)="toggleMotesEffect()">
+              {{ sceneOpts.showMotesEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Intensidad partículas</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.motesIntensityPercent"
+              (ngModelChange)="onMotesIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.motesIntensityPercent }}%</span>
+          </div>
+          <div class="param-row">
+            <label>Tamaño partículas</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="2"
+              [ngModel]="sceneOpts.motesSizePercent"
+              (ngModelChange)="onMotesSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.motesSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Sombras de nubes</p>
+          <div class="param-row">
+            <label>Nubes / sombra</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showCloudShadows"
+              (click)="toggleCloudShadows()">
+              {{ sceneOpts.showCloudShadows ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Intensidad sombra</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.cloudShadowIntensityPercent"
+              (ngModelChange)="onCloudShadowIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.cloudShadowIntensityPercent }}%</span>
+          </div>
+          <div class="param-row">
+            <label>Tamaño nubes</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="2"
+              [ngModel]="sceneOpts.cloudShadowSizePercent"
+              (ngModelChange)="onCloudShadowSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.cloudShadowSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Hojas y pétalos</p>
+          <p class="section-hint compact">Viento distinto por sección del parque.</p>
+          <div class="param-row">
+            <label>Hojas en mapa</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showLeavesEffect"
+              (click)="toggleLeavesEffect()">
+              {{ sceneOpts.showLeavesEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Intensidad hojas</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.leavesIntensityPercent"
+              (ngModelChange)="onLeavesIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.leavesIntensityPercent }}%</span>
+          </div>
+          <div class="param-row">
+            <label>Tamaño hojas</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="2"
+              [ngModel]="sceneOpts.leavesSizePercent"
+              (ngModelChange)="onLeavesSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.leavesSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Árboles animados</p>
+          <p class="section-hint compact">Catálogo fijo (~30 puntos por zona, muy ligero en memoria). Silueta distinta en Altas / Medias / Bajas. Para ubicar árboles exactos usa stickers <strong>tree-*</strong> en la capa Stickers.</p>
+          <div class="param-row">
+            <label>Árboles</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showTreesEffect"
+              (click)="toggleTreesEffect()">
+              {{ sceneOpts.showTreesEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Densidad</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.treesIntensityPercent"
+              (ngModelChange)="onTreesIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.treesIntensityPercent }}%</span>
+          </div>
+          <div class="param-row">
+            <label>Tamaño</label>
+            <input type="range" class="opacity-slider" min="8" max="200" step="1"
+              [ngModel]="sceneOpts.treesSizePercent"
+              (ngModelChange)="onTreesSizeChange($event)">
+            <span class="opacity-val">{{ sceneOpts.treesSizePercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Relámpago</p>
+          <p class="section-hint compact">Solo destella si la lluvia está ON y &gt; 70 %.</p>
+          <div class="param-row">
+            <label>Destellos</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showLightningEffect"
+              (click)="toggleLightningEffect()">
+              {{ sceneOpts.showLightningEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+
+          <p class="ambient-subtitle">Bruma nocturna</p>
+          <p class="section-hint compact">Tinte azul; visible solo con tema oscuro del mapa.</p>
+          <div class="param-row">
+            <label>Bruma azul</label>
+            <button type="button" class="section-toggle-btn" [class.active]="sceneOpts.showNightMistEffect"
+              (click)="toggleNightMistEffect()">
+              {{ sceneOpts.showNightMistEffect ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+          <div class="param-row">
+            <label>Intensidad bruma</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.nightMistIntensityPercent"
+              (ngModelChange)="onNightMistIntensityChange($event)">
+            <span class="opacity-val">{{ sceneOpts.nightMistIntensityPercent }}%</span>
+          </div>
+
+          <p class="ambient-subtitle">Viento / orientación</p>
+          <p class="section-hint compact">Dirección del viento para lluvia, niebla, hojas, partículas, nubes y balanceo de árboles.</p>
+          <div class="param-row column">
+            <label>Dirección</label>
+            <div class="wind-compass-grid">
+              <button type="button" class="wind-dir-btn"
+                *ngFor="let w of windPresets"
+                [class.active]="sceneOpts.ambientWindDeg === w.deg"
+                (click)="onAmbientWindDirection(w.deg)">
+                {{ w.label }}
+              </button>
+            </div>
+          </div>
+          <div class="param-row">
+            <label>Fuerza viento</label>
+            <input type="range" class="opacity-slider" min="0" max="100" step="1"
+              [ngModel]="sceneOpts.ambientWindStrengthPercent"
+              (ngModelChange)="onAmbientWindStrengthChange($event)">
+            <span class="opacity-val">{{ sceneOpts.ambientWindStrengthPercent }}%</span>
+          </div>
+
+          <div class="param-row column">
+            <label>Zona ambiental</label>
+            <div class="section-pick-grid rain-zone-grid">
+              <button type="button" class="section-pick-btn"
+                [class.active]="sceneOpts.rainSectionIndex === -1"
+                (click)="onRainSectionChange(-1)">
+                <span class="section-pick-label">Todo el parque</span>
+              </button>
+              <button type="button" class="section-pick-btn"
+                *ngFor="let s of editableSections; let i = index"
+                [class.active]="sceneOpts.rainSectionIndex === i"
+                (click)="onRainSectionChange(i)">
+                <span class="section-pick-swatch" [style.background]="s.chartColor"></span>
+                <span class="section-pick-label">{{ s.name }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REFERENCIAS ESPACIALES -->
+      <div class="section section-editor-block">
+        <div class="section-header" (click)="toggleSection('spatialRefs')">
+          <span class="section-chevron" [class.open]="openSections.spatialRefs">▸</span>
+          <span class="section-title">Referencias espaciales</span>
+        </div>
+        <div class="section-content scrollable" *ngIf="openSections.spatialRefs">
+          <p class="section-hint">
+            Puntos de escena con ficha propia. PNG o <code>spriteSheet</code> para animación por frames.
+          </p>
+
+          <div class="param-row">
+            <label>Mostrar en mapa</label>
+            <button type="button" class="section-toggle-btn" [class.active]="spatialRefsOpts.showSpatialReferences"
+              (click)="toggleSpatialRefs()">
+              {{ spatialRefsOpts.showSpatialReferences ? 'ON' : 'OFF' }}
+            </button>
+          </div>
+
+          <div class="param-row">
+            <label>Animación</label>
+            <input type="range" class="opacity-slider" min="20" max="200" step="5"
+              [ngModel]="spatialRefsOpts.spatialAnimPercent"
+              (ngModelChange)="onSpatialAnimSpeedChange($event)">
+            <span class="opacity-val">{{ spatialRefsOpts.spatialAnimPercent }}%</span>
+          </div>
+
+          <div class="spatial-ref-list" *ngIf="spatialReferences.length">
+            <div class="spatial-ref-item" *ngFor="let ref of spatialReferences; let i = index"
+              [class.placing]="spatialPlaceIndex === i"
+              [class.selected]="activeSpatialRefIndex === i"
+              (click)="selectSpatialRef(i)">
+              <div class="spatial-ref-head">
+                <strong>{{ ref.name }}</strong>
+                <span class="spatial-ref-cat">{{ ref.category }}</span>
+              </div>
+              <div class="spatial-ref-coords">{{ ref.lat | number:'1.5-5' }}, {{ ref.lng | number:'1.5-5' }}</div>
+              <button type="button" class="tool-btn" [class.active]="spatialPlaceIndex === i"
+                (click)="toggleSpatialPlace(i); $event.stopPropagation()">
+                <span class="tool-icon">📍</span><span>{{ spatialPlaceIndex === i ? 'Click mapa…' : 'Ubicar' }}</span>
+              </button>
+            </div>
+          </div>
+
+          <ng-container *ngIf="activeSpatialRef as ref">
+            <div class="param-row">
+              <label>Estilo marcador</label>
+              <div class="marker-style-row">
+                <button type="button" class="marker-style-btn" *ngFor="let st of markerStyles"
+                  [class.active]="(ref.markerStyle || 'circle') === st"
+                  (click)="onMarkerStyleChange(st)">{{ markerStyleLabel(st) }}</button>
+              </div>
+            </div>
+
+            <div class="param-row">
+              <label>Tamaño (px)</label>
+              <input type="range" class="opacity-slider" min="32" max="80" step="2"
+                [ngModel]="ref.displaySize || 48"
+                (ngModelChange)="onSpatialRefPatch({ displaySize: +$event })">
+              <span class="opacity-val">{{ ref.displaySize || 48 }}</span>
+            </div>
+
+            <div class="param-row">
+              <label>Visible</label>
+              <button type="button" class="section-toggle-btn" [class.active]="ref.visible"
+                (click)="onSpatialRefPatch({ visible: !ref.visible })">
+                {{ ref.visible ? 'ON' : 'OFF' }}
+              </button>
+            </div>
+
+            <label class="section-edu-label">Ficha — información</label>
+            <textarea class="spatial-ref-textarea" rows="4" maxlength="800"
+              [ngModel]="spatialRefSummary(ref)"
+              (ngModelChange)="onSpatialRefSummaryChange($event)"
+              placeholder="Texto de la ficha al pulsar el marcador…"></textarea>
+          </ng-container>
+
+          <div class="tool-grid cols-2">
+            <button class="tool-btn" (click)="exportSpatialReferences()" title="Descargar spatial-references.json">
+              <span class="tool-icon">⬇</span><span>Exportar JSON</span>
             </button>
           </div>
         </div>
@@ -340,8 +833,12 @@ export interface MapViewInfo {
           <div class="sub-divider"></div>
           <div class="param-row">
             <label>Imagen de ref.</label>
-            <button class="mini-btn" (click)="refImageInput.click()" title="Subir imagen de referencia">📂</button>
-            <button class="mini-btn" *ngIf="refImageName" (click)="clearRefImage()" title="Quitar imagen">✕</button>
+            <button class="mini-btn" (click)="refImageInput.click()" title="Subir imagen de referencia" aria-label="Subir imagen de referencia">
+              <mat-icon>folder_open</mat-icon>
+            </button>
+            <button class="mini-btn" *ngIf="refImageName" (click)="clearRefImage()" title="Quitar imagen" aria-label="Quitar imagen">
+              <mat-icon>close</mat-icon>
+            </button>
             <span class="param-val" style="max-width: 80px; overflow: hidden; text-overflow: ellipsis;">{{ refImageName || '—' }}</span>
             <input #refImageInput type="file" accept="image/*" hidden (change)="onRefImagePicked($event)">
           </div>
@@ -477,12 +974,40 @@ export interface MapViewInfo {
           <span class="section-title">Configuración</span>
         </div>
         <div class="section-content" *ngIf="openSections.config">
-          <div class="tool-grid cols-2">
-            <button class="tool-btn" (click)="emitEvent('saveConfig')" title="Guardar configuración de todas las capas">
-              <span class="tool-icon">💾</span><span>Guardar</span>
+          <p class="section-card-hint">{{ 'map.sessionAutoRestore' | translate }}</p>
+          <p class="section-card-hint" *ngIf="sessionSavedAt">
+            {{ 'map.sessionLastSaved' | translate }}: {{ formatSessionTime(sessionSavedAt) }}
+          </p>
+
+          <div class="checkpoint-form">
+            <input class="coord-input" type="text" [(ngModel)]="checkpointLabel"
+              [placeholder]="'map.checkpointNamePlaceholder' | translate" maxlength="40">
+            <button type="button" class="tool-btn wide-btn" (click)="saveCheckpoint()">
+              <mat-icon class="tool-icon" aria-hidden="true">bookmark_add</mat-icon>
+              <span>{{ 'map.saveCheckpoint' | translate }}</span>
             </button>
-            <button class="tool-btn" (click)="emitEvent('loadConfig')" title="Cargar configuración guardada">
-              <span class="tool-icon">📂</span><span>Cargar</span>
+          </div>
+
+          <div *ngIf="checkpoints.length > 0">
+            <div class="layer-row" *ngFor="let cp of checkpoints">
+              <div style="flex:1;min-width:0">
+                <div class="layer-label">{{ cp.label }}</div>
+                <div class="opacity-val">{{ formatSessionTime(cp.savedAt) }}</div>
+              </div>
+              <button type="button" class="tool-btn" [title]="'map.restoreCheckpoint' | translate"
+                (click)="restoreCheckpoint(cp.id)">↩</button>
+              <button type="button" class="tool-btn danger" [title]="'map.deleteCheckpoint' | translate"
+                (click)="deleteCheckpoint(cp.id)">✕</button>
+            </div>
+          </div>
+          <p class="section-card-hint" *ngIf="checkpoints.length === 0">{{ 'map.noCheckpoints' | translate }}</p>
+
+          <div class="tool-grid cols-2 config-server-actions">
+            <button class="tool-btn" (click)="emitEvent('saveConfig')" [title]="'map.saveLayersHint' | translate">
+              <mat-icon class="tool-icon" aria-hidden="true">cloud_upload</mat-icon><span>{{ 'map.saveShort' | translate }}</span>
+            </button>
+            <button class="tool-btn" (click)="emitEvent('loadConfig')" [title]="'map.loadConfigHint' | translate">
+              <mat-icon class="tool-icon" aria-hidden="true">cloud_download</mat-icon><span>{{ 'map.loadShort' | translate }}</span>
             </button>
           </div>
         </div>
@@ -505,9 +1030,9 @@ export interface MapViewInfo {
       --sp-border: rgba(255,255,255,0.1);
       --sp-text: #e0e0e0;
       --sp-text2: #888;
-      --sp-accent: #7c4dff;
-      --sp-active: rgba(124, 77, 255, 0.12);
-      --sp-danger: #ef5350;
+      --sp-accent: var(--sys-primary);
+      --sp-active: color-mix(in srgb, var(--sys-primary) 12%, transparent);
+      --sp-danger: var(--sys-error);
       --sp-section-bg: rgba(255,255,255,0.03);
       --sp-input-bg: rgba(255,255,255,0.05);
     }
@@ -518,9 +1043,9 @@ export interface MapViewInfo {
       --sp-border: rgba(0,0,0,0.1);
       --sp-text: #1a1a2a;
       --sp-text2: #666;
-      --sp-accent: #5c2dce;
-      --sp-active: rgba(92, 45, 206, 0.08);
-      --sp-danger: #d32f2f;
+      --sp-accent: var(--sys-primary);
+      --sp-active: color-mix(in srgb, var(--sys-primary) 8%, transparent);
+      --sp-danger: var(--sys-error);
       --sp-section-bg: rgba(0,0,0,0.025);
       --sp-input-bg: rgba(0,0,0,0.04);
     }
@@ -528,7 +1053,7 @@ export interface MapViewInfo {
       --sp-bg: rgba(248, 248, 252, 0.97);
       --sp-border: rgba(0,0,0,0.1);
       --sp-text: #1a1a2a;
-      --sp-accent: #5c2dce;
+      --sp-accent: var(--sys-primary);
       --sp-active: rgba(92, 45, 206, 0.08);
     }
 
@@ -751,7 +1276,7 @@ export interface MapViewInfo {
     }
     .tool-btn.danger { border-color: rgba(239,83,80,0.3); color: var(--sp-danger); }
     .tool-btn.danger:hover { background: rgba(239,83,80,0.12); border-color: var(--sp-danger); }
-    .tool-icon { font-size: 16px; line-height: 1; }
+    .tool-icon { font-size: 16px; line-height: 1; width: 16px; height: 16px; }
 
     .tool-divider {
       height: 1px;
@@ -993,6 +1518,86 @@ export interface MapViewInfo {
       gap: 6px;
       margin-bottom: 5px;
     }
+    .param-row.column {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .param-row.column label {
+      width: auto;
+    }
+    .ambient-subtitle {
+      margin: 8px 0 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--sp-text2);
+    }
+    .section-hint.compact {
+      margin: 0 0 6px;
+      font-size: 9px;
+      line-height: 1.35;
+    }
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+    .scenario-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border: 1px solid var(--sp-border);
+      border-radius: 8px;
+      background: var(--sp-surface2);
+      color: var(--sp-text);
+      cursor: pointer;
+      font-size: 10px;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .scenario-btn:hover {
+      border-color: var(--sp-accent);
+      background: var(--sp-surface);
+    }
+    .scenario-btn.active {
+      border-color: var(--sp-accent);
+      background: color-mix(in srgb, var(--sp-accent) 18%, var(--sp-surface2));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--sp-accent) 35%, transparent);
+    }
+    .scenario-emoji {
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .scenario-label {
+      line-height: 1.2;
+      font-weight: 600;
+    }
+    .wind-compass-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      width: 100%;
+    }
+    .wind-dir-btn {
+      padding: 5px 0;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid var(--sp-border);
+      background: var(--sp-section-bg);
+      color: var(--sp-text2);
+      cursor: pointer;
+    }
+    .wind-dir-btn:hover { border-color: var(--sp-accent); }
+    .wind-dir-btn.active {
+      background: var(--sp-accent);
+      color: #fff;
+      border-color: var(--sp-accent);
+    }
     .param-row label {
       width: 60px;
       font-size: 10px;
@@ -1185,15 +1790,280 @@ export interface MapViewInfo {
       font-size: 9px;
       font-family: monospace;
     }
+
+    .section-editor-block .section-editor-content {
+      max-height: 50vh;
+    }
+
+    .section-editor-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin: 6px 0;
+    }
+
+    .vertices-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--sp-text2);
+      margin: 4px 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .vertices-hint {
+      font-weight: 400;
+      text-transform: none;
+      font-size: 9px;
+    }
+
+    .vertex-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .vertex-item {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid var(--sp-border);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .vertex-item:hover {
+      border-color: rgba(255, 152, 0, 0.5);
+    }
+
+    .vertex-item.selected {
+      border-color: #ff9800;
+      background: rgba(255, 152, 0, 0.12);
+    }
+
+    .vertex-index {
+      font-size: 10px;
+      font-weight: 700;
+      color: #ff9800;
+      min-width: 22px;
+      padding-top: 4px;
+    }
+
+    .vertex-coords {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 24px 1fr;
+      gap: 4px 6px;
+      align-items: center;
+    }
+
+    .vertex-coords label {
+      font-size: 9px;
+      color: var(--sp-text2);
+    }
+
+    .section-pick-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .section-pick-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 2px solid var(--sp-border);
+      background: var(--sp-input-bg);
+      color: var(--sp-text);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .section-pick-btn:hover {
+      border-color: rgba(255, 152, 0, 0.55);
+      background: rgba(255, 152, 0, 0.08);
+    }
+
+    .section-pick-btn.active {
+      background: rgba(255, 152, 0, 0.14);
+      box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.25);
+    }
+
+    .spatial-ref-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 8px 0 10px;
+    }
+
+    .spatial-ref-item {
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--sp-border);
+      background: var(--sp-input-bg);
+    }
+
+    .spatial-ref-item.placing {
+      border-color: #ff9800;
+      box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.35);
+    }
+
+    .spatial-ref-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .spatial-ref-cat {
+      color: var(--sp-text2);
+      font-size: 10px;
+      text-transform: uppercase;
+    }
+
+    .spatial-ref-coords {
+      font-size: 10px;
+      color: var(--sp-text2);
+      margin: 4px 0 6px;
+      font-family: monospace;
+    }
+
+    .spatial-ref-item.selected {
+      border-color: #42a5f5;
+      box-shadow: 0 0 0 1px rgba(66, 165, 245, 0.35);
+    }
+
+    .spatial-ref-textarea {
+      width: 100%;
+      min-height: 72px;
+      margin: 6px 0 10px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--sp-border);
+      background: var(--sp-input-bg);
+      color: var(--sp-text);
+      font-size: 11px;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .marker-style-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .marker-style-btn {
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--sp-border);
+      background: var(--sp-input-bg);
+      color: var(--sp-text);
+      font-size: 10px;
+      cursor: pointer;
+    }
+
+    .marker-style-btn.active {
+      border-color: #42a5f5;
+      background: rgba(66, 165, 245, 0.15);
+    }
+
+    .section-edu-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: var(--sp-text2);
+      margin: 8px 0 4px;
+    }
+
+    .section-pick-swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .section-pick-label {
+      flex: 1;
+    }
+
+    .section-card-hint {
+      margin: 4px 0 8px;
+    }
+
+    .checkpoint-form { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+    .config-server-actions { margin-top: 4px; }
   `]
 })
 export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
+  readonly ambientScenarios = AMBIENT_SCENARIOS;
+  readonly windPresets = WIND_DIRECTION_PRESETS;
   @Input() isDarkTheme = true;
   @Input() isAdmin = false;
   @Input() selectedSticker: StickerInstance | null = null;
   @Input() mapViewInfo: MapViewInfo | null = null;
   @Input() tileEditorActive = false;
   @Input() coordPickerActive = false;
+  @Input() editableSections: ParkSectionRecord[] = [];
+  @Input() sectionEditorActive = false;
+  @Input() activeSectionIndex = 0;
+  @Input() selectedVertexIndex: number | null = null;
+  @Input() addVertexMode = false;
+  @Input() spatialReferences: SpatialReference[] = [];
+  @Input() spatialPlaceIndex = -1;
+  @Input() activeSpatialRefIndex = 0;
+  @Input() checkpoints: MapCheckpointSummary[] = [];
+  @Input() sessionSavedAt: string | null = null;
+  @Input() sceneOpts = {
+    activeScenarioId: null as string | null,
+    showRainEffect: false,
+    rainIntensityPercent: 45,
+    rainSizePercent: 100,
+    rainSectionIndex: -1,
+    showFogEffect: false,
+    fogIntensityPercent: 35,
+    fogSizePercent: 100,
+    showMotesEffect: false,
+    motesIntensityPercent: 40,
+    motesSizePercent: 100,
+    showCloudShadows: false,
+    cloudShadowIntensityPercent: 40,
+    cloudShadowSizePercent: 100,
+    showLeavesEffect: false,
+    leavesIntensityPercent: 45,
+    leavesSizePercent: 100,
+    showTreesEffect: false,
+    treesIntensityPercent: 55,
+    treesSizePercent: 100,
+    showLightningEffect: false,
+    showNightMistEffect: false,
+    nightMistIntensityPercent: 35,
+    ambientWindDeg: 245,
+    ambientWindStrengthPercent: 45,
+  };
+  @Input() spatialRefsOpts = {
+    showSpatialReferences: true,
+    spatialAnimPercent: 100,
+  };
+
+  readonly markerStyles = SPATIAL_REFERENCE_MARKER_STYLES;
+  readonly spatialRefSummary = spatialReferenceSummary;
 
   @Output() stickerSelected = new EventEmitter<string>();
   @Output() stickerChanged = new EventEmitter<StickerInstance>();
@@ -1216,7 +2086,7 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
   selectedPaletteKey: string | null = null;
 
   /** Local mirror of map options */
-  localOpts = { showSections: true, showLabels: true, showCanvasGrid: false, showTilemap: true, showBoundary: true, showMarkers: true };
+  localOpts = { showSections: true, showLabels: true, showCanvasGrid: false, showTilemap: true, showBoundary: true, showMarkers: true, showGroundTextures: true };
   localGridCellW = 32;
   localGridCellH = 32;
   localGridOpacity = 0.15;
@@ -1243,14 +2113,21 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
 
   /** Marker dot size (px) */
   localMarkerSize = 10;
+  localGroundTilePx: number = PARK_MAP_VIS.groundTilePx;
+  readonly groundTileMin = PARK_MAP_VIS.groundTileMin;
+  readonly groundTileMax = PARK_MAP_VIS.groundTileMax;
 
   /** Saved tilesets for quick access */
   savedTilesets: { name: string; thumbnailUrl: string; imageUrl: string; config: TilesetConfig }[] = [];
   activeTilesetIndex = -1;
+  checkpointLabel = '';
 
   /** Collapsible sections state — all collapsed by default */
   openSections = {
     layers: false,
+    sectionEditor: false,
+    scene: false,
+    spatialRefs: false,
     tools: false,
     info: false,
     tileEditor: false,
@@ -1309,10 +2186,12 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
         showSections: this.mapViewInfo.showSections,
         showLabels: this.mapViewInfo.showLabels,
         showCanvasGrid: this.mapViewInfo.showCanvasGrid,
-        showTilemap: (this.mapViewInfo as any).showTilemap ?? true,
+        showTilemap: this.mapViewInfo.showTilemap ?? true,
+        showGroundTextures: this.mapViewInfo.showGroundTextures ?? true,
         showBoundary: this.mapViewInfo.showBoundary,
         showMarkers: this.mapViewInfo.showMarkers,
       };
+      this.localGroundTilePx = this.mapViewInfo.groundTilePx ?? PARK_MAP_VIS.groundTilePx;
       this.localGridCellW = this.mapViewInfo.canvasGridCellW;
       this.localGridCellH = this.mapViewInfo.canvasGridCellH;
       this.localGridOpacity = this.mapViewInfo.canvasGridOpacity;
@@ -1411,6 +2290,323 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  get activePolygon(): Array<{ lat: number; lng: number }> {
+    return this.editableSections[this.activeSectionIndex]?.polygon ?? [];
+  }
+
+  get activeSection() {
+    return this.editableSections[this.activeSectionIndex] ?? null;
+  }
+
+  toggleSectionEditor(): void {
+    this.openSections.sectionEditor = true;
+    this.mapControlEvent.emit({ type: 'toggleSectionEditor' });
+  }
+
+  onSectionIndexChange(index: number): void {
+    this.mapControlEvent.emit({ type: 'setSectionEditorIndex', index });
+  }
+
+  onSectionColorChange(hex: string): void {
+    this.mapControlEvent.emit({
+      type: 'updateSectionColor',
+      sectionIndex: this.activeSectionIndex,
+      hex,
+    });
+  }
+
+  sectionFillOpacityPercent(sec: ParkSectionRecord, which: 'dark' | 'light'): number {
+    const ops = resolveSectionFillOpacities(sec);
+    return Math.round((which === 'dark' ? ops.dark : ops.light) * 100);
+  }
+
+  onSectionFillOpacityChange(which: 'dark' | 'light', percent: number): void {
+    this.mapControlEvent.emit({
+      type: 'updateSectionFillOpacity',
+      sectionIndex: this.activeSectionIndex,
+      which,
+      opacity: Math.min(100, Math.max(0, Number(percent) || 0)) / 100,
+    });
+  }
+
+  get activeSpatialRef(): SpatialReference | null {
+    return this.spatialReferences[this.activeSpatialRefIndex] ?? null;
+  }
+
+  markerStyleLabel(st: SpatialReferenceMarkerStyle): string {
+    const labels: Record<SpatialReferenceMarkerStyle, string> = {
+      circle: '○ Círculo',
+      pin: '▼ Pin',
+      square: '□ Cuadrado',
+      marker: '📍 Marcador',
+    };
+    return labels[st];
+  }
+
+  applyAmbientScenario(id: string): void {
+    this.sceneOpts.activeScenarioId = id;
+    this.mapControlEvent.emit({ type: 'applyAmbientScenario', scenarioId: id });
+    this.cdr.markForCheck();
+  }
+
+  private clearActiveScenario(): void {
+    if (!this.sceneOpts.activeScenarioId) return;
+    this.sceneOpts.activeScenarioId = null;
+    this.cdr.markForCheck();
+  }
+
+  toggleRainEffect(): void {
+    this.clearActiveScenario();
+    const next = !this.sceneOpts.showRainEffect;
+    this.sceneOpts.showRainEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showRainEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  toggleSpatialRefs(): void {
+    const next = !this.spatialRefsOpts.showSpatialReferences;
+    this.spatialRefsOpts.showSpatialReferences = next;
+    this.mapControlEvent.emit({ type: 'spatialRefsOptionChange', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onRainIntensityChange(percent: number): void {
+    this.sceneOpts.rainIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({
+      type: 'rainIntensityChange',
+      value: this.sceneOpts.rainIntensityPercent / 100,
+    });
+    this.cdr.markForCheck();
+  }
+
+  onRainSizeChange(percent: number): void {
+    this.sceneOpts.rainSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({
+      type: 'rainSizeChange',
+      value: this.sceneOpts.rainSizePercent / 100,
+    });
+    this.cdr.markForCheck();
+  }
+
+  toggleFogEffect(): void {
+    const next = !this.sceneOpts.showFogEffect;
+    this.sceneOpts.showFogEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showFogEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onFogIntensityChange(percent: number): void {
+    this.sceneOpts.fogIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'fogIntensityChange', value: this.sceneOpts.fogIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onFogSizeChange(percent: number): void {
+    this.sceneOpts.fogSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({ type: 'fogSizeChange', value: this.sceneOpts.fogSizePercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  toggleMotesEffect(): void {
+    const next = !this.sceneOpts.showMotesEffect;
+    this.sceneOpts.showMotesEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showMotesEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onMotesIntensityChange(percent: number): void {
+    this.sceneOpts.motesIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'motesIntensityChange', value: this.sceneOpts.motesIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onMotesSizeChange(percent: number): void {
+    this.sceneOpts.motesSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({ type: 'motesSizeChange', value: this.sceneOpts.motesSizePercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  toggleCloudShadows(): void {
+    const next = !this.sceneOpts.showCloudShadows;
+    this.sceneOpts.showCloudShadows = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showCloudShadows', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onCloudShadowIntensityChange(percent: number): void {
+    this.sceneOpts.cloudShadowIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'cloudShadowIntensityChange', value: this.sceneOpts.cloudShadowIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onCloudShadowSizeChange(percent: number): void {
+    this.sceneOpts.cloudShadowSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({ type: 'cloudShadowSizeChange', value: this.sceneOpts.cloudShadowSizePercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  toggleLeavesEffect(): void {
+    const next = !this.sceneOpts.showLeavesEffect;
+    this.sceneOpts.showLeavesEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showLeavesEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onLeavesIntensityChange(percent: number): void {
+    this.sceneOpts.leavesIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'leavesIntensityChange', value: this.sceneOpts.leavesIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onLeavesSizeChange(percent: number): void {
+    this.sceneOpts.leavesSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({ type: 'leavesSizeChange', value: this.sceneOpts.leavesSizePercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  toggleTreesEffect(): void {
+    const next = !this.sceneOpts.showTreesEffect;
+    this.sceneOpts.showTreesEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showTreesEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onTreesIntensityChange(percent: number): void {
+    this.sceneOpts.treesIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'treesIntensityChange', value: this.sceneOpts.treesIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onTreesSizeChange(percent: number): void {
+    this.sceneOpts.treesSizePercent = Math.min(200, Math.max(8, Number(percent) || 100));
+    this.mapControlEvent.emit({ type: 'treesSizeChange', value: this.sceneOpts.treesSizePercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  toggleLightningEffect(): void {
+    const next = !this.sceneOpts.showLightningEffect;
+    this.sceneOpts.showLightningEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showLightningEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  toggleNightMistEffect(): void {
+    const next = !this.sceneOpts.showNightMistEffect;
+    this.sceneOpts.showNightMistEffect = next;
+    this.mapControlEvent.emit({ type: 'sceneOptionChange', option: 'showNightMistEffect', value: next });
+    this.cdr.markForCheck();
+  }
+
+  onNightMistIntensityChange(percent: number): void {
+    this.sceneOpts.nightMistIntensityPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'nightMistIntensityChange', value: this.sceneOpts.nightMistIntensityPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onAmbientWindDirection(deg: number): void {
+    this.sceneOpts.ambientWindDeg = deg;
+    this.mapControlEvent.emit({ type: 'ambientWindDirectionChange', deg });
+    this.cdr.markForCheck();
+  }
+
+  onAmbientWindStrengthChange(percent: number): void {
+    this.sceneOpts.ambientWindStrengthPercent = Math.min(100, Math.max(0, Number(percent) || 0));
+    this.mapControlEvent.emit({ type: 'ambientWindStrengthChange', value: this.sceneOpts.ambientWindStrengthPercent / 100 });
+    this.cdr.markForCheck();
+  }
+
+  onRainSectionChange(index: number): void {
+    if (this.sceneOpts.rainSectionIndex === index) return;
+    this.sceneOpts.rainSectionIndex = index;
+    this.mapControlEvent.emit({ type: 'rainSectionChange', sectionIndex: index });
+    this.cdr.markForCheck();
+  }
+
+  onSpatialAnimSpeedChange(percent: number): void {
+    this.spatialRefsOpts.spatialAnimPercent = Math.min(200, Math.max(20, Number(percent) || 100));
+    this.mapControlEvent.emit({
+      type: 'spatialAnimSpeedChange',
+      value: this.spatialRefsOpts.spatialAnimPercent / 100,
+    });
+    this.cdr.markForCheck();
+  }
+
+  selectSpatialRef(index: number): void {
+    this.mapControlEvent.emit({ type: 'selectSpatialReferenceIndex', index });
+    this.cdr.markForCheck();
+  }
+
+  onMarkerStyleChange(style: SpatialReferenceMarkerStyle): void {
+    this.onSpatialRefPatch({ markerStyle: style });
+  }
+
+  onSpatialRefPatch(patch: Partial<SpatialReference>): void {
+    this.mapControlEvent.emit({
+      type: 'updateSpatialReference',
+      index: this.activeSpatialRefIndex,
+      patch,
+    });
+    this.cdr.markForCheck();
+  }
+
+  onSpatialRefSummaryChange(text: string): void {
+    const ref = this.activeSpatialRef;
+    if (!ref) return;
+    this.onSpatialRefPatch({
+      summary: text,
+      education: { ...ref.education, summary: text, referenceImageUrl: ref.education?.referenceImageUrl },
+    });
+  }
+
+  toggleSpatialPlace(index: number): void {
+    const next = this.spatialPlaceIndex === index ? -1 : index;
+    this.mapControlEvent.emit({ type: 'setSpatialReferencePlaceIndex', index: next });
+    this.cdr.markForCheck();
+  }
+
+  exportSpatialReferences(): void {
+    this.mapControlEvent.emit({ type: 'exportSpatialReferencesJson' });
+  }
+
+  selectVertex(vertexIndex: number): void {
+    this.mapControlEvent.emit({ type: 'setSectionEditorVertex', vertexIndex });
+  }
+
+  toggleAddVertexMode(): void {
+    this.mapControlEvent.emit({ type: 'setSectionEditorAddVertex', enabled: !this.addVertexMode });
+  }
+
+  deleteSelectedVertex(): void {
+    if (this.selectedVertexIndex === null) return;
+    this.mapControlEvent.emit({
+      type: 'deleteSectionVertex',
+      sectionIndex: this.activeSectionIndex,
+      vertexIndex: this.selectedVertexIndex,
+    });
+  }
+
+  onVertexFieldChange(vertexIndex: number, field: 'lat' | 'lng', value: number): void {
+    const v = this.activePolygon[vertexIndex];
+    if (!v || Number.isNaN(value)) return;
+    this.mapControlEvent.emit({
+      type: 'updateSectionVertex',
+      sectionIndex: this.activeSectionIndex,
+      vertexIndex,
+      lat: field === 'lat' ? value : v.lat,
+      lng: field === 'lng' ? value : v.lng,
+    });
+  }
+
+  exportSections(): void {
+    this.mapControlEvent.emit({ type: 'exportSectionsJson' });
+  }
+
+  resetSections(): void {
+    if (confirm('¿Restaurar los polígonos originales del repositorio? Se perderán los cambios no exportados.')) {
+      this.mapControlEvent.emit({ type: 'resetSections' });
+    }
+  }
+
   toggleEditMode(): void {
     const next = !this.isEditMode;
     this.stickerService.setEditMode(next);
@@ -1422,11 +2618,35 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
     this.mapControlEvent.emit({ type });
   }
 
+  formatSessionTime(iso: string): string {
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+      });
+    } catch {
+      return iso;
+    }
+  }
+
+  saveCheckpoint(): void {
+    const label = this.checkpointLabel.trim() || undefined;
+    this.mapControlEvent.emit({ type: 'saveCheckpoint', label });
+    this.checkpointLabel = '';
+  }
+
+  restoreCheckpoint(id: string): void {
+    this.mapControlEvent.emit({ type: 'restoreCheckpoint', id });
+  }
+
+  deleteCheckpoint(id: string): void {
+    this.mapControlEvent.emit({ type: 'deleteCheckpoint', id });
+  }
+
   emitEvent(type: 'centerMap' | 'toggleCoordPicker' | 'saveConfig' | 'loadConfig' | 'clearStickers' | 'clearPaintedTiles' | 'toggleEditorMode' | 'toggleFullscreen'): void {
     this.mapControlEvent.emit({ type } as MapControlEvent);
   }
 
-  toggleOpt(option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers'): void {
+  toggleOpt(option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers' | 'showGroundTextures'): void {
     (this.localOpts as any)[option] = !(this.localOpts as any)[option];
     this.mapControlEvent.emit({ type: 'optionChange', option, value: (this.localOpts as any)[option] });
   }
@@ -1564,6 +2784,11 @@ export class StickerPanelComponent implements OnInit, OnChanges, OnDestroy {
   onMarkerSizeChange(size: number): void {
     this.localMarkerSize = size;
     this.mapControlEvent.emit({ type: 'markerSize', value: size } as MapControlEvent);
+  }
+
+  onGroundTilePxChange(px: number): void {
+    this.localGroundTilePx = px;
+    this.mapControlEvent.emit({ type: 'groundTilePxChange', value: px });
   }
 
   // ── Tileset management ─────────────────────────────────

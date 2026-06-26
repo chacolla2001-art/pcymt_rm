@@ -1,19 +1,16 @@
-@if (isLoading) {
-  <div class="spinner-container">
-    <mat-spinner diameter="60"></mat-spinner>
-  </div>
-} @else {
+@if (!isLoading) {
   <div class="tools-container">
     <!-- Search Controls -->
     <div class="search-controls">
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="search-input">
-        <mat-label>Buscar usuario</mat-label>
-        <input #searchInput matInput placeholder="Nombre o correo..."
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-input">
+        <mat-label>{{ 'table.searchUser' | translate }}</mat-label>
+        <input #searchInput matInput [placeholder]="'table.searchUserPlaceholder' | translate"
                (keydown.enter)="applyFilter(searchInput.value)"
                (input)="searchInput.value === '' && applyFilter('')">
         <button *ngIf="searchInput.value" mat-icon-button matSuffix type="button"
                 (click)="searchInput.value = ''; applyFilter('')"
-                matTooltip="Limpiar búsqueda">
+                [matTooltip]="'table.clearSearch' | translate"
+                [attr.aria-label]="'table.clearSearch' | translate">
           <mat-icon>close</mat-icon>
         </button>
         <mat-icon *ngIf="!searchInput.value" matSuffix>search</mat-icon>
@@ -21,20 +18,20 @@
 
       <button mat-stroked-button class="control-button" (click)="applyFilter(searchInput.value)">
         <mat-icon>search</mat-icon>
-        <span class="label">Buscar</span>
+        <span class="label">{{ 'table.search' | translate }}</span>
       </button>
 
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="status-filter">
-        <mat-label>Estado</mat-label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-filter">
+        <mat-label>{{ 'table.status' | translate }}</mat-label>
         <mat-select [(value)]="selectedStatus" (selectionChange)="applyStatusFilter()">
-          <mat-option value="all">Todos</mat-option>
-          <mat-option value="active">Activos</mat-option>
-          <mat-option value="inactive">Inactivos</mat-option>
+          <mat-option value="all">{{ 'table.statusAll' | translate }}</mat-option>
+          <mat-option value="active">{{ 'table.statusActive' | translate }}</mat-option>
+          <mat-option value="inactive">{{ 'table.statusInactive' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
       
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="role-filter">
-        <mat-label>Rol</mat-label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="role-filter">
+        <mat-label>{{ 'table.role' | translate }}</mat-label>
         <mat-select [(value)]="selectedRole" (selectionChange)="applyRoleFilter()">
           <mat-option *ngFor="let r of roleOptions" [value]="r.value">{{ r.label }}</mat-option>
         </mat-select>
@@ -43,15 +40,15 @@
 
     <!-- Action Buttons -->
     <div class="action-buttons">
-      <button mat-raised-button color="primary" class="control-button new-btn" (click)="openDialog()">
+      <button mat-flat-button color="primary" class="control-button new-btn" (click)="openDialog()">
         <mat-icon>person_add</mat-icon>
-        <span class="label">Nuevo usuario</span>
+        <span class="label">{{ 'table.newUser' | translate }}</span>
       </button>
 
       @if (isFilteredById) {
         <button mat-stroked-button color="accent" class="control-button" (click)="clearIdFilter()">
           <mat-icon>filter_list_off</mat-icon>
-          <span class="label">Mostrar todos</span>
+          <span class="label">{{ 'table.showAll' | translate }}</span>
         </button>
       }
     </div>
@@ -68,24 +65,27 @@
                 <button mat-icon-button
                         color="primary"
                         class="action-btn"
-                        matTooltip="Editar rol y estado"
+                        [matTooltip]="'table.editUser' | translate"
                         matTooltipPosition="above"
+                        [attr.aria-label]="'table.editUser' | translate"
                         (click)="onEdit(element)">
                   <mat-icon>edit</mat-icon>
                 </button>
                 <button mat-icon-button
                         color="accent"
                         class="action-btn"
-                        matTooltip="Cambiar contraseña"
+                        [matTooltip]="'table.changePassword' | translate"
                         matTooltipPosition="above"
+                        [attr.aria-label]="'table.changePassword' | translate"
                         (click)="onChangePassword(element)">
                   <mat-icon>lock_reset</mat-icon>
                 </button>
                 <button mat-icon-button
                         color="warn"
                         class="action-btn action-btn-delete"
-                        matTooltip="Eliminar usuario"
+                        [matTooltip]="'table.deleteUser' | translate"
                         matTooltipPosition="above"
+                        [attr.aria-label]="'table.deleteUser' | translate"
                         (click)="onDelete(element)">
                   <mat-icon>delete_outline</mat-icon>
                 </button>
@@ -114,6 +114,14 @@
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
     <tr mat-row *matRowDef="let row; columns: displayedColumns;"
         [class.row-inactive]="!row.is_active">
+    </tr>
+    <tr class="mat-mdc-no-data-row" *matNoDataRow>
+      <td class="mat-mdc-cell" [attr.colspan]="displayedColumns.length">
+        <div class="table-empty-state">
+          <mat-icon>person_off</mat-icon>
+          <p>{{ 'table.noUsers' | translate }}</p>
+        </div>
+      </td>
     </tr>
   </table>
 

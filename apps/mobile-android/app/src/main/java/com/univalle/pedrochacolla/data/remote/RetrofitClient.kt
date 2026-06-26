@@ -51,8 +51,4 @@ object RetrofitClient {
     val mapConfigApi: MapConfigurationApiService by lazy {
         retrofit.create(MapConfigurationApiService::class.java)
     }
-
-    val mapTileApi: MapTileApiService by lazy {
-        retrofit.create(MapTileApiService::class.java)
-    }
 }

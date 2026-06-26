@@ -52,10 +52,13 @@ class AuthController {
         return ResponseUtil.error(res, 'Google authentication is not configured', 503);
       }
 
+      const platform = req.body.platform || 'mobile';
+
       const result = await this.authService.loginWithGoogle(
         token,
         this.googleAuthService,
         this.userService,
+        platform,
       );
 
       return ResponseUtil.success(res, result, 'Google login successful');

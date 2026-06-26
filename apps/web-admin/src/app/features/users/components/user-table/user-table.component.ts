@@ -16,6 +16,7 @@ import { BaseTableComponent, TableDataType } from '../../../../shared/controls/b
 import { UserService } from '../../services/user.service';
 import { User } from '../../models/user.model';
 import { CreateDialogComponent, DialogData } from '../../../../shared/modal-dialogs/create-dialog';
+import { TranslatePipe } from '../../../../shared/pipes/translate.pipe';
 
 /**
  * Componente de tabla para gestión de usuarios
@@ -37,7 +38,8 @@ import { CreateDialogComponent, DialogData } from '../../../../shared/modal-dial
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
-    MatTooltipModule
+    MatTooltipModule,
+    TranslatePipe,
   ]
 })
 export class UserTableComponent extends BaseTableComponent implements AfterViewInit {
@@ -97,7 +99,7 @@ export class UserTableComponent extends BaseTableComponent implements AfterViewI
   public override loadData(type: TableDataType): void {
     if (!this.isBrowser) return;
 
-    this.isLoading = true;
+    this.startTableLoad();
     this.currentLoadType = type;
 
     if (type !== 'users') {
@@ -118,7 +120,7 @@ export class UserTableComponent extends BaseTableComponent implements AfterViewI
         this.setupDataSource(result.rows);
       },
       error: () => {
-        this.isLoading = false;
+        this.finishTableLoad();
         this.alertService.showAlert('Error al cargar usuarios', 'error', 2000);
       }
     });
@@ -145,7 +147,7 @@ export class UserTableComponent extends BaseTableComponent implements AfterViewI
         this.paginator.pageSize = this.pageSize;
       }
     });
-    this.isLoading = false;
+    this.finishTableLoad();
   }
 
   /** Override: server-side search */

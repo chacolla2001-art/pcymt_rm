@@ -13,17 +13,6 @@
   background-color: var(--sys-surface);
 }
 
-/* Loading Overlay */
-.loading-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.3);
-  z-index: 200;
-}
-
 /* Left Sidebar */
 .sidebar {
   width: 260px;

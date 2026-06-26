@@ -37,7 +37,117 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Chip: zona actual del parque (P0 orientación) -->
+    <TextView
+        android:id="@+id/chip_current_section"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_section_chip"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/banner_out_of_bounds"
+        tools:text="Estás en: Tierras Medias"
+        tools:visibility="visible" />
 
+    <!-- Botones de zona (vista jugador) -->
+    <HorizontalScrollView
+        android:id="@+id/section_zone_scroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="6dp"
+        android:scrollbars="none"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/chip_current_section">
+
+        <LinearLayout
+            android:id="@+id/section_zone_buttons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="4dp" />
+    </HorizontalScrollView>
+
+    <!-- Ficha educativa de zona -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/section_edu_card"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="12dp"
+        android:visibility="gone"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/section_zone_scroll"
+        tools:visibility="visible">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:id="@+id/section_edu_color_bar"
+                    android:layout_width="4dp"
+                    android:layout_height="match_parent"
+                    android:minHeight="24dp"
+                    android:background="#8D6E63" />
+
+                <TextView
+                    android:id="@+id/section_edu_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textStyle="bold"
+                    tools:text="Tierras Altas" />
+
+                <ImageButton
+                    android:id="@+id/btn_close_section_edu"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Cerrar"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/section_edu_image"
+                android:layout_width="match_parent"
+                android:layout_height="120dp"
+                android:layout_marginTop="8dp"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/section_edu_summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="2dp"
+                android:textSize="14sp"
+                tools:text="Descripción educativa del ecosistema." />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Botón Volver (top-left) -->
     <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -128,7 +238,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        android:contentDescription="Mostrar puntos de interés"
+        android:contentDescription="@string/map_scene_fab_desc"
         android:src="@drawable/ic_layers"
         app:fabSize="mini"
         app:backgroundTint="#FFFFFF"

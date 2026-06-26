@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../environments/environment';
 import { AppConfigService } from './app-config.service';
+import { normalizeAvatarPath } from '../utils/avatar-url.util';
 
 const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'fbx']);
 
@@ -30,6 +31,7 @@ export interface ApiEndpoints {
     checkEmail: string;
     toggleActive: (id: string) => string;
     profilePicture: (id: string) => string;
+    avatar: (id: string) => string;
   };
   // Virtual Assets
   virtualAssets: {
@@ -165,6 +167,7 @@ export class ApiRoutesService {
         checkEmail: `${api}/users/check-email`,
         toggleActive: (id: string) => `${api}/users/${id}/toggle-active`,
         profilePicture: (id: string) => `${api}/users/${id}/profile-picture`,
+        avatar: (id: string) => `${api}/users/${id}/avatar`,
       },
 
       // ═══════════════════════════════════════════════════════════════
@@ -319,30 +322,16 @@ export class ApiRoutesService {
   getAssetUrl(path: string | null | undefined): string {
     if (!path) return '';
 
-    // Si es una URL externa (ej: Google profile pictures), devolverla tal cual
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path;
-    }
-
-    // Normalizar paths antiguos: /uploads/file.png → /api/files/file.png
-    let normalizedPath = path.replace(/^\/uploads\//, '/api/files/');
-
-    // Retrocompat: iconos sueltos → carpeta model-icons
-    normalizedPath = normalizedPath.replace(
-      /^\/api\/files\/(bear|cattle|chicken|cow|dog|horse|leopard|lizard|pig|tiger|viper|reptile)\.png$/,
-      '/api/files/model-icons/$1.png',
-    );
-
-    // Asegurar que empiece con /
-    if (!normalizedPath.startsWith('/')) {
-      normalizedPath = `/${normalizedPath}`;
+    const normalizedPath = normalizeAvatarPath(path);
+    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) {
+      return normalizedPath;
     }
 
     const url = `${this.baseUrl}${normalizedPath}`;
 
     // Adjuntar token JWT como query param para autenticación en <img> tags
     const token = localStorage.getItem('token');
-    return token ? `${url}?token=${token}` : url;
+    return token ? `${url}?token=${encodeURIComponent(token)}` : url;
   }
 
   /** Extrae la ruta relativa dentro del bucket (ej. bear.glb, map-icons/foo.svg) */

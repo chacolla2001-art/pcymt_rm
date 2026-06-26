@@ -20,11 +20,11 @@ describe('LoginRedirectGuard', () => {
     });
   });
 
-  it('should redirect to /main when already authenticated', () => {
+  it('should redirect to /dashboard when already authenticated', () => {
     authServiceSpy.isUserAuthenticated.and.returnValue(true);
 
     const result = TestBed.runInInjectionContext(() => LoginRedirectGuard({} as any, {} as any));
-    expect(routerSpy.createUrlTree).toHaveBeenCalledWith(['/main']);
+    expect(routerSpy.createUrlTree).toHaveBeenCalledWith(['/dashboard']);
     expect(result).toEqual(jasmine.any(Object)); // UrlTree
   });
 

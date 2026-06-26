@@ -38,13 +38,21 @@
               },
               {
                 "glob": "**/*",
+                "input": "../../shared/data/",
+                "output": "data/park"
+              },
+              {
+                "glob": "**/*",
                 "input": "src/styles/",
                 "output": "styles"
+              },
+              {
+                "glob": "**/*.{woff,woff2}",
+                "input": "node_modules/material-icons/iconfont/",
+                "output": "assets/material-icons/"
               }
             ],
             "styles": [
-              "node_modules/material-icons/iconfont/material-icons.css",
-              "src/tailwind.css",
               "src/styles.scss"
             ],
             "scripts": [

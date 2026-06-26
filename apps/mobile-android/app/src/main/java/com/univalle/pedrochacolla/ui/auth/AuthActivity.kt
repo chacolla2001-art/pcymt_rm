@@ -11,9 +11,9 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.findNavController
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.navigateUp
-import com.univalle.pedrochacolla.MainActivity
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.databinding.ActivityAuthBinding
+import com.univalle.pedrochacolla.utils.navigation.AppEntryNavigation
 import com.univalle.pedrochacolla.utils.session.SessionManager
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -58,8 +58,7 @@ class AuthActivity : AppCompatActivity() {
         // Standard mobile-app behaviour: always stay logged in if a saved token exists.
         // The user must explicitly log out to clear the session.
         if (sessionManager.loadSession()) {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+            AppEntryNavigation.openAfterAuth(this)
             return true
         }
         return false

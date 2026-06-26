@@ -47,9 +47,9 @@ class ParkMap3DManager(
     companion object {
         private const val TAG = "ParkMap3DManager"
 
-        // Park center — MUST match ParkMapView.LAT_CENTER / LNG_CENTER exactly
-        private const val LAT_CENTER = -16.48933421
-        private const val LNG_CENTER = -68.14573989
+        // Park center — OSM centroid (shared/data/park-boundary.json)
+        private const val LAT_CENTER = -16.48890769
+        private const val LNG_CENTER = -68.14567761
         private val LAT_CORRECTION = cos(LAT_CENTER * Math.PI / 180.0)
 
         // Scale: convert geo degrees → 3D scene units

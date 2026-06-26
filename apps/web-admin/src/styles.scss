@@ -1,14 +1,19 @@
 @use '@angular/material' as mat;
+@use './styles/page-layout';
+@use './styles/auth-layout';
+@use './styles/semantic-tokens';
+
+@import '@fontsource/material-icons/400.css';
 
 // ==================== THEME DEFINITIONS ====================
-// Base palettes for component structure (overridden below by brand tokens)
+// Angular Material 3 default palettes (violet / rose)
 
 // Light theme
 $light-theme: mat.define-theme((
   color: (
     theme-type: light,
-    primary: mat.$orange-palette,
-    tertiary: mat.$red-palette,
+    primary: mat.$violet-palette,
+    tertiary: mat.$rose-palette,
     use-system-variables: true,
   ),
   typography: (
@@ -20,8 +25,8 @@ $light-theme: mat.define-theme((
 $dark-theme: mat.define-theme((
   color: (
     theme-type: dark,
-    primary: mat.$orange-palette,
-    tertiary: mat.$red-palette,
+    primary: mat.$violet-palette,
+    tertiary: mat.$rose-palette,
     use-system-variables: true,
   ),
   typography: (
@@ -36,122 +41,15 @@ html {
   @include mat.all-component-themes($light-theme);
   @include mat.system-level-colors($light-theme);
   @include mat.system-level-typography($light-theme);
+  background-color: var(--mat-sys-background);
+  color-scheme: light;
 }
 
 html.dark-theme {
   @include mat.all-component-colors($dark-theme);
   @include mat.system-level-colors($dark-theme);
-}
-
-// ==================== BRAND COLOR OVERRIDES ====================
-// Parque de las Culturas y de la Madre Tierra — PCyMT palette
-// Applied AFTER Material so they take precedence over --mat-sys-* defaults
-
-:root,
-html:not(.dark-theme) {
-  // ── Primary: Marrón Tierra #634F46 ──
-  --mat-sys-primary: #634F46;
-  --mat-sys-on-primary: #FDFBF7;
-  --mat-sys-primary-container: #D9B992;
-  --mat-sys-on-primary-container: #1C1C1C;
-  --mat-sys-inverse-primary: #D9B992;
-
-  // ── Secondary: Verde Salvia #C9C99A ──
-  --mat-sys-secondary: #7A7A4A;
-  --mat-sys-on-secondary: #FDFBF7;
-  --mat-sys-secondary-container: #C9C99A;
-  --mat-sys-on-secondary-container: #1C1C1C;
-
-  // ── Tertiary / CTA: Rojo Arcilla #A33B31 ──
-  --mat-sys-tertiary: #A33B31;
-  --mat-sys-on-tertiary: #FDFBF7;
-  --mat-sys-tertiary-container: #F2C4BF;
-  --mat-sys-on-tertiary-container: #3B0F0B;
-
-  // ── Error ──
-  --mat-sys-error: #A33B31;
-  --mat-sys-on-error: #FDFBF7;
-  --mat-sys-error-container: #F2C4BF;
-  --mat-sys-on-error-container: #3B0F0B;
-
-  // ── Background & Surface: Blanco Crema #FDFBF7 ──
-  --mat-sys-background: #FDFBF7;
-  --mat-sys-on-background: #1C1C1C;
-  --mat-sys-surface: #FDFBF7;
-  --mat-sys-on-surface: #1C1C1C;
-  --mat-sys-surface-variant: #EDE8E0;
-  --mat-sys-on-surface-variant: #4A3F38;
-  --mat-sys-surface-container-lowest: #FFFFFF;
-  --mat-sys-surface-container-low: #F7F3EE;
-  --mat-sys-surface-container: #EDE8E0;
-  --mat-sys-surface-container-high: #E5DDD4;
-  --mat-sys-surface-container-highest: #DDD4C9;
-  --mat-sys-surface-bright: #FDFBF7;
-  --mat-sys-surface-dim: #D9D0C6;
-  --mat-sys-surface-tint: #634F46;
-  --mat-sys-inverse-surface: #312920;
-  --mat-sys-inverse-on-surface: #F7F3EE;
-
-  // ── Outline: mid-tone warm ──
-  --mat-sys-outline: #8A7060;
-  --mat-sys-outline-variant: #C9B9AA;
-
-  // ── Misc ──
-  --mat-sys-shadow: #000000;
-  --mat-sys-scrim: #000000;
-}
-
-html.dark-theme {
-  // ── Primary light for dark bg ──
-  --mat-sys-primary: #D9B992;
-  --mat-sys-on-primary: #1C1C1C;
-  --mat-sys-primary-container: #4A3428;
-  --mat-sys-on-primary-container: #F2DFC8;
-  --mat-sys-inverse-primary: #634F46;
-
-  // ── Secondary ──
-  --mat-sys-secondary: #C9C99A;
-  --mat-sys-on-secondary: #1C1C1C;
-  --mat-sys-secondary-container: #3D3D1A;
-  --mat-sys-on-secondary-container: #E8E8C0;
-
-  // ── Tertiary / CTA ──
-  --mat-sys-tertiary: #F2C4BF;
-  --mat-sys-on-tertiary: #3B0F0B;
-  --mat-sys-tertiary-container: #7A2A22;
-  --mat-sys-on-tertiary-container: #FFDAD4;
-
-  // ── Error ──
-  --mat-sys-error: #F2C4BF;
-  --mat-sys-on-error: #3B0F0B;
-  --mat-sys-error-container: #7A2A22;
-  --mat-sys-on-error-container: #FFDAD4;
-
-  // ── Background & Surface ──
-  --mat-sys-background: #1C1714;
-  --mat-sys-on-background: #EDE8E0;
-  --mat-sys-surface: #1C1714;
-  --mat-sys-on-surface: #EDE8E0;
-  --mat-sys-surface-variant: #4A3F38;
-  --mat-sys-on-surface-variant: #C9B9AA;
-  --mat-sys-surface-container-lowest: #140F0D;
-  --mat-sys-surface-container-low: #231D1A;
-  --mat-sys-surface-container: #28201D;
-  --mat-sys-surface-container-high: #332923;
-  --mat-sys-surface-container-highest: #3E312A;
-  --mat-sys-surface-bright: #3E312A;
-  --mat-sys-surface-dim: #1C1714;
-  --mat-sys-surface-tint: #D9B992;
-  --mat-sys-inverse-surface: #EDE8E0;
-  --mat-sys-inverse-on-surface: #312920;
-
-  // ── Outline ──
-  --mat-sys-outline: #9E897A;
-  --mat-sys-outline-variant: #4A3F38;
-
-  // ── Misc ──
-  --mat-sys-shadow: #000000;
-  --mat-sys-scrim: #000000;
+  background-color: var(--mat-sys-background);
+  color-scheme: dark;
 }
 
 // ==================== CSS VARIABLE ALIASES ====================
@@ -224,6 +122,13 @@ html.dark-theme {
 
 html, body {
   height: 100%;
+  min-height: 100dvh;
+}
+
+app-root {
+  display: block;
+  min-height: 100%;
+  background-color: var(--sys-background);
 }
 
 body {
@@ -233,14 +138,27 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-mat-icon {
-  font-family: 'Material Icons', sans-serif;
+mat-icon,
+.mat-icon {
+  font-family: 'Material Icons', sans-serif !important;
   font-weight: normal;
   font-style: normal;
+  font-size: 24px;
+  line-height: 1;
   letter-spacing: normal;
   text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
   white-space: nowrap;
   word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
 }
 
 // ==================== SCROLLBAR THEMING ====================
@@ -283,7 +201,7 @@ a {
 
 // ==================== RESPONSIVE UTILITIES ====================
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .hide-mobile {
     display: none !important;
   }
@@ -292,7 +210,40 @@ a {
 .show-mobile {
   display: none !important;
 
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
     display: block !important;
+  }
+}
+
+// ==================== ACCESSIBILITY ====================
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0.5rem;
+  z-index: 10000;
+  padding: 0.75rem 1rem;
+  border-radius: 0 0 8px 8px;
+  background: var(--sys-primary);
+  color: var(--sys-on-primary);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 12px var(--sys-shadow);
+
+  &:focus {
+    top: 0;
+    outline: 2px solid var(--sys-on-primary);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

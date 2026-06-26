@@ -48,8 +48,14 @@
     <color name="background_dark">#FF1E1E1E</color>
 
     <!-- Modo Explorador — estados de encuentro -->
-    <color name="encounter_nearby">#FFCC2200</color>   <!-- Naranja-rojo: animal cercano -->
-    <color name="encounter_found">#FF34C759</color>    <!-- Verde: animal ya encontrado -->
+    <color name="encounter_nearby">#FFCC2200</color>
+    <color name="encounter_found">#FF34C759</color>
+
+    <!-- Ecosistemas del parque (alineado con shared/data/park-sections.json) -->
+    <color name="section_highlands">#8D6E63</color>
+    <color name="section_midlands">#66BB6A</color>
+    <color name="section_lowlands">#42A5F5</color>
+    <color name="section_myths">#AB47BC</color>
 
 
 </resources>

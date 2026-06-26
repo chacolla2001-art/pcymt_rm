@@ -105,7 +105,7 @@
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Restablecer posiciones de POIs"
+        android:text="Restablecer referencias espaciales"
         android:textColor="#888888"
         android:textSize="12sp"
         android:visibility="gone" />

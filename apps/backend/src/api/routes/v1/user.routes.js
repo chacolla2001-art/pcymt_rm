@@ -1,7 +1,7 @@
 const express = require('express');
 const { userSchemas } = require('../../../shared/validators');
 const { validateBody, authLimiter, passwordResetLimiter } = require('../../middlewares');
-const { adminOnly } = require('../../middlewares/authorize.middleware');
+const { adminOnly, staffOnly } = require('../../middlewares/authorize.middleware');
 
 /**
  * Create user routes
@@ -16,7 +16,7 @@ const createUserRoutes = (userController, authMiddleware, uploadMiddleware) => {
   // Public routes with rate limiting
   router.post('/register',
     authLimiter,
-    uploadMiddleware.single('profile_picture_url'),
+    uploadMiddleware.profilePicture(),
     validateBody(userSchemas.create),
     userController.create,
   );
@@ -45,19 +45,19 @@ const createUserRoutes = (userController, authMiddleware, uploadMiddleware) => {
     userController.deleteOwnAccount,
   );
 
-  router.get('/', authMiddleware, userController.getAll);
+  router.get('/', authMiddleware, staffOnly, userController.getAll);
   router.get('/:id', authMiddleware, userController.getById);
 
   router.put('/:id',
     authMiddleware,
-    uploadMiddleware.single('profile_picture_url'),
+    uploadMiddleware.profilePicture(),
     validateBody(userSchemas.update),
     userController.update,
   );
 
-  router.delete('/:id', authMiddleware, userController.delete);
+  router.delete('/:id', authMiddleware, staffOnly, userController.delete);
 
-  router.patch('/:id/toggle-active', authMiddleware, userController.toggleActive);
+  router.patch('/:id/toggle-active', authMiddleware, staffOnly, userController.toggleActive);
 
   router.patch('/:id/set-password',
     authMiddleware,
@@ -68,8 +68,14 @@ const createUserRoutes = (userController, authMiddleware, uploadMiddleware) => {
 
   router.patch('/:id/profile-picture',
     authMiddleware,
-    uploadMiddleware.single('profile_picture_url'),
+    uploadMiddleware.profilePicture(),
     userController.updateProfilePicture,
+  );
+
+  router.patch('/:id/avatar',
+    authMiddleware,
+    validateBody(userSchemas.setAvatar),
+    userController.setAvatar,
   );
 
   return router;

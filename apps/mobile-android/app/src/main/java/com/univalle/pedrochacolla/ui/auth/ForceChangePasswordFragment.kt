@@ -11,7 +11,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.univalle.pedrochacolla.MainActivity
+import com.univalle.pedrochacolla.utils.navigation.AppEntryNavigation
 import com.univalle.pedrochacolla.databinding.FragmentForceChangePasswordBinding
 import com.univalle.pedrochacolla.utils.loading_screen.LoadingDialogFragment
 import com.univalle.pedrochacolla.utils.session.SessionManager
@@ -128,8 +128,7 @@ class ForceChangePasswordFragment : Fragment() {
         loadingDialog?.dismiss()
         loadingDialog = null
         Timber.i("ForceChangePasswordFragment: Password changed successfully — navigating to MainActivity")
-        startActivity(Intent(requireContext(), MainActivity::class.java))
-        requireActivity().finish()
+        AppEntryNavigation.openAfterAuth(requireContext())
     }
 
     private fun onError(message: String) {

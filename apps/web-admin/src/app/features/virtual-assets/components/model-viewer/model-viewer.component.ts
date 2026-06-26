@@ -71,7 +71,24 @@ export class ModelViewerComponent implements OnInit, OnDestroy {
   }
 
   private getThemeColor(): number {
+    if (typeof document !== 'undefined') {
+      const css = getComputedStyle(document.documentElement).getPropertyValue('--sys-surface-container').trim();
+      if (css) {
+        return this.cssColorToHex(css);
+      }
+    }
     return this.themeManager.isDarkMode() ? THEME_COLORS.dark : THEME_COLORS.light;
+  }
+
+  private cssColorToHex(color: string): number {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return THEME_COLORS.light;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return (r << 16) | (g << 8) | b;
   }
 
   initThreeJS() {

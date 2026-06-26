@@ -78,7 +78,7 @@ describe('AuthService', () => {
       service.login({ email: 'bad@test.com', password: 'wrong' }).subscribe({
         error: (err) => {
           expect(err.status).toBe(401);
-          expect(alertSpy.showError).toHaveBeenCalled();
+          expect(alertSpy.showError).not.toHaveBeenCalled();
         }
       });
 
@@ -89,7 +89,7 @@ describe('AuthService', () => {
     it('should handle network error', () => {
       service.login({ email: 'a@b.com', password: 'p' }).subscribe({
         error: () => {
-          expect(alertSpy.showError).toHaveBeenCalled();
+          expect(alertSpy.showError).not.toHaveBeenCalled();
         }
       });
 

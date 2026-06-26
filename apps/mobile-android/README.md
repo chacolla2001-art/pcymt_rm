@@ -1,6 +1,6 @@
-# 📱 Android App - Kotlin + ARCore + Jetpack Compose
+# 📱 Android App - Kotlin + ARCore + ViewBinding
 
-Aplicación móvil de realidad aumentada para visualización de modelos 3D en el mundo real.
+Aplicación móvil **Juku Go** para visitantes: exploración del parque, mapa custom y tres modos AR (mixta, mapa AR, AR simple).
 
 ---
 
@@ -120,22 +120,18 @@ apps/mobile-android/
 ## Capítulo 3: Arquitectura MVVM
 
 ### Data Layer
-Maneja datos de API y base de datos local.
+Datos remotos vía Retrofit; sin persistencia local Room (eliminada en reingeniería 2026).
 
 **Componentes:**
-- **ApiClient** - Cliente Retrofit
-- **Database** - Room Database
-- **Repository** - Capa de abstracción
+- **RetrofitClient** / **ApiClient** — HTTP + JWT
+- **Repositories** — Auth, locations, interactions, map config, etc.
 
 ```kotlin
-// Ejemplo: AnimalRepository
-class AnimalRepository @Inject constructor(
-    private val apiService: ApiService,
-    private val animalDao: AnimalDao
+// Ejemplo: LocationRepository
+class LocationRepository @Inject constructor(
+    private val locationApi: LocationApiService
 ) {
-    suspend fun getAnimals(): List<Animal> {
-        // Lógica de caché + API
-    }
+    suspend fun getActiveLocations(): Result<List<Location>> { /* ... */ }
 }
 ```
 
@@ -154,7 +150,8 @@ class GetAnimalsUseCase @Inject constructor(
 ```
 
 ### Presentation Layer
-UI con Jetpack Compose + ViewModels.
+### Presentation Layer
+UI con **Fragments + ViewBinding + XML** (no Jetpack Compose) y ViewModels con StateFlow.
 
 ```kotlin
 @HiltViewModel
@@ -476,27 +473,16 @@ app/src/androidTest/
         └── LoginScreenTest.kt
 ```
 
-### Pruebas de UI (Compose)
+### Pruebas de UI (instrumented)
 
-```kotlin
-@Test
-fun testLoginButtonDisplayed() {
-    composeTestRule.setContent {
-        LoginScreen()
-    }
-    
-    composeTestRule
-        .onNodeWithText("Login")
-        .assertIsDisplayed()
-}
-```
+Pruebas Espresso sobre Fragments (p. ej. login). Ver `app/src/androidTest/`.
 
 ---
 
 ## 📚 Recursos Adicionales
 
 - **[ARCore Documentation](https://developers.google.com/ar)** - Docs oficiales de ARCore
-- **[Jetpack Compose](https://developer.android.com/jetpack/compose)** - UI moderna de Android
+- **[ViewBinding](https://developer.android.com/topic/libraries/view-binding)** — UI declarativa XML
 - **[Kotlin Documentation](https://kotlinlang.org/)** - Lenguaje Kotlin
 - **[README Principal](../README.md)** - Documentación del proyecto completo
 - **[Backend README](../backend/README.md)** - API documentation

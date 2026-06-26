@@ -19,13 +19,6 @@
         android:label="AR"
         tools:layout="@layout/fragment_ar" />
 
-    <!-- AR Unsupported Device Fragment -->
-    <fragment
-        android:id="@+id/navigation_ar_unsupported"
-        android:name="com.univalle.pedrochacolla.ui.ar.ArUnsupportedFragment"
-        android:label="AR no disponible"
-        tools:layout="@layout/fragment_ar_unsupported" />
-
     <!-- Assets Grid Fragment - Shows anchor points by section -->
     <fragment
         android:id="@+id/navigation_collection"

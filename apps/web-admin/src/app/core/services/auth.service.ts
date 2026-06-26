@@ -1,20 +1,21 @@
 import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
-import { Observable, tap, catchError, throwError, of, switchMap } from 'rxjs';
+import { Observable, tap, catchError, throwError, of, switchMap, Subject } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Router } from '@angular/router';
-import { User } from '../../features/users/models/user.model';
+import { User, UserRole } from '../../features/users/models/user.model';
 import { AlertService } from './alert.service';
 import { ApiRoutesService } from './api-routes.service';
 import { LoggerService } from './logger.service';
 import {
   LoginResponse,
   ApiErrorResponse,
+  RefreshTokenResponse,
   API_ERROR_CODES,
   ERROR_MESSAGES,
-  RefreshTokenResponse
 } from '../models/api-response.model';
+import { resolveApiError } from '../utils/api-error.util';
 
 /** Claves de almacenamiento local */
 const STORAGE_KEYS = {
@@ -34,6 +35,9 @@ const STORAGE_KEYS = {
 export class AuthService {
   public currentUser: User | undefined;
   private readonly isBrowser: boolean;
+  private readonly userUpdatedSubject = new Subject<void>();
+  /** Emite cuando el perfil del usuario en sesión cambia */
+  readonly userUpdated$ = this.userUpdatedSubject.asObservable();
 
   constructor(
     private readonly router: Router,
@@ -79,21 +83,14 @@ export class AuthService {
     return this.http
       .post<LoginResponse>(this.apiRoutes.endpoints.auth.login, payload, { headers })
       .pipe(
-        tap((response) => {
-          if (!response.success || !response.data) {
-            this.logger.error('Respuesta de login sin datos', 'AuthService', {
-              success: response.success,
-              message: response.message
-            });
-            return;
+        switchMap((response) => {
+          if (!response.success || !response.data?.token) {
+            return throwError(() => new HttpErrorResponse({
+              status: 401,
+              error: response,
+            }));
           }
 
-          if (!response.data.token) {
-            this.logger.error('Respuesta de login sin token', 'AuthService');
-            return;
-          }
-
-          // Guardar datos de usuario - campos sincronizados con backend
           const user = response.data.user;
           const userData: Partial<User> = {
             id: String(user.id),
@@ -105,7 +102,7 @@ export class AuthService {
             email_verified_at: user.email_verified_at ? new Date(user.email_verified_at) : undefined,
             last_login_at: user.last_login_at ? new Date(user.last_login_at) : undefined,
             created_at: user.created_at ? new Date(user.created_at) : undefined,
-            updated_at: user.updated_at ? new Date(user.updated_at) : undefined
+            updated_at: user.updated_at ? new Date(user.updated_at) : undefined,
           };
           this.currentUser = new User(userData);
           this.saveToken(response.data.token, response.data.refreshToken);
@@ -117,11 +114,19 @@ export class AuthService {
           this.logger.info('Login exitoso', 'AuthService', {
             userId: response.data.user.id,
             email: response.data.user.email,
-            role: response.data.user.role
+            role: response.data.user.role,
           });
+
+          return of(response);
         }),
         catchError((error: HttpErrorResponse) => this.handleAuthError(error, 'login'))
       );
+  }
+
+  /** Verifica si el usuario tiene rol staff (admin o moderator) */
+  isStaffUser(): boolean {
+    const role = this.currentUser?.role?.toLowerCase();
+    return role === UserRole.ADMIN || role === UserRole.MODERATOR;
   }
 
   /** Cierra la sesión actual */
@@ -213,18 +218,21 @@ export class AuthService {
 
             // Actualizar usuario si viene en la respuesta
             if (response.data.user) {
+              const existing = this.currentUser;
               const userData: Partial<User> = {
                 id: String(response.data.user.id),
                 name: response.data.user.name,
                 email: response.data.user.email,
                 role: response.data.user.role,
                 is_active: response.data.user.is_active,
+                avatar_url: response.data.user.avatar_url ?? existing?.avatar_url,
               };
               this.currentUser = new User(userData);
               localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
             }
 
             this.logger.info('Token refrescado exitosamente', 'AuthService');
+            this.userUpdatedSubject.next();
           }
         }),
         catchError((error: HttpErrorResponse) => {
@@ -247,6 +255,7 @@ export class AuthService {
         email: user.email
       });
     }
+    this.userUpdatedSubject.next();
   }
 
   /** Limpia todos los datos de sesión del almacenamiento */
@@ -263,22 +272,11 @@ export class AuthService {
   private handleAuthError(error: HttpErrorResponse, action: string): Observable<never> {
     this.logger.logAuthError(error, action);
 
-    const errorBody = error.error as ApiErrorResponse | null;
-    let userMessage = ERROR_MESSAGES[API_ERROR_CODES.INTERNAL_ERROR];
+    const resolved = resolveApiError(error, error.url ?? undefined);
 
-    if (error.status === 0) {
-      userMessage = ERROR_MESSAGES[API_ERROR_CODES.NETWORK_ERROR];
-    } else if (error.status === 401) {
-      userMessage = errorBody?.message || ERROR_MESSAGES[API_ERROR_CODES.UNAUTHORIZED];
-    } else if (error.status === 403) {
-      userMessage = errorBody?.message || ERROR_MESSAGES[API_ERROR_CODES.FORBIDDEN];
-    } else if (error.status === 429) {
-      userMessage = ERROR_MESSAGES[API_ERROR_CODES.RATE_LIMITED];
-    } else if (errorBody?.message) {
-      userMessage = errorBody.message;
+    if (action !== 'login') {
+      this.alertService.showError(resolved.message);
     }
-
-    this.alertService.showError(userMessage);
 
     return throwError(() => error);
   }

@@ -27,12 +27,14 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { VirtualAssetService } from '../../virtual-assets/services/virtual-asset.service';
 import { VirtualAsset } from '../../virtual-assets/models/virtual-asset.model';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 import { AnimationSequence, AnimationStep } from '../../virtual-assets/models/animation-sequence.model';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
 
 import { ThreeRendererService } from '../services/three-renderer.service';
 import { AnimationSequenceService } from '../services/animation-sequence.service';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 import {
   AnimatorState,
   TimelineBlock,
@@ -61,6 +63,7 @@ import {
     MatDividerModule,
     MatProgressSpinnerModule,
     MatButtonToggleModule,
+    TranslatePipe,
   ],
   providers: [ThreeRendererService, AnimationSequenceService],
 })
@@ -81,10 +84,10 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
   showModelsSidebar = true;
   showAnimationSidebar = false;
   showTimeline = false;
-  isLoading = false;
 
   private readonly destroy$ = new Subject<void>();
   private readonly themeManager = inject(ThemeManagerService);
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private readonly virtualAssetService: VirtualAssetService,
@@ -146,19 +149,18 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
   // Data Loading
 
   private loadVirtualAssets(): void {
-    this.isLoading = true;
     this.virtualAssetService
       .getAllVirtualAssets()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        this.shellLoad.endNavigationWhenDone(),
+        takeUntil(this.destroy$)
+      )
       .subscribe({
         next: (assets) => {
           this.virtualAssets = assets.filter((a) => a.is_active);
           this.filteredAssets = [...this.virtualAssets];
-          this.isLoading = false;
         },
-        error: () => {
-          this.isLoading = false;
-        }
+        error: () => {},
       });
   }
 
@@ -189,9 +191,31 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
   }
 
   private applyThemeToCanvas(): void {
-    const isDark = this.themeManager.isDarkMode();
-    const color = isDark ? THEME_CANVAS_COLORS.dark : THEME_CANVAS_COLORS.light;
+    const color = this.getThemeCanvasColor();
     this.renderer.setBackgroundColor(color);
+  }
+
+  private getThemeCanvasColor(): number {
+    if (typeof document !== 'undefined') {
+      const css = getComputedStyle(document.documentElement)
+        .getPropertyValue('--sys-surface-container')
+        .trim();
+      if (css) {
+        return this.cssColorToHex(css);
+      }
+    }
+    return this.themeManager.isDarkMode() ? THEME_CANVAS_COLORS.dark : THEME_CANVAS_COLORS.light;
+  }
+
+  private cssColorToHex(color: string): number {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return THEME_CANVAS_COLORS.light;
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return (r << 16) | (g << 8) | b;
   }
 
   // Type conversion helpers
@@ -236,14 +260,17 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
     this.loadedModelId = assetId;
     this.animatorState = 2;
     this.selectedAnimationName = '';
-    this.isLoading = true;
 
-    this.renderer.initialize(this.canvasContainer.nativeElement);
+    this.renderer.initialize(this.canvasContainer.nativeElement, this.getThemeCanvasColor());
+    this.applyThemeToCanvas();
     this.renderer.loadModel(assetUrl, assetId);
 
     this.virtualAssetService
       .getVirtualAssetById(assetId)
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        this.shellLoad.refreshWhenDone('animator-model'),
+        takeUntil(this.destroy$),
+      )
       .subscribe({
         next: (asset) => {
           if (asset.animation_sequence && Array.isArray(asset.animation_sequence)) {
@@ -254,11 +281,8 @@ export class ModelAnimatorComponent implements OnInit, OnDestroy {
             this.sequenceService.clearSequence();
             this.showTimeline = false;
           }
-          this.isLoading = false;
         },
-        error: () => {
-          this.isLoading = false;
-        }
+        error: () => {},
       });
   }
 

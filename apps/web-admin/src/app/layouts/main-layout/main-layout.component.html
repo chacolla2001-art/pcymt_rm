@@ -1,163 +1,122 @@
-<div class="layout-wrapper">
-  <!-- Header - Fixed at top -->
+<a class="skip-link" href="#main-content">{{ 'a11y.skipToContent' | translate }}</a>
+
+<div class="layout-wrapper" [class.shell-loading]="shellLoad.isBlocking()">
   <main-header></main-header>
 
-  <!-- Main content with drawer -->
   <mat-drawer-container class="main-container" [hasBackdrop]="isMobile">
 
-    <!-- Sidenav lateral -->
     <mat-drawer #drawer class="sidenav" [mode]="isMobile ? 'over' : 'side'">
-      <nav class="sidenav-nav">
+      <div class="sidenav-ecosystems" aria-hidden="true">
+        <span class="eco eco-1"></span>
+        <span class="eco eco-2"></span>
+        <span class="eco eco-3"></span>
+        <span class="eco eco-4"></span>
+      </div>
 
-        <!-- Dashboard -->
+      <nav class="sidenav-nav" aria-label="Navegación principal">
+
         <div class="nav-section">
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('dashboard')"
-            (click)="navigateTo('dashboard')">
+          <a mat-button class="nav-item" routerLink="/dashboard" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">dashboard</mat-icon>
             <span class="nav-label">{{ 'nav.dashboard' | translate }}</span>
-          </button>
+          </a>
         </div>
 
-        <!-- Sección de gestión -->
         <div class="nav-section">
           <span class="nav-section-title">{{ 'nav.management' | translate }}</span>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('users')"
-            (click)="navigateTo('users')">
+          <a mat-button class="nav-item" routerLink="/users" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">group</mat-icon>
             <span class="nav-label">{{ 'nav.users' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('virtual-assets')"
-            (click)="navigateTo('virtual-assets')">
+          <a mat-button class="nav-item" routerLink="/virtual-assets" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">view_in_ar</mat-icon>
             <span class="nav-label">{{ 'nav.virtualAssets' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('anchor-points')"
-            (click)="navigateTo('anchor-points')">
+          <a mat-button class="nav-item" routerLink="/anchor-points" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">place</mat-icon>
             <span class="nav-label">{{ 'nav.anchorPoints' | translate }}</span>
-          </button>
+          </a>
         </div>
 
-        <!-- Sección de herramientas -->
         <div class="nav-section">
           <span class="nav-section-title">{{ 'nav.tools' | translate }}</span>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('map')"
-            (click)="navigateTo('map')">
+          <a mat-button class="nav-item" routerLink="/map" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">map</mat-icon>
             <span class="nav-label">{{ 'nav.parkMap' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('animator')"
-            (click)="navigateTo('animator')">
+          <a mat-button class="nav-item" routerLink="/animator" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">animation</mat-icon>
             <span class="nav-label">{{ 'nav.animator' | translate }}</span>
-          </button>
-
-
-
+          </a>
         </div>
 
-        <!-- Sección de estadísticas -->
         <div class="nav-section">
           <span class="nav-section-title">{{ 'nav.statistics' | translate }}</span>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('stats/session-history')"
-            (click)="navigateTo('stats/session-history')">
+          <a mat-button class="nav-item" routerLink="/stats/session-history" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">login</mat-icon>
             <span class="nav-label">{{ 'nav.sessionHistory' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('stats/interaction-stats')"
-            (click)="navigateTo('stats/interaction-stats')">
+          <a mat-button class="nav-item" routerLink="/stats/interaction-stats" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">analytics</mat-icon>
             <span class="nav-label">{{ 'nav.interactions' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('stats/zone-visits')"
-            (click)="navigateTo('stats/zone-visits')">
+          <a mat-button class="nav-item" routerLink="/stats/zone-visits" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">donut_large</mat-icon>
             <span class="nav-label">{{ 'nav.zoneVisits' | translate }}</span>
-          </button>
+          </a>
         </div>
 
-        <!-- Estadísticas por usuario -->
         <div class="nav-section">
           <span class="nav-section-title">{{ 'nav.byUser' | translate }}</span>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('stats/user-interactions')"
-            (click)="navigateTo('stats/user-interactions')">
+          <a mat-button class="nav-item" routerLink="/stats/user-interactions" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">person_search</mat-icon>
             <span class="nav-label">{{ 'nav.userInteractions' | translate }}</span>
-          </button>
+          </a>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('stats/user-access')"
-            (click)="navigateTo('stats/user-access')">
+          <a mat-button class="nav-item" routerLink="/stats/user-access" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">calendar_month</mat-icon>
             <span class="nav-label">{{ 'nav.userAccess' | translate }}</span>
-          </button>
+          </a>
         </div>
 
-        <!-- Configuración -->
         <div class="nav-section">
           <span class="nav-section-title">{{ 'nav.system' | translate }}</span>
 
-          <button
-            mat-button
-            class="nav-item"
-            [class.active]="isRouteActive('settings')"
-            (click)="navigateTo('settings')">
+          <a mat-button class="nav-item" routerLink="/settings" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }" (click)="closeDrawerIfMobile()">
             <mat-icon class="nav-icon">settings</mat-icon>
             <span class="nav-label">{{ 'nav.settings' | translate }}</span>
-          </button>
+          </a>
         </div>
 
       </nav>
     </mat-drawer>
 
-    <!-- Contenido principal - ROUTER OUTLET -->
     <mat-drawer-content class="main-content">
-      <div class="content-wrapper">
-        <!-- All feature components now loaded via routing -->
+      <div class="content-wrapper" id="main-content" tabindex="-1" #contentWrapper>
+        <app-shell-load-overlay />
         <router-outlet></router-outlet>
       </div>
-      <!-- Footer - Hidden on map page to maximize map space -->
       @if (!isMapRoute) {
         <main-footer></main-footer>
       }

@@ -10,7 +10,7 @@
         <p *ngIf="data.subtitle" class="dialog-subtitle">{{ data.subtitle }}</p>
       </div>
     </div>
-    <button mat-icon-button class="dialog-close-btn" (click)="onCancel()" [disabled]="isSubmitting">
+    <button mat-icon-button class="dialog-close-btn" (click)="onCancel()" [disabled]="isSubmitting" aria-label="Cerrar diálogo">
       <mat-icon>close</mat-icon>
     </button>
   </div>

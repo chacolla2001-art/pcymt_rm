@@ -1,4 +1,6 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ElementRef } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ElementRef, inject } from '@angular/core';
+import { forkJoin } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ChartType, ChartData } from 'chart.js';
@@ -16,6 +18,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { DashboardMetricsService } from '../services/dashboard-metrics.service';
 import { UserService } from '../../users/services/user.service';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 import { VirtualAsset } from '../../virtual-assets/models/virtual-asset.model';
 import { User } from '../../users/models/user.model';
@@ -35,7 +39,8 @@ import { TopVirtualAsset, TopUser } from '../models/dashboard-metrics.model';
     MatFormFieldModule,
     MatInputModule,
     MatListModule,
-    MatTooltipModule
+    MatTooltipModule,
+    TranslatePipe,
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
@@ -108,6 +113,9 @@ export class DashboardComponent implements OnInit {
   topUsers: TopUser[] = [];
   sectionChartData: ChartData<'pie'> = { labels: [], datasets: [{ data: [] }] };
 
+  isLoadingMetrics = true;
+  loadError = false;
+
   // Referencias a los gráficos para forzar actualización
   @ViewChild('sessionChart') sessionChart?: BaseChartDirective;
   @ViewChild('interactionChart') interactionChart?: BaseChartDirective;
@@ -115,6 +123,7 @@ export class DashboardComponent implements OnInit {
 
   // Flag para detectar si estamos en el navegador
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private metricsService: DashboardMetricsService,
@@ -130,38 +139,55 @@ export class DashboardComponent implements OnInit {
   ngOnInit(): void {
     if (!this.isBrowser) return;
 
-    // Load initial metrics in parallel
-    this.metricsService.loadAllMetrics().subscribe(metrics => {
-      // Role chart
-      this.roleChartData = this.metricsService.buildRoleChartData(metrics.usersByRole);
-      this.roleChartLabels = metrics.usersByRole.map((item: any) => item.role);
-
-      // Active users
-      this.activeUsersCount = metrics.activeUsersCount;
-
-      // User status
-      this.userStatusChartData = this.metricsService.buildUserStatusChartData(
-        metrics.userStatus.active,
-        metrics.userStatus.inactive
-      );
-
-      // Total counts
-      this.totalUsers = metrics.totalCounts.users ?? 0;
-      this.totalUserInteractions = metrics.totalCounts.interactions ?? 0;
-      this.totalAnchorPoints = metrics.totalCounts.locations ?? 0;
-      this.totalVirtualAssets = metrics.totalCounts.virtualAssets ?? 0;
-    });
-
-    this.loadVirtualAssets();
+    this.loadDashboardMetrics();
     this.updateSessionPeriodLabel();
     this.updateInteractionPeriodLabel();
     this.loadSessionTimeSeries();
+  }
 
-    // Load rankings
-    this.metricsService.loadRankings().subscribe(rankings => {
-      this.topVirtualAssets = rankings.topVirtualAssets;
-      this.topUsers = rankings.topUsers;
-      this.sectionChartData = this.metricsService.buildSectionChartData(rankings.interactionsBySection);
+  retryLoad(): void {
+    this.loadDashboardMetrics();
+  }
+
+  private loadDashboardMetrics(): void {
+    this.isLoadingMetrics = true;
+    this.loadError = false;
+
+    forkJoin({
+      metrics: this.metricsService.loadAllMetrics(),
+      rankings: this.metricsService.loadRankings(),
+      assets: this.metricsService.loadVirtualAssets(),
+    }).pipe(
+      finalize(() => {
+        this.shellLoad.endNavigation();
+        this.isLoadingMetrics = false;
+        this.cdr.markForCheck();
+      })
+    ).subscribe({
+      next: ({ metrics, rankings, assets }) => {
+        this.roleChartData = this.metricsService.buildRoleChartData(metrics.usersByRole);
+        this.roleChartLabels = metrics.usersByRole.map((item: { role: string }) => item.role);
+        this.activeUsersCount = metrics.activeUsersCount;
+        this.userStatusChartData = this.metricsService.buildUserStatusChartData(
+          metrics.userStatus.active,
+          metrics.userStatus.inactive
+        );
+        this.totalUsers = metrics.totalCounts.users ?? 0;
+        this.totalUserInteractions = metrics.totalCounts.interactions ?? 0;
+        this.totalAnchorPoints = metrics.totalCounts.locations ?? 0;
+        this.totalVirtualAssets = metrics.totalCounts.virtualAssets ?? 0;
+
+        this.topVirtualAssets = rankings.topVirtualAssets;
+        this.topUsers = rankings.topUsers;
+        this.sectionChartData = this.metricsService.buildSectionChartData(rankings.interactionsBySection);
+
+        this.virtualAssets = assets;
+        this.filteredAssets = [...this.virtualAssets];
+        this.updateInteractionChartForAll(this.selectedTimeRange);
+      },
+      error: () => {
+        this.loadError = true;
+      }
     });
   }
 

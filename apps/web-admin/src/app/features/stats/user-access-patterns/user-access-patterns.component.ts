@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,11 +15,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 import { UserSessionService, TimeSeriesPoint } from '../../dashboard/services/user-session.service';
 import { UserService } from '../../users/services/user.service';
 import { User } from '../../users/models/user.model';
 import { UserSession, Platform } from '../../dashboard/models/user-session.model';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 export interface CalendarDay {
   date: Date;
@@ -57,7 +59,8 @@ export interface MonthlyStats {
     MatTooltipModule,
     MatProgressBarModule,
     MatChipsModule,
-    MatDividerModule
+    MatDividerModule,
+    TranslatePipe
   ],
   templateUrl: './user-access-patterns.component.html',
   styleUrls: ['./user-access-patterns.component.scss']
@@ -101,9 +104,9 @@ export class UserAccessPatternsComponent implements OnInit {
   // Recent sessions
   recentSessions: UserSession[] = [];
 
-  isLoading = false;
   private allUserSessions: UserSession[] = [];
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private userSessionService: UserSessionService,
@@ -119,6 +122,7 @@ export class UserAccessPatternsComponent implements OnInit {
     if (!this.isBrowser) return;
     this.currentMonth = new Date();
     this.updateMonthLabel();
+    this.shellLoad.endNavigation();
   }
 
   searchUsers(): void {
@@ -149,9 +153,9 @@ export class UserAccessPatternsComponent implements OnInit {
 
   private loadUserSessions(): void {
     if (!this.selectedUser) return;
-    this.isLoading = true;
 
     this.userSessionService.getSessionsByUser(this.selectedUser.id).pipe(
+      this.shellLoad.refreshWhenDone('user-sessions'),
       map((sessions: any) => {
         // Handle if response is wrapped
         const data = Array.isArray(sessions) ? sessions : (sessions?.data || []);
@@ -164,7 +168,6 @@ export class UserAccessPatternsComponent implements OnInit {
       this.computeAllTimeStats();
       this.computeMonthlyStats();
       this.loadRecentSessions();
-      this.isLoading = false;
       this.cdr.markForCheck();
     });
   }

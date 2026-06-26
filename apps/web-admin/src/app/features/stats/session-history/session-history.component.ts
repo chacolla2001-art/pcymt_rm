@@ -1,9 +1,10 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, inject } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ChartType, ChartData } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -18,6 +19,8 @@ import { DashboardMetricsService } from '../../dashboard/services/dashboard-metr
 import { UserService } from '../../users/services/user.service';
 import { User } from '../../users/models/user.model';
 import { TopUser } from '../../dashboard/models/dashboard-metrics.model';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 @Component({
   selector: 'app-session-history',
@@ -34,7 +37,8 @@ import { TopUser } from '../../dashboard/models/dashboard-metrics.model';
     MatInputModule,
     MatListModule,
     MatTooltipModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    TranslatePipe,
   ],
   templateUrl: './session-history.component.html',
   styleUrls: ['./session-history.component.scss']
@@ -67,6 +71,7 @@ export class SessionHistoryComponent implements OnInit {
   @ViewChild('sessionChart') sessionChart?: BaseChartDirective;
 
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private metricsService: DashboardMetricsService,
@@ -81,8 +86,36 @@ export class SessionHistoryComponent implements OnInit {
   ngOnInit(): void {
     if (!this.isBrowser) return;
     this.updateSessionPeriodLabel();
-    this.loadSessionTimeSeries();
-    this.loadRankings();
+    const platform = this.selectedPlatform !== 'all' ? this.selectedPlatform : undefined;
+    forkJoin({
+      rankings: this.metricsService.loadRankings(),
+      sessions: this.metricsService.loadSessionTimeSeries(
+        this.selectedSessionRange,
+        platform,
+        this.selectedUser?.id,
+        this.sessionPeriodOffset
+      ),
+    }).pipe(this.shellLoad.endNavigationWhenDone()).subscribe(({ rankings, sessions }) => {
+      this.topUsers = rankings.topUsers;
+      this.maxRankingCount = Math.max(...this.topUsers.map(u => u.interactionCount), 1);
+      this.rankingBarChartData = {
+        labels: this.topUsers.map(u => u.name || ''),
+        datasets: [{
+          data: this.topUsers.map(u => u.interactionCount),
+          label: 'Interacciones',
+          backgroundColor: [
+            'rgba(255, 193, 7, 0.85)',
+            'rgba(76, 175, 80, 0.85)',
+            'rgba(33, 150, 243, 0.85)',
+            'rgba(156, 39, 176, 0.85)',
+            'rgba(255, 87, 34, 0.85)'
+          ]
+        }]
+      };
+      this.sessionTimeChartData = sessions;
+      this.cdr.detectChanges();
+      this.sessionChart?.chart?.update();
+    });
   }
 
   // — Ranking methods (from top-users) —

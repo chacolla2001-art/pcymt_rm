@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.view.Choreographer
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -11,6 +12,8 @@ import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
+import com.univalle.pedrochacolla.utils.map.ParkSectionResolver
+import com.univalle.pedrochacolla.data.local.ParkDataLoader
 import com.univalle.pedrochacolla.data.model.Location
 import com.univalle.pedrochacolla.R
 import kotlin.math.atan2
@@ -44,6 +47,16 @@ class ParkMapView @JvmOverloads constructor(
         setLayerType(LAYER_TYPE_SOFTWARE, null)
     }
 
+    private val parkData by lazy { ParkDataLoader.load(context) }
+    private val parkBoundary: List<GeoPoint> get() = parkData.boundary
+    private val parkSections: List<ParkSection> get() = parkData.sections
+    private val bounds by lazy { calculateBounds(parkBoundary, 0.00035) }
+
+    private fun latCorrectionFactor(): Double {
+        val midLat = (bounds.minLat + bounds.maxLat) / 2.0
+        return cos(midLat * Math.PI / 180.0)
+    }
+
     // Punto geográfico
     data class GeoPoint(val lat: Double, val lng: Double)
 
@@ -70,8 +83,17 @@ class ParkMapView @JvmOverloads constructor(
         val name: String,
         val color: Int,
         val colorLight: Int,
+        val chartColor: Int,
+        val fillOpacity: Float,
+        val fillOpacityLight: Float,
+        val educationSummary: String,
+        val referenceImageUrl: String?,
         val polygon: List<GeoPoint>
     )
+
+    fun interface OnSectionClickListener {
+        fun onSectionClick(section: ParkSection, index: Int)
+    }
 
     // Listener para clicks en marcadores
     interface OnMarkerClickListener {
@@ -83,320 +105,19 @@ class ParkMapView @JvmOverloads constructor(
         fun onPoiClick(poi: PoiItem)
     }
 
-    // Constantes geodésicas (centradas en La Paz, Bolivia)
+    // Constantes geodésicas — centroide derivado del polígono OSM en shared/data
     companion object {
-        private const val LAT_CENTER = -16.48933421
-        private const val LNG_CENTER = -68.14573989
         private const val METERS_PER_DEG_LAT = 111320.0
-        private val LAT_CORRECTION = cos(LAT_CENTER * Math.PI / 180)
-        private val METERS_PER_DEG_LNG = METERS_PER_DEG_LAT * LAT_CORRECTION
 
-        // Polígono del parque con alta precisión (100+ puntos)
-        private val PARK_BOUNDARY = listOf(
-            // Entrada norte
-            GeoPoint(-16.48659768, -68.14596329),
-            GeoPoint(-16.48665000, -68.14593000),
-            GeoPoint(-16.48680000, -68.14585000),
-            GeoPoint(-16.48700000, -68.14575000),
-            GeoPoint(-16.48720000, -68.14567000),
-            GeoPoint(-16.48740000, -68.14560000),
-            GeoPoint(-16.48760000, -68.14554000),
-            GeoPoint(-16.48780000, -68.14549000),
-            GeoPoint(-16.48800000, -68.14545000),
-            GeoPoint(-16.48822963, -68.14541751),
-            GeoPoint(-16.48832000, -68.14535000),
-            GeoPoint(-16.48841898, -68.14528839),
-            GeoPoint(-16.48855000, -68.14523000),
-            GeoPoint(-16.48870000, -68.14518000),
-            GeoPoint(-16.48886235, -68.14515052),
-            GeoPoint(-16.48888001, -68.14519958),
-            GeoPoint(-16.48900000, -68.14510000),
-            GeoPoint(-16.48920000, -68.14502000),
-            GeoPoint(-16.48940000, -68.14495000),
-            GeoPoint(-16.48960000, -68.14488000),
-            GeoPoint(-16.48980000, -68.14481000),
-            GeoPoint(-16.49000000, -68.14475000),
-            GeoPoint(-16.49020000, -68.14469000),
-            GeoPoint(-16.49040000, -68.14465000),
-            GeoPoint(-16.49055000, -68.14463000),
-            GeoPoint(-16.49068582, -68.14462362),
-            GeoPoint(-16.49070782, -68.14472540),
-            GeoPoint(-16.49074000, -68.14480000),
-            GeoPoint(-16.49078941, -68.14487740),
-            GeoPoint(-16.49082000, -68.14491000),
-            GeoPoint(-16.49086051, -68.14496028),
-            GeoPoint(-16.49092000, -68.14500000),
-            GeoPoint(-16.49099475, -68.14505184),
-            GeoPoint(-16.49105000, -68.14508000),
-            GeoPoint(-16.49110403, -68.14510370),
-            GeoPoint(-16.49115000, -68.14511500),
-            GeoPoint(-16.49120474, -68.14512204),
-            GeoPoint(-16.49127000, -68.14513000),
-            GeoPoint(-16.49133294, -68.14513233),
-            GeoPoint(-16.49138000, -68.14513000),
-            GeoPoint(-16.49142827, -68.14512204),
-            GeoPoint(-16.49149000, -68.14510500),
-            GeoPoint(-16.49156435, -68.14508133),
-            GeoPoint(-16.49161000, -68.14506000),
-            GeoPoint(-16.49166074, -68.14502906),
-            GeoPoint(-16.49171000, -68.14498000),
-            GeoPoint(-16.49176942, -68.14491858),
-            // Curva sureste
-            GeoPoint(-16.49185000, -68.14500000),
-            GeoPoint(-16.49195000, -68.14510000),
-            GeoPoint(-16.49207074, -68.14524457),
-            GeoPoint(-16.49202000, -68.14524500),
-            GeoPoint(-16.49197133, -68.14524635),
-            GeoPoint(-16.49185000, -68.14528000),
-            GeoPoint(-16.49170000, -68.14532000),
-            GeoPoint(-16.49155000, -68.14535000),
-            GeoPoint(-16.49139718, -68.14538138),
-            GeoPoint(-16.49125000, -68.14540000),
-            GeoPoint(-16.49110000, -68.14541500),
-            GeoPoint(-16.49095112, -68.14542437),
-            GeoPoint(-16.49080000, -68.14544000),
-            GeoPoint(-16.49065000, -68.14546000),
-            GeoPoint(-16.49050000, -68.14548000),
-            GeoPoint(-16.49033610, -68.14550804),
-            GeoPoint(-16.49027000, -68.14557000),
-            GeoPoint(-16.49022058, -68.14564895),
-            GeoPoint(-16.49000000, -68.14562000),
-            GeoPoint(-16.48975000, -68.14559000),
-            GeoPoint(-16.48950180, -68.14556667),
-            GeoPoint(-16.48938000, -68.14557500),
-            GeoPoint(-16.48926133, -68.14558171),
-            GeoPoint(-16.48918000, -68.14557800),
-            GeoPoint(-16.48910599, -68.14557360),
-            GeoPoint(-16.48912299, -68.14561761),
-            GeoPoint(-16.48904000, -68.14560500),
-            GeoPoint(-16.48896332, -68.14559755),
-            GeoPoint(-16.48886000, -68.14560500),
-            GeoPoint(-16.48876984, -68.14561738),
-            GeoPoint(-16.48865000, -68.14565000),
-            GeoPoint(-16.48855000, -68.14569000),
-            GeoPoint(-16.48844095, -68.14573936),
-            // Lado oeste
-            GeoPoint(-16.48849000, -68.14590000),
-            GeoPoint(-16.48854573, -68.14608713),
-            GeoPoint(-16.48860000, -68.14607000),
-            GeoPoint(-16.48866891, -68.14604836),
-            GeoPoint(-16.48869000, -68.14620000),
-            GeoPoint(-16.48871507, -68.14636503),
-            GeoPoint(-16.48860000, -68.14645000),
-            GeoPoint(-16.48845000, -68.14658000),
-            GeoPoint(-16.48830000, -68.14668000),
-            GeoPoint(-16.48820410, -68.14673619),
-            GeoPoint(-16.48812000, -68.14677000),
-            GeoPoint(-16.48803366, -68.14679585),
-            GeoPoint(-16.48790000, -68.14683000),
-            GeoPoint(-16.48776299, -68.14685615),
-            GeoPoint(-16.48762000, -68.14684000),
-            GeoPoint(-16.48748103, -68.14680104),
-            GeoPoint(-16.48746000, -68.14674000),
-            GeoPoint(-16.48744563, -68.14667352),
-            GeoPoint(-16.48742500, -68.14664000),
-            GeoPoint(-16.48740845, -68.14661360),
-            GeoPoint(-16.48737000, -68.14657000),
-            GeoPoint(-16.48734035, -68.14654090),
-            // Regreso al norte
-            GeoPoint(-16.48728000, -68.14635000),
-            GeoPoint(-16.48722000, -68.14615000),
-            GeoPoint(-16.48714337, -68.14591061),
-            GeoPoint(-16.48700000, -68.14595000),
-            GeoPoint(-16.48685000, -68.14600000),
-            GeoPoint(-16.48671717, -68.14603711),
-            GeoPoint(-16.48668000, -68.14602500),
-            GeoPoint(-16.48664566, -68.14600784),
-            GeoPoint(-16.48662000, -68.14598500),
-            GeoPoint(-16.48659707, -68.14596340),
-            GeoPoint(-16.48659768, -68.14596329)
-        )
+        private fun metersPerDegLng(midLat: Double): Double =
+            METERS_PER_DEG_LAT * cos(midLat * Math.PI / 180.0)
 
-        // Secciones del parque - tessellating polygons covering full park area
-        // Junction points on boundary: B15, B25, B62, B72, B104
-        // Divider TA-ML: B15 → internal → B104 (separates Tierras Altas from Mitos y Leyendas)
-        // Divider TM-ML: B15 → B72 (separates Tierras Medias from Mitos y Leyendas)
-        // Divider TM-TB: B25 → B62 (separates Tierras Medias from Tierras Bajas)
-        private val PARK_SECTIONS = listOf(
-            ParkSection(
-                name = "Tierras Altas",
-                color = Color.argb(90, 56, 142, 60),   // verde bosque intenso
-                colorLight = Color.argb(70, 56, 142, 60),
-                polygon = listOf(
-                    // N boundary: entrance (B0) → NE (B15)
-                    GeoPoint(-16.48659768, -68.14596329),
-                    GeoPoint(-16.48665000, -68.14593000),
-                    GeoPoint(-16.48680000, -68.14585000),
-                    GeoPoint(-16.48700000, -68.14575000),
-                    GeoPoint(-16.48720000, -68.14567000),
-                    GeoPoint(-16.48740000, -68.14560000),
-                    GeoPoint(-16.48760000, -68.14554000),
-                    GeoPoint(-16.48780000, -68.14549000),
-                    GeoPoint(-16.48800000, -68.14545000),
-                    GeoPoint(-16.48822963, -68.14541751),
-                    GeoPoint(-16.48832000, -68.14535000),
-                    GeoPoint(-16.48841898, -68.14528839),
-                    GeoPoint(-16.48855000, -68.14523000),
-                    GeoPoint(-16.48870000, -68.14518000),
-                    GeoPoint(-16.48886235, -68.14515052),
-                    GeoPoint(-16.48888001, -68.14519958),
-                    // Divider TA-ML: B15 → internal → B104
-                    GeoPoint(-16.48870000, -68.14560000),
-                    GeoPoint(-16.48820000, -68.14570000),
-                    GeoPoint(-16.48760000, -68.14580000),
-                    GeoPoint(-16.48714337, -68.14591061),
-                    // NW boundary: B104 → entrance (B0)
-                    GeoPoint(-16.48700000, -68.14595000),
-                    GeoPoint(-16.48685000, -68.14600000),
-                    GeoPoint(-16.48671717, -68.14603711),
-                    GeoPoint(-16.48668000, -68.14602500),
-                    GeoPoint(-16.48664566, -68.14600784),
-                    GeoPoint(-16.48662000, -68.14598500),
-                    GeoPoint(-16.48659707, -68.14596340)
-                )
-            ),
-            ParkSection(
-                name = "Tierras Medias",
-                color = Color.argb(80, 158, 158, 158), // gris medio
-                colorLight = Color.argb(60, 158, 158, 158),
-                polygon = listOf(
-                    // NE boundary: B15 → B25
-                    GeoPoint(-16.48888001, -68.14519958),
-                    GeoPoint(-16.48900000, -68.14510000),
-                    GeoPoint(-16.48920000, -68.14502000),
-                    GeoPoint(-16.48940000, -68.14495000),
-                    GeoPoint(-16.48960000, -68.14488000),
-                    GeoPoint(-16.48980000, -68.14481000),
-                    GeoPoint(-16.49000000, -68.14475000),
-                    GeoPoint(-16.49020000, -68.14469000),
-                    GeoPoint(-16.49040000, -68.14465000),
-                    GeoPoint(-16.49055000, -68.14463000),
-                    GeoPoint(-16.49068582, -68.14462362),
-                    // Divider TM-TB: B25 → B62
-                    GeoPoint(-16.49033610, -68.14550804),
-                    // S boundary: B62 → B72
-                    GeoPoint(-16.49027000, -68.14557000),
-                    GeoPoint(-16.49022058, -68.14564895),
-                    GeoPoint(-16.49000000, -68.14562000),
-                    GeoPoint(-16.48975000, -68.14559000),
-                    GeoPoint(-16.48950180, -68.14556667),
-                    GeoPoint(-16.48938000, -68.14557500),
-                    GeoPoint(-16.48926133, -68.14558171),
-                    GeoPoint(-16.48918000, -68.14557800),
-                    GeoPoint(-16.48910599, -68.14557360),
-                    GeoPoint(-16.48912299, -68.14561761),
-                    // Divider TM-ML: B72 → B15
-                    GeoPoint(-16.48888001, -68.14519958)
-                )
-            ),
-            ParkSection(
-                name = "Tierras Bajas",
-                color = Color.argb(80, 255, 152, 0),   // naranja intenso
-                colorLight = Color.argb(60, 255, 152, 0),
-                polygon = listOf(
-                    // SE peninsula: B25 → around tip → B62
-                    GeoPoint(-16.49068582, -68.14462362),
-                    GeoPoint(-16.49070782, -68.14472540),
-                    GeoPoint(-16.49074000, -68.14480000),
-                    GeoPoint(-16.49078941, -68.14487740),
-                    GeoPoint(-16.49082000, -68.14491000),
-                    GeoPoint(-16.49086051, -68.14496028),
-                    GeoPoint(-16.49092000, -68.14500000),
-                    GeoPoint(-16.49099475, -68.14505184),
-                    GeoPoint(-16.49105000, -68.14508000),
-                    GeoPoint(-16.49110403, -68.14510370),
-                    GeoPoint(-16.49115000, -68.14511500),
-                    GeoPoint(-16.49120474, -68.14512204),
-                    GeoPoint(-16.49127000, -68.14513000),
-                    GeoPoint(-16.49133294, -68.14513233),
-                    GeoPoint(-16.49138000, -68.14513000),
-                    GeoPoint(-16.49142827, -68.14512204),
-                    GeoPoint(-16.49149000, -68.14510500),
-                    GeoPoint(-16.49156435, -68.14508133),
-                    GeoPoint(-16.49161000, -68.14506000),
-                    GeoPoint(-16.49166074, -68.14502906),
-                    GeoPoint(-16.49171000, -68.14498000),
-                    GeoPoint(-16.49176942, -68.14491858),
-                    GeoPoint(-16.49185000, -68.14500000),
-                    GeoPoint(-16.49195000, -68.14510000),
-                    GeoPoint(-16.49207074, -68.14524457),
-                    GeoPoint(-16.49202000, -68.14524500),
-                    GeoPoint(-16.49197133, -68.14524635),
-                    GeoPoint(-16.49185000, -68.14528000),
-                    GeoPoint(-16.49170000, -68.14532000),
-                    GeoPoint(-16.49155000, -68.14535000),
-                    GeoPoint(-16.49139718, -68.14538138),
-                    GeoPoint(-16.49125000, -68.14540000),
-                    GeoPoint(-16.49110000, -68.14541500),
-                    GeoPoint(-16.49095112, -68.14542437),
-                    GeoPoint(-16.49080000, -68.14544000),
-                    GeoPoint(-16.49065000, -68.14546000),
-                    GeoPoint(-16.49050000, -68.14548000),
-                    GeoPoint(-16.49033610, -68.14550804),
-                    // Divider TM-TB: B62 → B25
-                    GeoPoint(-16.49068582, -68.14462362)
-                )
-            ),
-            ParkSection(
-                name = "Mitos y Leyendas",
-                color = Color.argb(90, 88, 189, 94),   // verde tropical intenso
-                colorLight = Color.argb(70, 88, 189, 94),
-                polygon = listOf(
-                    // Divider TM-ML: B72 → B15
-                    GeoPoint(-16.48912299, -68.14561761),
-                    GeoPoint(-16.48888001, -68.14519958),
-                    // Divider TA-ML reversed: B15 → internal → B104
-                    GeoPoint(-16.48870000, -68.14560000),
-                    GeoPoint(-16.48820000, -68.14570000),
-                    GeoPoint(-16.48760000, -68.14580000),
-                    GeoPoint(-16.48714337, -68.14591061),
-                    // W boundary: B104 → SW arm → B72
-                    GeoPoint(-16.48722000, -68.14615000),
-                    GeoPoint(-16.48728000, -68.14635000),
-                    GeoPoint(-16.48734035, -68.14654090),
-                    GeoPoint(-16.48737000, -68.14657000),
-                    GeoPoint(-16.48740845, -68.14661360),
-                    GeoPoint(-16.48742500, -68.14664000),
-                    GeoPoint(-16.48744563, -68.14667352),
-                    GeoPoint(-16.48746000, -68.14674000),
-                    GeoPoint(-16.48748103, -68.14680104),
-                    GeoPoint(-16.48762000, -68.14684000),
-                    GeoPoint(-16.48776299, -68.14685615),
-                    GeoPoint(-16.48790000, -68.14683000),
-                    GeoPoint(-16.48803366, -68.14679585),
-                    GeoPoint(-16.48812000, -68.14677000),
-                    GeoPoint(-16.48820410, -68.14673619),
-                    GeoPoint(-16.48830000, -68.14668000),
-                    GeoPoint(-16.48845000, -68.14658000),
-                    GeoPoint(-16.48860000, -68.14645000),
-                    GeoPoint(-16.48871507, -68.14636503),
-                    GeoPoint(-16.48869000, -68.14620000),
-                    GeoPoint(-16.48866891, -68.14604836),
-                    GeoPoint(-16.48860000, -68.14607000),
-                    GeoPoint(-16.48854573, -68.14608713),
-                    GeoPoint(-16.48849000, -68.14590000),
-                    GeoPoint(-16.48844095, -68.14573936),
-                    GeoPoint(-16.48855000, -68.14569000),
-                    GeoPoint(-16.48865000, -68.14565000),
-                    GeoPoint(-16.48876984, -68.14561738),
-                    GeoPoint(-16.48886000, -68.14560500),
-                    GeoPoint(-16.48896332, -68.14559755),
-                    GeoPoint(-16.48904000, -68.14560500),
-                    GeoPoint(-16.48912299, -68.14561761)
-                )
-            )
-        )
-
-
-        // Marker size constants
         const val MARKER_RADIUS = 34f
         const val MARKER_INNER_RADIUS = 11f
         const val MARKER_WARNING_RADIUS = 56f
-        /** Radius of the circular icon drawn in Modo Explorador (screen-size-invariant). */
+        /** Radius for animal icon bitmap on map markers (px at scale=1). */
         const val MARKER_ICON_RADIUS = 52f
-    }
 
-    // Colores de tema
     private object ThemeColors {
         val darkBackground = Color.parseColor("#1a1a2e")
         val darkGrid = Color.argb(128, 50, 50, 80)
@@ -415,6 +136,7 @@ class ParkMapView @JvmOverloads constructor(
 
         // Fondo fuera de los limites del parque (tono beige del mapa ilustrado)
         val mapOutside = Color.parseColor("#E8DFC9")
+    }
     }
 
     // ── Background illustration ───────────────────────────────────────────────
@@ -453,6 +175,8 @@ class ParkMapView @JvmOverloads constructor(
     // Opciones de visualización
     var showGrid = true
     var showSections = true
+    var showSectionLabels = true
+    var showMapLegend = true
     var showLabels = true
     var showBoundary = true
 
@@ -461,6 +185,19 @@ class ParkMapView @JvmOverloads constructor(
 
     /** When false, ALL 2D drawing is skipped — only the transparent punch-through remains */
     var show2DOverlay = true
+
+    /** Lluvia — capa ambiental separada de referencias espaciales. */
+    var showRainEffect = false
+    var rainIntensity = 0.45f
+    var rainSize = 1f
+    /** -1 = todo el parque; 0..n = índice de sección. */
+    var rainSectionIndex = -1
+    var spatialAnimSpeed = 1f
+
+    private var spatialRefsPhase = 0f
+    private val mapRainEffect = MapRainEffect()
+    private var sceneFrameCallback: Choreographer.FrameCallback? = null
+    private val parkClipPath = Path()
 
     /** When true (admin), pan is not clamped to the park polygon — allows free map navigation. */
     var isAdminMode = false
@@ -481,6 +218,7 @@ class ParkMapView @JvmOverloads constructor(
     /** Smoothly-animated position used for rendering — interpolates to userLocation. */
     private var displayedUserLocation: GeoPoint? = null
     private var locationAnimator: ValueAnimator? = null
+    private var viewFocusAnimator: ValueAnimator? = null
 
     private var userHeading: Float = 0f // compass heading in degrees
     /** Smoothly-animated heading used for rendering. */
@@ -580,7 +318,6 @@ class ParkMapView @JvmOverloads constructor(
 
     // Bounds del parque
     // Slightly expanded bounds to give more breathing room around the park
-    private val bounds = calculateBounds(PARK_BOUNDARY, 0.00035)
 
     // Paints
     private val gridPaint = Paint().apply {
@@ -603,6 +340,24 @@ class ParkMapView @JvmOverloads constructor(
     private val sectionPaint = Paint().apply {
         style = Paint.Style.FILL
         isAntiAlias = true
+    }
+
+    private val sectionStrokePaint = Paint().apply {
+        style = Paint.Style.STROKE
+        isAntiAlias = true
+    }
+
+    /** Sección resaltada (tap o botón) — efecto botón en el mapa. */
+    var highlightedSectionIndex: Int = -1
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private var sectionClickListener: OnSectionClickListener? = null
+
+    fun setOnSectionClickListener(listener: OnSectionClickListener?) {
+        sectionClickListener = listener
     }
 
     private val markerPaint = Paint().apply {
@@ -646,7 +401,7 @@ class ParkMapView @JvmOverloads constructor(
             val boundsWidth = bounds.maxLng - bounds.minLng
             val scaleBarWidth = 200.0
             // scale = scaleBarWidth * boundsWidth * METERS_PER_DEG_LNG / (w * targetMeters)
-            val computedScale = (scaleBarWidth * boundsWidth * METERS_PER_DEG_LNG) / (w * targetScaleBarMeters)
+            val computedScale = (scaleBarWidth * boundsWidth * metersPerDegLng((bounds.minLat + bounds.maxLat) / 2)) / (w * targetScaleBarMeters)
             scale = computedScale.toFloat().coerceIn(0.3f, 15f)
             initialScaleSet = true
         }
@@ -709,22 +464,24 @@ class ParkMapView @JvmOverloads constructor(
     private data class Bounds(val minLat: Double, val maxLat: Double, val minLng: Double, val maxLng: Double)
 
     private fun calculateBounds(polygon: List<GeoPoint>, padding: Double): Bounds {
+        // ponytail: fallback = OSM bbox way/641677241
+        val defaultLat = -16.489311
+        val defaultLng = -68.145316
         if (polygon.isEmpty()) {
-            // Default bounds centered at park center if polygon is empty
             return Bounds(
-                minLat = LAT_CENTER - 0.002,
-                maxLat = LAT_CENTER + 0.002,
-                minLng = LNG_CENTER - 0.002,
-                maxLng = LNG_CENTER + 0.002
+                minLat = -16.4919539,
+                maxLat = -16.4866356,
+                minLng = -68.146852,
+                maxLng = -68.1446378
             )
         }
         val lats = polygon.map { it.lat }
         val lngs = polygon.map { it.lng }
         return Bounds(
-            minLat = (lats.minOrNull() ?: LAT_CENTER) - padding,
-            maxLat = (lats.maxOrNull() ?: LAT_CENTER) + padding,
-            minLng = (lngs.minOrNull() ?: LNG_CENTER) - padding,
-            maxLng = (lngs.maxOrNull() ?: LNG_CENTER) + padding
+            minLat = (lats.minOrNull() ?: defaultLat) - padding,
+            maxLat = (lats.maxOrNull() ?: defaultLat) + padding,
+            minLng = (lngs.minOrNull() ?: defaultLng) - padding,
+            maxLng = (lngs.maxOrNull() ?: defaultLng) + padding
         )
     }
 
@@ -732,7 +489,7 @@ class ParkMapView @JvmOverloads constructor(
     private fun clampOffsets() {
         if (isAdminMode) return  // Admin: free pan beyond park limits
         if (width == 0 || height == 0) return
-        if (PARK_BOUNDARY.isEmpty()) return
+        if (parkBoundary.isEmpty()) return
 
         val cx = width / 2f
         val cy = height / 2f
@@ -744,7 +501,7 @@ class ParkMapView @JvmOverloads constructor(
         var minY = Float.POSITIVE_INFINITY
         var maxY = Float.NEGATIVE_INFINITY
 
-        for (p in PARK_BOUNDARY) {
+        for (p in parkBoundary) {
             val base = geoToCanvas(p)
             var x = base.x - cx
             var y = base.y - cy
@@ -791,24 +548,76 @@ class ParkMapView @JvmOverloads constructor(
         offsetY += dy
     }
 
-    // Verificar si un punto está dentro del polígono
-    private fun isPointInPolygon(point: GeoPoint, polygon: List<GeoPoint>): Boolean {
-        var inside = false
-        var j = polygon.size - 1
-        for (i in polygon.indices) {
-            val xi = polygon[i].lng
-            val yi = polygon[i].lat
-            val xj = polygon[j].lng
-            val yj = polygon[j].lat
+    /**
+     * Acerca y centra el polígono de una sección para que ocupe la mayor parte de la pantalla.
+     */
+    fun focusOnSection(sectionIndex: Int, fill: Float = 0.88f) {
+        val section = parkSections.getOrNull(sectionIndex) ?: return
+        if (section.polygon.size < 3 || width == 0 || height == 0) return
 
-            if (((yi > point.lat) != (yj > point.lat)) &&
-                (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi)) {
-                inside = !inside
-            }
-            j = i
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val cx = w / 2f
+        val cy = h / 2f
+
+        val basePoints = section.polygon.map { geoToCanvas(it) }
+        val bcx = basePoints.map { it.x }.average().toFloat()
+        val bcy = basePoints.map { it.y }.average().toFloat()
+
+        val cosr = cos(rotation.toDouble()).toFloat()
+        val sinr = sin(rotation.toDouble()).toFloat()
+        val centroidRelX = (bcx - cx) * cosr - (bcy - cy) * sinr
+        val centroidRelY = (bcx - cx) * sinr + (bcy - cy) * cosr
+
+        var minDx = Float.POSITIVE_INFINITY
+        var maxDx = Float.NEGATIVE_INFINITY
+        var minDy = Float.POSITIVE_INFINITY
+        var maxDy = Float.NEGATIVE_INFINITY
+        for (p in basePoints) {
+            val rdx = (p.x - cx) * cosr - (p.y - cy) * sinr - centroidRelX
+            val rdy = (p.x - cx) * sinr + (p.y - cy) * cosr - centroidRelY
+            minDx = min(minDx, rdx)
+            maxDx = max(maxDx, rdx)
+            minDy = min(minDy, rdy)
+            maxDy = max(maxDy, rdy)
         }
-        return inside
+
+        val baseW = (maxDx - minDx).coerceAtLeast(1f)
+        val baseH = (maxDy - minDy).coerceAtLeast(1f)
+        val margin = (1f - fill) / 2f
+        val availW = w * (1f - 2f * margin)
+        val availH = h * (1f - 2f * margin)
+
+        val newScale = min(availW / baseW, availH / baseH).coerceIn(0.3f, 15f)
+
+        val dx0 = (bcx - cx) * newScale
+        val dy0 = (bcy - cy) * newScale
+        val rx = cosr * dx0 - sinr * dy0
+        val ry = sinr * dx0 + cosr * dy0
+        val newOffX = w / 2f - cx - rx
+        val newOffY = h / 2f - cy - ry
+
+        val startScale = scale
+        val startOffX = offsetX
+        val startOffY = offsetY
+
+        viewFocusAnimator?.cancel()
+        viewFocusAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 450
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { anim ->
+                val t = anim.animatedValue as Float
+                scale = startScale + (newScale - startScale) * t
+                offsetX = startOffX + (newOffX - startOffX) * t
+                offsetY = startOffY + (newOffY - startOffY) * t
+                invalidate()
+            }
+            start()
+        }
     }
+
+    private fun isPointInPolygon(point: GeoPoint, polygon: List<GeoPoint>): Boolean =
+        ParkSectionResolver.isPointInPolygon(point, polygon)
 
     // Conversión de coordenadas geo a canvas (sin transformaciones)
     private fun geoToCanvas(geo: GeoPoint): ScreenPoint {
@@ -817,7 +626,7 @@ class ParkMapView @JvmOverloads constructor(
 
         val geoW = bounds.maxLng - bounds.minLng
         val geoH = bounds.maxLat - bounds.minLat
-        val latCorrectionFactor = LAT_CORRECTION.toFloat()
+        val latCorrectionFactor = latCorrectionFactor().toFloat()
         val correctedGeoW = geoW * latCorrectionFactor
 
         val scaleX = w / correctedGeoW.toFloat()
@@ -875,7 +684,7 @@ class ParkMapView @JvmOverloads constructor(
 
         val geoW = bounds.maxLng - bounds.minLng
         val geoH = bounds.maxLat - bounds.minLat
-        val latCorrectionFactor = LAT_CORRECTION.toFloat()
+        val latCorrectionFactor = latCorrectionFactor().toFloat()
         val correctedGeoW = geoW * latCorrectionFactor
 
         val scaleX = w / correctedGeoW.toFloat()
@@ -1022,6 +831,19 @@ class ParkMapView @JvmOverloads constructor(
     }
 
     private fun handleTap(x: Float, y: Float) {
+        // Zonas del parque (tap = botón)
+        if (showSections) {
+            val geo = screenToGeo(ScreenPoint(x, y))
+            for (i in parkSections.indices.reversed()) {
+                val section = parkSections[i]
+                if (isPointInPolygon(geo, section.polygon)) {
+                    highlightedSectionIndex = i
+                    sectionClickListener?.onSectionClick(section, i)
+                    return
+                }
+            }
+        }
+
         // Check POI overlay hits
         poiOverlayManager?.let { overlay ->
             val poi = overlay.hitTest(x, y, ::geoToScreenPublic, scale)
@@ -1095,11 +917,33 @@ class ParkMapView @JvmOverloads constructor(
         canvas.restore()
 
         // Dibujar labels sin rotación
+        if (showSectionLabels && showSections) drawSectionLabels(canvas)
         if (showLabels) drawMarkerLabels(canvas)
+        if (showMapLegend) drawMapLegend(canvas)
         if (showScaleBar) drawScale(canvas)
 
-        // Draw POI overlay (without map rotation, uses geoToScreen which already handles transforms)
-        poiOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale)
+        // Lluvia bajo las referencias espaciales
+        if (showRainEffect) {
+            parkClipPath.reset()
+            val clipPolygon = rainClipPolygon()
+            val clipPts = clipPolygon.map { geoToScreen(it) }
+            if (clipPts.size >= 3) {
+                parkClipPath.moveTo(clipPts[0].x, clipPts[0].y)
+                for (i in 1 until clipPts.size) {
+                    parkClipPath.lineTo(clipPts[i].x, clipPts[i].y)
+                }
+                parkClipPath.close()
+            }
+            mapRainEffect.sizeMul = rainSize
+            mapRainEffect.draw(
+                canvas,
+                if (clipPts.size >= 3) parkClipPath else null,
+            ) { bx, by -> baseCanvasToScreen(bx, by) },
+                scale,
+            )
+        }
+
+        poiOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, spatialRefsPhase)
 
         // Draw sticker overlay (only non-tree stickers follow map rotation)
         stickerOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, rotation)
@@ -1110,6 +954,178 @@ class ParkMapView @JvmOverloads constructor(
         // ⚠️ User location + navigation drawn LAST so they are ALWAYS on top of every other layer
         if (isNavigating) drawNavigationArrow(canvas)
         drawUserLocation(canvas)
+    }
+
+    private fun needsSceneAnimation(): Boolean =
+        showRainEffect || (poiOverlayManager?.isOverlayVisible == true)
+
+    private fun updateSceneAnimationLoop() {
+        if (needsSceneAnimation()) startSceneAnimationLoop() else stopSceneAnimationLoop()
+    }
+
+    private fun startSceneAnimationLoop() {
+        if (sceneFrameCallback != null) return
+        val choreographer = Choreographer.getInstance()
+        sceneFrameCallback = Choreographer.FrameCallback {
+            if (poiOverlayManager?.isOverlayVisible == true) {
+                spatialRefsPhase += 0.018f * spatialAnimSpeed
+            }
+            if (showRainEffect && width > 0 && height > 0) {
+                mapRainEffect.intensity = rainIntensity
+                mapRainEffect.sizeMul = rainSize
+                mapRainEffect.tick(getRainEffectOptions())
+            }
+            invalidate()
+            if (needsSceneAnimation()) {
+                choreographer.postFrameCallback(sceneFrameCallback!!)
+            } else {
+                sceneFrameCallback = null
+            }
+        }
+        choreographer.postFrameCallback(sceneFrameCallback!!)
+    }
+
+    private fun stopSceneAnimationLoop() {
+        sceneFrameCallback = null
+    }
+
+    fun setRainEffectEnabled(enabled: Boolean) {
+        showRainEffect = enabled
+        if (!enabled) mapRainEffect.clear()
+        updateSceneAnimationLoop()
+        invalidate()
+    }
+
+    fun setRainIntensity(value: Float) {
+        rainIntensity = value.coerceIn(0f, 1f)
+        mapRainEffect.intensity = rainIntensity
+        invalidate()
+    }
+
+    fun setRainSize(value: Float) {
+        rainSize = value.coerceIn(0.08f, 2.5f)
+        mapRainEffect.sizeMul = rainSize
+        invalidate()
+    }
+
+    fun setRainSectionIndex(index: Int) {
+        if (rainSectionIndex == index) return
+        rainSectionIndex = index
+        mapRainEffect.clear()
+        mapRainEffect.setContainsPoint(getRainContainsPoint())
+        invalidate()
+    }
+
+    fun setSpatialAnimSpeed(value: Float) {
+        spatialAnimSpeed = value.coerceIn(0.2f, 2f)
+    }
+
+    fun notifySceneOptionsChanged() {
+        updateSceneAnimationLoop()
+        invalidate()
+    }
+
+    private fun getParkMapPlaneBounds(): MapRainEffect.MapPlaneBounds {
+        val pts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+        var minX = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        var minY = Float.POSITIVE_INFINITY
+        var maxY = Float.NEGATIVE_INFINITY
+        for (p in pts) {
+            minX = min(minX, p.x)
+            maxX = max(maxX, p.x)
+            minY = min(minY, p.y)
+            maxY = max(maxY, p.y)
+        }
+        return MapRainEffect.MapPlaneBounds(minX, maxX, minY, maxY)
+    }
+
+    private fun getRainEffectOptions(): MapRainEffect.RainTickOptions =
+        MapRainEffect.RainTickOptions(
+            bounds = getRainPlaneBounds(),
+            containsPoint = getRainContainsPoint(),
+        )
+
+    private fun getRainPlaneBounds(): MapRainEffect.MapPlaneBounds {
+        if (rainSectionIndex < 0) return getParkMapPlaneBounds()
+        val polygon = parkSections.getOrNull(rainSectionIndex)?.polygon ?: return getParkMapPlaneBounds()
+        if (polygon.size < 3) return getParkMapPlaneBounds()
+        val pts = polygon.map { geoToCanvas(it) }
+        var minX = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        var minY = Float.POSITIVE_INFINITY
+        var maxY = Float.NEGATIVE_INFINITY
+        for (p in pts) {
+            minX = min(minX, p.x)
+            maxX = max(maxX, p.x)
+            minY = min(minY, p.y)
+            maxY = max(maxY, p.y)
+        }
+        return MapRainEffect.MapPlaneBounds(minX, maxX, minY, maxY)
+    }
+
+    private fun getRainContainsPoint(): ((Float, Float) -> Boolean)? {
+        if (rainSectionIndex < 0) return null
+        val polygon = parkSections.getOrNull(rainSectionIndex)?.polygon ?: return null
+        if (polygon.size < 3) return null
+        return { bx, by ->
+            isPointInPolygon(canvasToGeo(bx, by), polygon)
+        }
+    }
+
+    private fun rainClipPolygon(): List<GeoPoint> {
+        if (rainSectionIndex < 0) {
+            return parkBoundary.map { GeoPoint(it.lat, it.lng) }
+        }
+        return parkSections.getOrNull(rainSectionIndex)?.polygon
+            ?: parkBoundary.map { GeoPoint(it.lat, it.lng) }
+    }
+
+    private fun canvasToGeo(bx: Float, by: Float): GeoPoint {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val geoW = bounds.maxLng - bounds.minLng
+        val geoH = bounds.maxLat - bounds.minLat
+        val latCorrectionFactor = latCorrectionFactor().toFloat()
+        val correctedGeoW = geoW * latCorrectionFactor
+        val scaleX = w / correctedGeoW.toFloat()
+        val scaleY = h / geoH.toFloat()
+        val s = min(scaleX, scaleY) * 0.9f
+        val cx = w / 2f
+        val cy = h / 2f
+        val geoMidLat = (bounds.minLat + bounds.maxLat) / 2
+        val geoMidLng = (bounds.minLng + bounds.maxLng) / 2
+        val relX = bx - cx
+        val relY = by - cy
+        val lng = geoMidLng + relX / (latCorrectionFactor * s)
+        val lat = geoMidLat - relY / s
+        return GeoPoint(lat, lng)
+    }
+
+    private fun baseCanvasToScreen(bx: Float, by: Float): Pair<Float, Float> {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val cx = w / 2f
+        val cy = h / 2f
+        var x = bx - cx
+        var y = by - cy
+        x *= scale
+        y *= scale
+        val cosr = cos(rotation.toDouble()).toFloat()
+        val sinr = sin(rotation.toDouble()).toFloat()
+        val rx = cosr * x - sinr * y
+        val ry = sinr * x + cosr * y
+        return Pair(rx + cx + offsetX, ry + cy + offsetY)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        updateSceneAnimationLoop()
+    }
+
+    override fun onDetachedFromWindow() {
+        stopSceneAnimationLoop()
+        super.onDetachedFromWindow()
     }
 
     private fun drawGrid(canvas: Canvas) {
@@ -1136,7 +1152,7 @@ class ParkMapView @JvmOverloads constructor(
 
 
     private fun drawSections(canvas: Canvas) {
-        for (section in PARK_SECTIONS) {
+        for ((index, section) in parkSections.withIndex()) {
             if (section.polygon.size < 3) continue
 
             val path = Path()
@@ -1149,20 +1165,99 @@ class ParkMapView @JvmOverloads constructor(
             }
             path.close()
 
-            sectionPaint.color = if (isDarkTheme) section.color else section.colorLight
-            canvas.drawPath(path, sectionPaint)
+            val highlight = index == highlightedSectionIndex
+            val baseOpacity = if (isDarkTheme) section.fillOpacity else section.fillOpacityLight
+            val drawOpacity = if (highlight) minOf(baseOpacity + 0.12f, 1f) else baseOpacity
+
+            if (drawOpacity > 0f) {
+                sectionPaint.color = Color.argb(
+                    (drawOpacity * 255).toInt(),
+                    Color.red(section.chartColor),
+                    Color.green(section.chartColor),
+                    Color.blue(section.chartColor),
+                )
+                canvas.drawPath(path, sectionPaint)
+            }
+
+            sectionStrokePaint.color = section.chartColor
+            sectionStrokePaint.strokeWidth = (if (highlight) 5.5f else 4f) / scale
+            canvas.drawPath(path, sectionStrokePaint)
         }
     }
 
+    /** Etiquetas de ecosistema (P0) — espacio pantalla, sin rotar con el mapa. */
+    private fun drawSectionLabels(canvas: Canvas) {
+        for (section in parkSections) {
+            if (section.polygon.size < 3) continue
+            val centroid = ParkSectionResolver.polygonCentroid(section.polygon)
+            val screenPos = geoToScreen(centroid)
+
+            labelPaint.textSize = 30f
+            labelPaint.typeface = Typeface.DEFAULT_BOLD
+            val textWidth = labelPaint.measureText(section.name)
+            val padH = 14f
+            val boxH = 36f
+            val rect = RectF(
+                screenPos.x - (textWidth + padH * 2) / 2f,
+                screenPos.y - boxH / 2f,
+                screenPos.x + (textWidth + padH * 2) / 2f,
+                screenPos.y + boxH / 2f,
+            )
+            labelBgPaint.color = if (isDarkTheme) Color.argb(200, 0, 0, 0) else Color.argb(235, 255, 255, 255)
+            canvas.drawRoundRect(rect, 10f, 10f, labelBgPaint)
+            labelPaint.color = if (isDarkTheme) Color.WHITE else Color.parseColor("#212121")
+            canvas.drawText(section.name, screenPos.x, screenPos.y + 10f, labelPaint)
+        }
+    }
+
+    /** Leyenda 3 zonas + punto GPS (P0). */
+    private fun drawMapLegend(canvas: Canvas) {
+        val left = 16f
+        var top = height - 24f - (parkSections.size + 1) * 22f
+        val legendBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isDarkTheme) Color.argb(210, 20, 20, 30) else Color.argb(230, 255, 255, 255)
+            style = Paint.Style.FILL
+        }
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 22f
+            color = if (isDarkTheme) Color.WHITE else Color.parseColor("#333333")
+        }
+        val titlePaint = Paint(textPaint).apply {
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            color = if (isDarkTheme) Color.LTGRAY else Color.DKGRAY
+        }
+        val boxW = 200f
+        val boxH = 24f + (parkSections.size + 1) * 22f + 12f
+        canvas.drawRoundRect(RectF(left, top - 8f, left + boxW, top + boxH), 12f, 12f, legendBg)
+        canvas.drawText("ZONAS", left + 12f, top + 14f, titlePaint)
+        top += 28f
+        for (section in parkSections) {
+            val swatch = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = section.chartColor
+                style = Paint.Style.FILL
+            }
+            canvas.drawRoundRect(RectF(left + 12f, top, left + 28f, top + 14f), 3f, 3f, swatch)
+            canvas.drawText(section.name, left + 36f, top + 12f, textPaint)
+            top += 22f
+        }
+        val youPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#1E88E5")
+            style = Paint.Style.FILL
+        }
+        canvas.drawCircle(left + 20f, top + 7f, 7f, youPaint)
+        canvas.drawText("Tú (GPS)", left + 36f, top + 12f, textPaint)
+    }
+
     private fun drawBoundary(canvas: Canvas) {
-        if (PARK_BOUNDARY.size < 3) return
+        if (parkBoundary.size < 3) return
 
         val path = Path()
-        val firstPoint = geoToCanvas(PARK_BOUNDARY[0])
+        val firstPoint = geoToCanvas(parkBoundary[0])
         path.moveTo(firstPoint.x, firstPoint.y)
 
-        for (i in 1 until PARK_BOUNDARY.size) {
-            val p = geoToCanvas(PARK_BOUNDARY[i])
+        for (i in 1 until parkBoundary.size) {
+            val p = geoToCanvas(parkBoundary[i])
             path.lineTo(p.x, p.y)
         }
         path.close()
@@ -1177,7 +1272,7 @@ class ParkMapView @JvmOverloads constructor(
         // Vértices
         markerPaint.color = if (isDarkTheme) ThemeColors.darkText else ThemeColors.lightText
         val vertexRadius = 3f / scale
-        for (p in PARK_BOUNDARY) {
+        for (p in parkBoundary) {
             val sp = geoToCanvas(p)
             canvas.drawCircle(sp.x, sp.y, vertexRadius, markerPaint)
         }
@@ -1346,7 +1441,7 @@ class ParkMapView @JvmOverloads constructor(
         val y = height - 60f
 
         val degreesPerPixel = (bounds.maxLng - bounds.minLng) / width / scale
-        val metersPerPixel = degreesPerPixel * METERS_PER_DEG_LNG
+        val metersPerPixel = degreesPerPixel * metersPerDegLng((bounds.minLat + bounds.maxLat) / 2)
         val meters = (scaleBarWidth * metersPerPixel).toInt()
 
         // Fondo
@@ -1633,7 +1728,7 @@ class ParkMapView @JvmOverloads constructor(
                 name = loc.name,
                 geo = geo,
                 section = loc.section,
-                isInside = isPointInPolygon(geo, PARK_BOUNDARY)
+                isInside = isPointInPolygon(geo, parkBoundary)
             ))
         }
         invalidate()
@@ -1754,7 +1849,7 @@ class ParkMapView @JvmOverloads constructor(
         if (width > 0) {
             val boundsWidth = bounds.maxLng - bounds.minLng
             val scaleBarWidth = 200.0
-            val computedScale = (scaleBarWidth * boundsWidth * METERS_PER_DEG_LNG) / (width * targetScaleBarMeters)
+            val computedScale = (scaleBarWidth * boundsWidth * metersPerDegLng((bounds.minLat + bounds.maxLat) / 2)) / (width * targetScaleBarMeters)
             scale = computedScale.toFloat().coerceIn(0.3f, 15f)
         } else {
             scale = 1.2f

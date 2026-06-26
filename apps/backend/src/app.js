@@ -3,7 +3,6 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
-const path = require('path');
 
 const { env, container } = require('./config');
 const { createRoutes } = require('./api');
@@ -20,6 +19,14 @@ const {
 const { connectDB, closeDB } = require('./infrastructure/database');
 const logger = require('./shared/utils/logger.util');
 
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+const DB_OPTIONAL_PATHS = [
+  /^\/health$/,
+  /^\/api\/ping$/,
+  /^\/api\/config\/?$/,
+];
+const DB_CONNECT_TIMEOUT_MS = 25000;
+
 /**
  * Create and configure Express application
  */
@@ -32,8 +39,11 @@ const createApp = () => {
   // Trust proxy (for rate limiting behind reverse proxy)
   app.set('trust proxy', 1);
 
-  // Enforce HTTPS in production (behind trusted proxy)
+  // Enforce HTTPS in production (skip on Vercel — platform terminates TLS)
   app.use((req, res, next) => {
+    if (process.env.VERCEL || process.env.VERCEL_ENV) {
+      return next();
+    }
     if (env.isProduction && !req.secure && req.get('x-forwarded-proto') !== 'https') {
       return res.redirect(301, `https://${req.headers.host}${req.originalUrl}`);
     }
@@ -110,6 +120,45 @@ const createApp = () => {
   // Sanitization
   app.use(sanitizeInput);
   app.use(preventParameterPollution);
+
+  const isServerless = IS_SERVERLESS;
+
+  if (isServerless) {
+    app.use(async (req, res, next) => {
+      if (req.method === 'OPTIONS') {
+        return next();
+      }
+
+      const path = (req.path || req.url.split('?')[0] || '').replace(/\/$/, '') || '/';
+      const normalizedPath = path === '' ? '/' : path;
+
+      if (DB_OPTIONAL_PATHS.some((pattern) => pattern.test(normalizedPath))) {
+        return next();
+      }
+
+      try {
+        const { ensureDB } = require('./infrastructure/database');
+        await Promise.race([
+          ensureDB(),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Database connection timeout')), DB_CONNECT_TIMEOUT_MS);
+          }),
+        ]);
+        return next();
+      } catch (error) {
+        logger.warn('Database not ready for request', {
+          path: normalizedPath,
+          error: error.message,
+        });
+        return res.status(503).json({
+          success: false,
+          message: 'Database temporarily unavailable',
+          code: 'DB_UNAVAILABLE',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+  }
 
   // Backward compatibility: redirect old /uploads/* paths to protected /api/files/*
   // Previously files were served publicly via express.static.

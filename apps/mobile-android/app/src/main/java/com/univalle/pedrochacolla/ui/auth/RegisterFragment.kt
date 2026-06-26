@@ -13,7 +13,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.core.os.bundleOf
 import androidx.navigation.fragment.findNavController
 import com.google.android.material.textfield.TextInputLayout
-import com.univalle.pedrochacolla.MainActivity
+import com.univalle.pedrochacolla.utils.navigation.AppEntryNavigation
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.data.model.UserData
 import com.univalle.pedrochacolla.databinding.FragmentRegisterBinding
@@ -216,8 +216,7 @@ class RegisterFragment : Fragment() {
         loadingDialog?.dismiss()
         loadingDialog = null
         BannerUtil.showBanner(requireActivity(), "Cuenta creada correctamente")
-        startActivity(Intent(requireContext(), MainActivity::class.java))
-        requireActivity().finish()
+        AppEntryNavigation.openAfterAuth(requireContext())
     }
 
     private fun onEmailVerificationRequired(email: String) {

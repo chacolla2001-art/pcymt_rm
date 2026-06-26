@@ -3,7 +3,9 @@ package com.univalle.pedrochacolla.ui.notifications
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.univalle.pedrochacolla.data.model.PredefinedAvatar
 import com.univalle.pedrochacolla.data.repository.AuthRepository
+import com.univalle.pedrochacolla.data.repository.ConfigRepository
 import com.univalle.pedrochacolla.utils.session.SessionManager
 import com.univalle.pedrochacolla.utils.session.UserSession
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,13 +20,19 @@ sealed class ProfileUiState {
     object PasswordChanged : ProfileUiState()
     object AccountDeleted : ProfileUiState()
     data class PhotoUpdated(val newUrl: String) : ProfileUiState()
+    data class AvatarsLoaded(val avatars: List<PredefinedAvatar>) : ProfileUiState()
+    data class AvatarUpdated(val newUrl: String) : ProfileUiState()
     data class Error(val message: String) : ProfileUiState()
 }
 
 class ProfileViewModel(
     private val repository: AuthRepository = AuthRepository(),
+    private val configRepository: ConfigRepository = ConfigRepository(),
     private val sessionManager: SessionManager
 ) : ViewModel() {
+
+    private val _avatars = MutableStateFlow<List<PredefinedAvatar>>(emptyList())
+    val avatars: StateFlow<List<PredefinedAvatar>> = _avatars
 
     private val _state = MutableStateFlow<ProfileUiState>(ProfileUiState.Idle)
     val state: StateFlow<ProfileUiState> = _state
@@ -82,6 +90,36 @@ class ProfileViewModel(
         }
     }
 
+    fun loadAvatars() {
+        viewModelScope.launch {
+            configRepository.getConfig()
+                .onSuccess { config ->
+                    val list = config.avatars.orEmpty()
+                    _avatars.value = list
+                    _state.value = ProfileUiState.AvatarsLoaded(list)
+                }
+        }
+    }
+
+    fun setAvatar(userId: String, avatarId: String) {
+        viewModelScope.launch {
+            _state.value = ProfileUiState.Loading
+
+            repository.setPredefinedAvatar(userId, avatarId)
+                .onSuccess { newUrl ->
+                    val updatedUser = UserSession.currentUser?.copy(avatarUrl = newUrl)
+                        ?: return@onSuccess
+
+                    UserSession.currentUser = updatedUser
+                    sessionManager.saveSession(updatedUser)
+                    _state.value = ProfileUiState.AvatarUpdated(newUrl)
+                }
+                .onFailure {
+                    _state.value = ProfileUiState.Error(it.message ?: "Error al cambiar avatar")
+                }
+        }
+    }
+
     fun updatePhoto(userId: String, imageFile: File) {
         viewModelScope.launch {
             _state.value = ProfileUiState.Loading
@@ -98,6 +136,10 @@ class ProfileViewModel(
                 .onFailure {
                     _state.value = ProfileUiState.Error(it.message ?: "Error subiendo foto")
                 }
+
+            if (imageFile.exists()) {
+                imageFile.delete()
+            }
         }
     }
 

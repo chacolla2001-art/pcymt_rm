@@ -1,15 +1,15 @@
 <div class="user-interaction-stats">
   <!-- Header -->
   <div class="page-header">
-    <button mat-icon-button (click)="goBack()" matTooltip="Volver al dashboard">
+    <button mat-icon-button (click)="goBack()" [matTooltip]="'stats.back' | translate" [attr.aria-label]="'stats.back' | translate">
       <mat-icon>arrow_back</mat-icon>
     </button>
     <div class="header-info">
       <h2>
         <mat-icon class="header-icon">person_search</mat-icon>
-        Interacciones por Usuario
+        {{ 'stats.userInteractionsTitle' | translate }}
       </h2>
-      <p class="subtitle">Consulta detallada de las interacciones de cada usuario con los animales virtuales del parque</p>
+      <p class="subtitle">{{ 'stats.userInteractionsSub' | translate }}</p>
     </div>
   </div>
 
@@ -18,14 +18,14 @@
     <mat-card-content>
       <div class="search-row">
         <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Buscar usuario</mat-label>
+          <mat-label>{{ 'stats.searchUser' | translate }}</mat-label>
           <input matInput [(ngModel)]="userSearch"
                  (keyup.enter)="searchUsers()"
-                 placeholder="Usuario o email...">
+                 [placeholder]="'stats.searchUserPlaceholder' | translate">
           <mat-icon matPrefix>person_search</mat-icon>
         </mat-form-field>
         <button mat-raised-button color="primary" (click)="searchUsers()">
-          <mat-icon>search</mat-icon> Buscar
+          <mat-icon>search</mat-icon> {{ 'table.search' | translate }}
         </button>
       </div>
 
@@ -49,7 +49,7 @@
         <div class="selected-user-chip">
           <mat-icon>person</mat-icon>
           <span>{{ selectedUser.name || selectedUser.email }} &middot; {{ selectedUser.email }}</span>
-          <button mat-icon-button (click)="clearUser()" matTooltip="Quitar filtro de usuario">
+          <button mat-icon-button (click)="clearUser()" [matTooltip]="'stats.clearUserFilter' | translate" [attr.aria-label]="'stats.clearUserFilter' | translate">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -63,22 +63,22 @@
       <mat-card class="summary-card total">
         <mat-icon>touch_app</mat-icon>
         <div class="summary-value">{{ totalInteractions }}</div>
-        <div class="summary-label">Total Interacciones</div>
+        <div class="summary-label">{{ 'stats.totalInteractions' | translate }}</div>
       </mat-card>
       <mat-card class="summary-card interacted">
         <mat-icon>visibility</mat-icon>
         <div class="summary-value">{{ uniqueAssetsInteracted }}</div>
-        <div class="summary-label">Animales Visitados</div>
+        <div class="summary-label">{{ 'stats.animalsVisited' | translate }}</div>
       </mat-card>
       <mat-card class="summary-card missing">
         <mat-icon>visibility_off</mat-icon>
         <div class="summary-value">{{ missingAssetsCount }}</div>
-        <div class="summary-label">Animales Sin Visitar</div>
+        <div class="summary-label">{{ 'stats.animalsNotVisited' | translate }}</div>
       </mat-card>
       <mat-card class="summary-card completion">
         <mat-icon>emoji_events</mat-icon>
         <div class="summary-value">{{ completionPercentage }}%</div>
-        <div class="summary-label">Completitud</div>
+        <div class="summary-label">{{ 'stats.completion' | translate }}</div>
         <mat-progress-bar mode="determinate" [value]="completionPercentage"></mat-progress-bar>
       </mat-card>
     </div>
@@ -88,14 +88,14 @@
       <mat-card class="highlight-card">
         <mat-icon class="highlight-icon favorite">star</mat-icon>
         <div>
-          <div class="highlight-label">Más Interactuado</div>
+          <div class="highlight-label">{{ 'stats.mostInteracted' | translate }}</div>
           <div class="highlight-value">{{ mostInteractedAsset }}</div>
         </div>
       </mat-card>
       <mat-card class="highlight-card">
         <mat-icon class="highlight-icon least">trending_down</mat-icon>
         <div>
-          <div class="highlight-label">Menos Interactuado</div>
+          <div class="highlight-label">{{ 'stats.leastInteracted' | translate }}</div>
           <div class="highlight-value">{{ leastInteractedAsset }}</div>
         </div>
       </mat-card>
@@ -106,15 +106,15 @@
       <mat-card-header>
         <mat-card-title>
           <mat-icon>table_chart</mat-icon>
-          Detalle de Interacciones
+          {{ 'stats.interactionDetail' | translate }}
         </mat-card-title>
       </mat-card-header>
       <mat-card-content>
         <!-- Filters -->
         <div class="table-filters">
           <mat-form-field appearance="outline" class="filter-search">
-            <mat-label>Buscar animal</mat-label>
-            <input matInput (input)="onAssetSearch($event)" placeholder="Nombre del animal...">
+            <mat-label>{{ 'stats.searchAnimal' | translate }}</mat-label>
+            <input matInput (input)="onAssetSearch($event)" [placeholder]="'stats.searchAnimalTablePlaceholder' | translate">
             <mat-icon matPrefix>search</mat-icon>
           </mat-form-field>
 
@@ -136,18 +136,13 @@
             </button>
           </div>
 
-          <button mat-icon-button matTooltip="Descargar CSV" (click)="downloadData()">
+          <button mat-icon-button matTooltip="Descargar CSV" aria-label="Descargar CSV" (click)="downloadData()">
             <mat-icon>download</mat-icon>
           </button>
         </div>
 
         <!-- Table -->
-        @if (isLoading) {
-          <div class="loading-state">
-            <mat-progress-bar mode="indeterminate"></mat-progress-bar>
-            <p>Cargando interacciones...</p>
-          </div>
-        } @else if (filteredInteractions.length > 0) {
+        @if (filteredInteractions.length > 0) {
           <div class="table-container">
             <table matSort (matSortChange)="onSortChange($event)"
                    matSortActive="totalInteractions" matSortDirection="desc">

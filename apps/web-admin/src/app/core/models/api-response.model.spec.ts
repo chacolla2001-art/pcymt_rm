@@ -25,10 +25,12 @@ describe('ApiResponseModel', () => {
       expect(API_ERROR_CODES.SESSION_EXPIRED).toBe('SESSION_EXPIRED');
       expect(API_ERROR_CODES.NETWORK_ERROR).toBe('NETWORK_ERROR');
       expect(API_ERROR_CODES.TIMEOUT_ERROR).toBe('TIMEOUT_ERROR');
+      expect(API_ERROR_CODES.DATABASE_UNAVAILABLE).toBe('DATABASE_UNAVAILABLE');
+      expect(API_ERROR_CODES.SERVICE_UNAVAILABLE).toBe('SERVICE_UNAVAILABLE');
     });
 
-    it('should have 12 error codes', () => {
-      expect(Object.keys(API_ERROR_CODES).length).toBe(12);
+    it('should have 14 error codes', () => {
+      expect(Object.keys(API_ERROR_CODES).length).toBe(14);
     });
   });
 

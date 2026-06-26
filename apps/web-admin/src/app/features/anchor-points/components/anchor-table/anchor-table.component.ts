@@ -16,6 +16,8 @@ import { VirtualAssetService } from '../../../virtual-assets/services/virtual-as
 import { AnchorPoint, ParkSection } from '../../models/anchor-point.model';
 import { VirtualAsset, VirtualAssetDTO } from '../../../virtual-assets/models/virtual-asset.model';
 import { DialogData } from '../../../../shared/modal-dialogs/create-dialog';
+import { I18nService } from '../../../../core/services/i18n.service';
+import { TranslatePipe } from '../../../../shared/pipes/translate.pipe';
 
 /**
  * Componente de tabla para gestión de puntos de anclaje
@@ -36,12 +38,14 @@ import { DialogData } from '../../../../shared/modal-dialogs/create-dialog';
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    TranslatePipe,
   ]
 })
 export class AnchorTableComponent extends BaseTableComponent implements OnInit {
   private readonly anchorPointService = inject(AnchorPointService);
   private readonly virtualAssetService = inject(VirtualAssetService);
+  private readonly i18n = inject(I18nService);
 
   @Input() sectionFilter: string | null = null;
   isFilteredBySection = false;
@@ -74,16 +78,16 @@ export class AnchorTableComponent extends BaseTableComponent implements OnInit {
     '4': 'Mitos y Leyendas'
   };
 
-  readonly anchorPointColumnNames = {
-    name: 'Nombre del Punto',
-    latitude: 'Latitud',
-    longitude: 'Longitud',
-    virtualAssetId: 'Modelo asociado',
-    active: 'Activo',
-    edit: 'Editar',
-    section: 'Sección',
-    showInMap: 'Mostrar en Mapa',
-  };
+  readonly anchorPointColumnKeys = {
+    name: 'anchors.col.name',
+    latitude: 'anchors.col.latitude',
+    longitude: 'anchors.col.longitude',
+    virtualAssetId: 'anchors.col.virtualAsset',
+    active: 'anchors.col.active',
+    edit: 'anchors.col.edit',
+    section: 'anchors.col.section',
+    showInMap: 'anchors.col.showInMap',
+  } as const;
 
   constructor(@Inject(PLATFORM_ID) platformId: object) {
     super(platformId);
@@ -102,7 +106,7 @@ export class AnchorTableComponent extends BaseTableComponent implements OnInit {
   public override loadData(type: TableDataType): void {
     if (!this.isBrowser) return;
 
-    this.isLoading = true;
+    this.startTableLoad();
     this.currentLoadType = type;
 
     if (type !== 'anchorPoints') {
@@ -110,28 +114,41 @@ export class AnchorTableComponent extends BaseTableComponent implements OnInit {
       return;
     }
 
-    this.anchorPointService.getAllAnchorPoints(this.getIsActiveFilter()).subscribe((anchorPoints: AnchorPoint[]) => {
-      const sortedAnchorPoints = anchorPoints.sort(this.sortByUpdated);
-      this.allAnchorData = sortedAnchorPoints;
+    this.anchorPointService.getAllAnchorPoints(this.getIsActiveFilter()).subscribe({
+      next: (anchorPoints: AnchorPoint[]) => {
+        const sortedAnchorPoints = anchorPoints.sort(this.sortByUpdated);
+        this.allAnchorData = sortedAnchorPoints;
 
-      if (this.sectionFilter) {
-        // Normalize filter: accept both numeric codes ('1') and full names ('Tierras Altas')
-        const filterName = this.sectionCodeToName[this.sectionFilter] || this.sectionFilter;
-        const filterCode = this.sectionNameToCode[this.sectionFilter] || this.sectionFilter;
-        const filtered = sortedAnchorPoints.filter(ap =>
-          ap.section === filterCode || ap.section === filterName
-        );
-        this.isFilteredBySection = true;
-        this.setupDataSource(filtered);
-      } else {
-        this.isFilteredBySection = false;
-        this.setupDataSource(sortedAnchorPoints);
-      }
+        if (this.sectionFilter) {
+          const filterName = this.sectionCodeToName[this.sectionFilter] || this.sectionFilter;
+          const filterCode = this.sectionNameToCode[this.sectionFilter] || this.sectionFilter;
+          const filtered = sortedAnchorPoints.filter(ap =>
+            ap.section === filterCode || ap.section === filterName
+          );
+          this.isFilteredBySection = true;
+          this.setupDataSource(filtered);
+        } else {
+          this.isFilteredBySection = false;
+          this.setupDataSource(sortedAnchorPoints);
+        }
+      },
+      error: () => {
+        this.finishTableLoad();
+        this.alertService.showAlert('Error al cargar puntos de anclaje', 'error', 2000);
+      },
     });
   }
 
-  protected getColumnNames(): { [key: string]: string } {
-    return this.anchorPointColumnNames;
+  protected override getColumnNames(): { [key: string]: string } {
+    const names: { [key: string]: string } = {};
+    for (const [col, key] of Object.entries(this.anchorPointColumnKeys)) {
+      names[col] = this.i18n.t(key);
+    }
+    return names;
+  }
+
+  override get searchPlaceholder(): string {
+    return this.i18n.t('anchors.searchPlaceholder');
   }
 
   protected getDisplayedColumns(): string[] {

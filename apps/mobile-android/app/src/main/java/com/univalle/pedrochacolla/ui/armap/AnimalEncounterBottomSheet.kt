@@ -129,6 +129,15 @@ class AnimalEncounterBottomSheet : BottomSheetDialogFragment() {
             section.contains("Mitos",  ignoreCase=true) -> Color.parseColor("#AB47BC")
             else                                         -> Color.parseColor("#D9B992")
         }
+
+        private fun educationalTipResForSection(section: String?): Int = when {
+            section == null                              -> R.string.encounter_tip_default
+            section.contains("Altas",  ignoreCase = true) -> R.string.encounter_tip_highlands
+            section.contains("Medias", ignoreCase = true) -> R.string.encounter_tip_midlands
+            section.contains("Bajas",  ignoreCase = true) -> R.string.encounter_tip_lowlands
+            section.contains("Mitos",  ignoreCase = true) -> R.string.encounter_tip_myths
+            else                                         -> R.string.encounter_tip_default
+        }
     }
 
     /** Listener para que el Fragment padre maneje la acción de guardar */
@@ -352,20 +361,24 @@ class AnimalEncounterBottomSheet : BottomSheetDialogFragment() {
                 tvCapturedBadge.visibility = View.VISIBLE
                 cardIcon.strokeColor = Color.parseColor("#00C853")
                 btnSave.isEnabled = false
-                btnSave.text = "Ya guardado"
+                btnSave.text = getString(R.string.encounter_already_saved)
                 tvRangeHint.visibility = View.GONE
             }
             isInRange || isAdminMode -> {
                 tvCapturedBadge.visibility = View.GONE
                 cardIcon.strokeColor = Color.parseColor("#FF6D00")
                 btnSave.isEnabled = true
-                btnSave.text = if (isAdminMode && !isInRange) "Guardar (Admin)" else "Guardar encuentro"
+                btnSave.text = if (isAdminMode && !isInRange) {
+                    getString(R.string.encounter_save_admin)
+                } else {
+                    getString(R.string.encounter_save_btn)
+                }
                 tvRangeHint.visibility = View.GONE
             }
             else -> {
                 tvCapturedBadge.visibility = View.GONE
                 btnSave.isEnabled = false
-                btnSave.text = "Acercate mas"
+                btnSave.text = getString(R.string.encounter_approach)
                 val remaining = if (distance != null) {
                     " (${(distance - ENCOUNTER_RADIUS_METERS).roundToInt()} m más)"
                 } else ""
@@ -403,7 +416,14 @@ class AnimalEncounterBottomSheet : BottomSheetDialogFragment() {
         // ── Acción de guardar ────────────────────────────────────────
         btnSave.setOnClickListener {
             onSaveEncounter?.invoke(locationId, assetId, animalName)
-            dismiss()
+            tvCapturedBadge.visibility = View.VISIBLE
+            cardIcon.strokeColor = Color.parseColor("#00C853")
+            btnSave.isEnabled = false
+            btnSave.text = getString(R.string.encounter_already_saved)
+            tvRangeHint.text = getString(R.string.encounter_saved) + "\n" +
+                getString(educationalTipResForSection(section))
+            tvRangeHint.visibility = View.VISIBLE
+            view?.postDelayed({ dismiss() }, 2000L)
         }
     }
 
@@ -457,8 +477,9 @@ class AnimalEncounterBottomSheet : BottomSheetDialogFragment() {
             tvCapturedBadge?.visibility = View.VISIBLE
             cardIcon?.strokeColor = Color.parseColor("#00C853")
             btnSave?.isEnabled = false
-            btnSave?.text = "Ya guardado"
-            tvHint?.visibility = View.GONE
+            btnSave?.text = getString(R.string.encounter_already_saved)
+            tvHint?.text = getString(educationalTipResForSection(null))
+            tvHint?.visibility = View.VISIBLE
         }
     }
 

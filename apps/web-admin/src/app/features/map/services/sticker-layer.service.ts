@@ -244,6 +244,17 @@ export class StickerLayerService {
     this.flushSave();
   }
 
+  /** Replace all layers (session restore / checkpoints). */
+  importLayers(layers: StickerLayer[]): void {
+    this.layersSubject.next(layers);
+    const active = layers.find((l) => l.id === this.activeLayerId)?.id ?? layers[0]?.id ?? null;
+    this.activeLayerIdSubject.next(active);
+    this.saveImmediate();
+    const keys = new Set<string>();
+    layers.forEach((l) => l.stickers.forEach((s) => keys.add(s.stickerKey)));
+    keys.forEach((k) => this.loadImage(k).catch(() => {}));
+  }
+
   private flushSave(): void {
     try {
       const data = JSON.stringify(this.layers);

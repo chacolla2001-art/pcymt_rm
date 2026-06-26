@@ -1,24 +1,23 @@
 <div class="page-container">
   <div class="page-header">
-    <button mat-icon-button (click)="goBack()" matTooltip="Volver al Dashboard">
+    <button mat-icon-button (click)="goBack()" [matTooltip]="'stats.back' | translate" [attr.aria-label]="'stats.back' | translate">
       <mat-icon>arrow_back</mat-icon>
     </button>
     <mat-icon class="header-icon">login</mat-icon>
-    <h1>Historial de Accesos</h1>
+    <h1>{{ 'stats.sessionHistory' | translate }}</h1>
     <span class="spacer"></span>
     <mat-button-toggle-group [(value)]="selectedSessionRange" (change)="onSessionRangeChanged($event.value)" class="time-toggle">
-      <mat-button-toggle value="day">Día</mat-button-toggle>
-      <mat-button-toggle value="month">Mes</mat-button-toggle>
-      <mat-button-toggle value="year">Año</mat-button-toggle>
+      <mat-button-toggle value="day">{{ 'stats.day' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="month">{{ 'stats.month' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="year">{{ 'stats.year' | translate }}</mat-button-toggle>
     </mat-button-toggle-group>
   </div>
 
-  <!-- Ranking de Usuarios Más Activos (integrado de top-users) -->
   <div class="content-grid">
     <mat-card appearance="outlined" class="ranking-detail-card">
       <mat-card-header>
-        <mat-card-title>Ranking por Actividad</mat-card-title>
-        <mat-card-subtitle>Top usuarios con más interacciones en el parque</mat-card-subtitle>
+        <mat-card-title>{{ 'stats.rankingByActivity' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.rankingByActivitySub' | translate }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
         <div class="ranking-list-detail">
@@ -37,7 +36,7 @@
           @empty {
             <div class="empty-state">
               <mat-icon>info</mat-icon>
-              <p>Aún no hay actividad de usuarios</p>
+              <p>{{ 'stats.noUserActivity' | translate }}</p>
             </div>
           }
         </div>
@@ -46,8 +45,8 @@
 
     <mat-card appearance="outlined" class="chart-card">
       <mat-card-header>
-        <mat-card-title>Distribución de Actividad</mat-card-title>
-        <mat-card-subtitle>Comparativa visual entre usuarios</mat-card-subtitle>
+        <mat-card-title>{{ 'stats.activityDistribution' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.activityDistributionSub' | translate }}</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
         <div class="ranking-chart-container">
@@ -57,37 +56,34 @@
     </mat-card>
   </div>
 
-  <!-- Gráfico de sesiones por período -->
   <mat-card appearance="outlined" class="main-card">
     <mat-card-content>
-      <!-- Period navigation -->
       <div class="period-navigation">
-        <button mat-icon-button (click)="navigateSessionPeriod(-1)" matTooltip="Período anterior">
+        <button mat-icon-button (click)="navigateSessionPeriod(-1)" [matTooltip]="'stats.periodPrev' | translate" [attr.aria-label]="'stats.periodPrev' | translate">
           <mat-icon>chevron_left</mat-icon>
         </button>
         <span class="period-label">{{ sessionPeriodLabel }}</span>
-        <button mat-icon-button (click)="navigateSessionPeriod(1)" matTooltip="Período siguiente">
+        <button mat-icon-button (click)="navigateSessionPeriod(1)" [matTooltip]="'stats.periodNext' | translate" [attr.aria-label]="'stats.periodNext' | translate">
           <mat-icon>chevron_right</mat-icon>
         </button>
         @if (sessionPeriodOffset !== 0) {
           <button mat-stroked-button class="today-btn" (click)="resetSessionPeriod()">
-            <mat-icon>today</mat-icon> Actual
+            <mat-icon>today</mat-icon> {{ 'stats.currentPeriod' | translate }}
           </button>
         }
         <span class="spacer"></span>
-        <button mat-icon-button (click)="downloadSessionData()" matTooltip="Descargar CSV">
+        <button mat-icon-button (click)="downloadSessionData()" [matTooltip]="'stats.downloadCsv' | translate" [attr.aria-label]="'stats.downloadCsv' | translate">
           <mat-icon>download</mat-icon>
         </button>
       </div>
 
       <div class="stats-layout">
-        <!-- Panel lateral de filtros -->
         <div class="filters-panel">
-          <h3 class="filter-section-title">Filtros</h3>
+          <h3 class="filter-section-title">{{ 'stats.filters' | translate }}</h3>
 
           <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-width">
-            <mat-label>Buscar usuario</mat-label>
-            <input matInput [(ngModel)]="userSearch" (keyup.enter)="searchUsers()" placeholder="Usuario o email...">
+            <mat-label>{{ 'stats.searchUser' | translate }}</mat-label>
+            <input matInput [(ngModel)]="userSearch" (keyup.enter)="searchUsers()" [placeholder]="'stats.searchUserPlaceholder' | translate">
             <mat-icon matSuffix>search</mat-icon>
           </mat-form-field>
 
@@ -103,11 +99,11 @@
           }
 
           <div class="filter-section">
-            <h4 class="filter-title">Plataforma</h4>
+            <h4 class="filter-title">{{ 'stats.platform' | translate }}</h4>
             <mat-button-toggle-group [(value)]="selectedPlatform" (change)="onPlatformChanged($event.value)" class="vertical-toggle">
-              <mat-button-toggle value="all"><mat-icon>devices</mat-icon> Todas</mat-button-toggle>
-              <mat-button-toggle value="web"><mat-icon>computer</mat-icon> Web</mat-button-toggle>
-              <mat-button-toggle value="mobile"><mat-icon>smartphone</mat-icon> Móvil</mat-button-toggle>
+              <mat-button-toggle value="all"><mat-icon>devices</mat-icon> {{ 'stats.platformAll' | translate }}</mat-button-toggle>
+              <mat-button-toggle value="web"><mat-icon>computer</mat-icon> {{ 'stats.platformWeb' | translate }}</mat-button-toggle>
+              <mat-button-toggle value="mobile"><mat-icon>smartphone</mat-icon> {{ 'stats.platformMobile' | translate }}</mat-button-toggle>
             </mat-button-toggle-group>
           </div>
 
@@ -115,14 +111,13 @@
             <div class="selected-user-chip">
               <mat-icon>person</mat-icon>
               <span>{{ selectedUser.name || selectedUser.email }}</span>
-              <button mat-icon-button (click)="clearUser()">
+              <button mat-icon-button (click)="clearUser()" [attr.aria-label]="'stats.clearUserFilter' | translate">
                 <mat-icon>close</mat-icon>
               </button>
             </div>
           }
         </div>
 
-        <!-- Gráfico principal -->
         <div class="chart-main">
           <div class="chart-container-large">
             <canvas baseChart #sessionChart [data]="sessionTimeChartData" [type]="sessionTimeChartType"></canvas>

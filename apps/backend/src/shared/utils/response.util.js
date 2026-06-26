@@ -1,4 +1,5 @@
 const { HTTP_STATUS, ERROR_CODES } = require('../constants');
+const { codeFromStatus } = require('./errorResponse.util');
 
 /**
  * Response utility for standardized API responses
@@ -150,15 +151,7 @@ class ResponseUtil {
    * @private
    */
   static getErrorCode(statusCode) {
-    const mapping = {
-      [HTTP_STATUS.BAD_REQUEST]: ERROR_CODES.VALIDATION_ERROR,
-      [HTTP_STATUS.UNAUTHORIZED]: ERROR_CODES.UNAUTHORIZED,
-      [HTTP_STATUS.FORBIDDEN]: ERROR_CODES.FORBIDDEN,
-      [HTTP_STATUS.NOT_FOUND]: ERROR_CODES.NOT_FOUND,
-      [HTTP_STATUS.CONFLICT]: ERROR_CODES.CONFLICT,
-      [HTTP_STATUS.TOO_MANY_REQUESTS]: ERROR_CODES.RATE_LIMITED,
-    };
-    return mapping[statusCode] || ERROR_CODES.INTERNAL_ERROR;
+    return codeFromStatus(statusCode);
   }
 }
 

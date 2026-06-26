@@ -1,0 +1,11 @@
+<main class="access-denied-page">
+  <mat-card class="access-denied-card">
+    <mat-icon class="access-denied-icon" aria-hidden="true">block</mat-icon>
+    <h1>{{ 'accessDenied.title' | translate }}</h1>
+    <p>{{ 'accessDenied.message' | translate }}</p>
+    <button mat-flat-button color="primary" type="button" (click)="logout()">
+      <mat-icon>logout</mat-icon>
+      {{ 'accessDenied.logout' | translate }}
+    </button>
+  </mat-card>
+</main>

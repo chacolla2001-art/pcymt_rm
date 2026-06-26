@@ -3,19 +3,22 @@ package com.univalle.pedrochacolla.ui.dashboard
 import android.content.Context
 import android.content.res.Resources
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
-import androidx.core.content.ContextCompat
 import com.univalle.pedrochacolla.R
 
 /**
- * Manages the Point of Interest (POI) overlay layer on the park map.
- * POIs represent fixed landmarks in the park (Ingreso, Boleterías, Chiwiña, etc.)
- * The overlay can be toggled on/off by the user.
+ * Capa de referencias espaciales en el mapa del parque (ingreso, servicios, cultura, paisaje).
+ * El overlay puede activarse/desactivarse desde el panel de escena.
  */
 class PoiOverlayManager(private val context: Context) {
+
+    /** POI ids destacados (Ingreso, Boleterías). */
+    var highlightedPoiIds: Set<Int> = setOf(1, 2)
 
     /** Whether the POI overlay is currently visible */
     var isOverlayVisible = false
@@ -49,10 +52,10 @@ class PoiOverlayManager(private val context: Context) {
     /** POI items — assigned from the fragment after building with [createDefaultItems]. Empty until populated. */
     var poiItems: List<PoiItem> = emptyList()
 
-
-
-    /** Cached bitmaps for POI icons (64x64 dp equivalent) */
-    private val iconBitmaps = mutableMapOf<Int, Bitmap>()
+    private val assetBitmapCache = mutableMapOf<String, Bitmap>()
+    private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val srcRect = Rect()
+    private val dstRect = RectF()
 
     // Paint objects for drawing
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -78,6 +81,34 @@ class PoiOverlayManager(private val context: Context) {
         style = Paint.Style.FILL
     }
 
+    private val highlightRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF2E7D32.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+    }
+
+    private val categoryFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val badgeStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
+
+    private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+
+    private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFFFFF.toInt()
+        textSize = 28f
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+
     fun toggleOverlay(): Boolean {
         isOverlayVisible = !isOverlayVisible
         return isOverlayVisible
@@ -96,33 +127,29 @@ class PoiOverlayManager(private val context: Context) {
     fun drawOverlay(
         canvas: Canvas,
         geoToScreen: (Double, Double) -> Pair<Float, Float>,
-        scale: Float
+        scale: Float,
+        animPhase: Float = 0f,
     ) {
         if (!isOverlayVisible) return
 
-        // Clamp icon size for readability
-        val iconSize = (48f * scale.coerceIn(0.8f, 3f)).toInt()
-
-        for (poi in poiItems) {
+        for ((index, poi) in poiItems.withIndex()) {
+            if (!poi.visible) continue
             val (lat, lng) = getPoiPosition(poi.id)
             val (sx, sy) = geoToScreen(lat, lng)
+            val anim = spatialAnimOffset(poi.animation, animPhase, index)
+            val isHighlight = poi.id in highlightedPoiIds
 
-            // Get or create cached bitmap
-            val bitmap = getIconBitmap(poi.drawableRes, iconSize)
+            val drawY = sy + anim.dy
+            val displaySize = (poi.displaySize * anim.scale * scale.coerceIn(0.8f, 3f)).toInt().coerceAtLeast(24)
 
-            // Draw shadow
-            canvas.drawCircle(sx + 2f, sy + 2f, iconSize / 2f, shadowPaint)
+            val bitmap = resolveFrameBitmap(poi, animPhase)
+            if (bitmap != null) {
+                drawImageMarker(canvas, bitmap.bitmap, sx, drawY, displaySize, poi, isHighlight, bitmap.srcRect)
+            } else {
+                drawBadgeMarker(canvas, poi, sx, drawY, displaySize, anim, isHighlight)
+            }
 
-            // Draw icon
-            canvas.drawBitmap(
-                bitmap,
-                sx - iconSize / 2f,
-                sy - iconSize / 2f,
-                null
-            )
-
-            // Draw label below the icon
-            val labelY = sy + iconSize / 2f + 24f
+            val labelY = drawY + displaySize / 2f + 24f
             val textWidth = labelPaint.measureText(poi.name)
             val labelRect = RectF(
                 sx - textWidth / 2f - 8f,
@@ -134,6 +161,100 @@ class PoiOverlayManager(private val context: Context) {
             canvas.drawRoundRect(labelRect, 8f, 8f, labelBgStrokePaint)
             canvas.drawText(poi.name, sx, labelY, labelPaint)
         }
+    }
+
+    private data class FrameSlice(val bitmap: Bitmap, val srcRect: Rect?)
+
+    private fun resolveFrameBitmap(poi: PoiItem, animPhase: Float): FrameSlice? {
+        val sheet = poi.spriteSheet
+        val assetPath = poi.imageAsset ?: sheet?.assetPath ?: return null
+        val full = loadAssetBitmap(assetPath) ?: return null
+        if (sheet == null || sheet.frameCount <= 1) return FrameSlice(full, null)
+
+        val cols = sheet.columns ?: sheet.frameCount
+        val frame = (animPhase * sheet.fps).toInt() % sheet.frameCount
+        val col = frame % cols
+        val row = frame / cols
+        srcRect.set(
+            col * sheet.frameWidth,
+            row * sheet.frameHeight,
+            col * sheet.frameWidth + sheet.frameWidth,
+            row * sheet.frameHeight + sheet.frameHeight,
+        )
+        return FrameSlice(full, Rect(srcRect))
+    }
+
+    private fun loadAssetBitmap(path: String): Bitmap? {
+        assetBitmapCache[path]?.let { return it }
+        return runCatching {
+            context.assets.open(path).use { BitmapFactory.decodeStream(it) }
+        }.getOrNull()?.also { assetBitmapCache[path] = it }
+    }
+
+    private fun drawImageMarker(
+        canvas: Canvas,
+        bitmap: Bitmap,
+        sx: Float,
+        sy: Float,
+        size: Int,
+        poi: PoiItem,
+        isHighlight: Boolean,
+        src: Rect? = null,
+    ) {
+        val aspect = bitmap.width.toFloat() / bitmap.height
+        val drawW = if (aspect >= 1f) size.toFloat() else size * aspect
+        val drawH = if (aspect >= 1f) size / aspect else size.toFloat()
+
+        canvas.drawOval(
+            sx + 2f - drawW * 0.2f,
+            sy + drawH * 0.38f,
+            sx + 2f + drawW * 0.2f,
+            sy + drawH * 0.38f + drawH * 0.12f,
+            shadowPaint,
+        )
+
+        if (isHighlight) {
+            highlightRingPaint.strokeWidth = 4f
+            canvas.drawCircle(sx, sy, drawW / 2f + 6f, highlightRingPaint)
+        }
+
+        dstRect.set(sx - drawW / 2f, sy - drawH / 2f, sx + drawW / 2f, sy + drawH / 2f)
+        if (src != null) {
+            canvas.drawBitmap(bitmap, src, dstRect, imagePaint)
+        } else {
+            canvas.drawBitmap(bitmap, null, dstRect, imagePaint)
+        }
+    }
+
+    private fun drawBadgeMarker(
+        canvas: Canvas,
+        poi: PoiItem,
+        sx: Float,
+        drawY: Float,
+        iconSize: Int,
+        anim: AnimOffset,
+        isHighlight: Boolean,
+    ) {
+        if (anim.ripple > 0f) {
+            ripplePaint.color = (0x40 shl 24) or 0x64B4FF
+            ripplePaint.alpha = (64 + anim.ripple * 120).toInt().coerceIn(0, 255)
+            canvas.drawCircle(sx, drawY + iconSize * 0.35f, iconSize / 2f + anim.ripple * 14f, ripplePaint)
+        }
+
+        if (isHighlight) {
+            highlightRingPaint.strokeWidth = 4f
+            canvas.drawCircle(sx, drawY, iconSize / 2f + 6f, highlightRingPaint)
+        }
+
+        canvas.drawCircle(sx + 2f, drawY + iconSize * 0.42f, iconSize * 0.22f, shadowPaint)
+
+        categoryFillPaint.color = categoryColor(poi.category)
+        canvas.drawCircle(sx, drawY, iconSize / 2f, categoryFillPaint)
+        badgeStrokePaint.strokeWidth = 2.5f
+        canvas.drawCircle(sx, drawY, iconSize / 2f, badgeStrokePaint)
+
+        val glyph = poi.name.firstOrNull()?.uppercaseChar()?.toString() ?: "•"
+        canvas.drawText(glyph, sx, drawY + iconSize * 0.1f, glyphPaint)
     }
 
     /**
@@ -182,28 +303,31 @@ class PoiOverlayManager(private val context: Context) {
         return null
     }
 
-    private fun getIconBitmap(drawableRes: Int, size: Int): Bitmap {
-        val key = drawableRes * 10000 + size
-        iconBitmaps[key]?.let { return it }
-
-        val drawable = ContextCompat.getDrawable(context, drawableRes)
-            ?: return Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        drawable.setBounds(0, 0, size, size)
-        drawable.draw(canvas)
-        iconBitmaps[key] = bitmap
-        return bitmap
-    }
-
-    /** Clear cached bitmaps (call on configuration changes) */
+    /** Clear cached state (call on configuration changes) */
     fun clearCache() {
-        iconBitmaps.values.forEach { it.recycle() }
-        iconBitmaps.clear()
+        // ponytail: badges are drawn procedurally; nothing to recycle
     }
 
     companion object {
+        private fun categoryColor(category: String): Int = when (category) {
+            "acceso" -> 0xFF2E7D32.toInt()
+            "servicio" -> 0xFFFF9E67.toInt()
+            "cultura" -> 0xFF7E57C2.toInt()
+            else -> 0xFF43A047.toInt()
+        }
+
+        private data class AnimOffset(val dy: Float, val scale: Float, val ripple: Float)
+
+        private fun spatialAnimOffset(animation: String, phase: Float, index: Int): AnimOffset {
+            val t = phase + index * 0.7f
+            return when (animation) {
+                "bob" -> AnimOffset(kotlin.math.sin(t * 2.2f) * 5f, 1f, 0f)
+                "pulse" -> AnimOffset(0f, 1f + kotlin.math.sin(t * 3f) * 0.06f, 0f)
+                "ripple" -> AnimOffset(0f, 1f, (kotlin.math.sin(t * 2.5f) + 1f) * 0.5f)
+                else -> AnimOffset(0f, 1f, 0f)
+            }
+        }
+
         /**
          * Build the default list of POI metadata using local drawable resources.
          * Positions default to (0, 0) and may be overridden at runtime via
@@ -226,20 +350,46 @@ class PoiOverlayManager(private val context: Context) {
             return entries.map { (id, name, resName) ->
                 val resId = resources.getIdentifier(resName, "drawable", packageName)
                     .takeIf { it != 0 } ?: R.drawable.ic_launcher_foreground
-                PoiItem(id = id, name = name, lat = 0.0, lng = 0.0, drawableRes = resId, color = "#CCCCCC")
+                PoiItem(
+                    id = id,
+                    refId = resName.removePrefix("ic_poi_"),
+                    name = name,
+                    lat = 0.0,
+                    lng = 0.0,
+                    drawableRes = resId,
+                    color = "#CCCCCC",
+                )
             }
         }
     }
 }
 
+data class PoiSpriteSheet(
+    val assetPath: String,
+    val frameWidth: Int,
+    val frameHeight: Int,
+    val frameCount: Int,
+    val fps: Int = 8,
+    val columns: Int? = null,
+)
+
 /**
- * Data class representing a Point of Interest in the park
+ * Referencia espacial georreferenciada en el mapa del parque.
  */
 data class PoiItem(
     val id: Int,
+    val refId: String = "",
     val name: String,
     val lat: Double,
     val lng: Double,
     val drawableRes: Int,
-    val color: String
+    val color: String,
+    val category: String = "paisaje",
+    val animation: String = "none",
+    val summary: String = "",
+    val visible: Boolean = true,
+    /** PNG en assets (p. ej. spatial-refs/ingress.png). */
+    val imageAsset: String? = null,
+    val spriteSheet: PoiSpriteSheet? = null,
+    val displaySize: Float = 48f,
 )

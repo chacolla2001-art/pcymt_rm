@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const { ROLE_VALUES } = require('../constants');
+const { PREDEFINED_AVATARS } = require('../constants/predefinedAvatars');
 
 /**
  * Password validation pattern
@@ -91,6 +92,16 @@ const userSchemas = {
       'string.email': 'Please provide a valid email',
       'any.required': 'Email is required',
     }),
+  }),
+
+  setAvatar: Joi.object({
+    avatar_id: Joi.string()
+      .valid(...PREDEFINED_AVATARS.map((a) => a.id))
+      .required()
+      .messages({
+        'any.only': 'Invalid avatar selection',
+        'any.required': 'avatar_id is required',
+      }),
   }),
 };
 

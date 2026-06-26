@@ -1,32 +1,3 @@
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-
-  .header-icon {
-    font-size: 32px;
-    width: 32px;
-    height: 32px;
-    color: var(--sys-primary);
-  }
-
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--sys-on-surface);
-  }
-}
-
 .content-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -132,9 +103,6 @@
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 1rem; }
-  .page-header h1 { font-size: 1.25rem; }
-
   .stats-layout {
     flex-direction: column;
   }

@@ -73,14 +73,14 @@ jobs:
         working-directory: ./apps/web-admin
         run: |
           cat > .env << EOF
-          VITE_API_URL=http://localhost:5000
-          VITE_ENV_NAME=production
-          VITE_PRODUCTION=true
+          API_URL=http://localhost:5000
+          ENV_NAME=production
+          PRODUCTION=true
           EOF
 
       - name: Build production
         working-directory: ./apps/web-admin
-        run: npm run build:prod
+        run: npm run build
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3

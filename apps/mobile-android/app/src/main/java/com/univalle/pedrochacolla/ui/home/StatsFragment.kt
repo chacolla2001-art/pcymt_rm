@@ -1,11 +1,13 @@
 package com.univalle.pedrochacolla.ui.home
 
-import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AnimationUtils
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -13,12 +15,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.snackbar.Snackbar
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.adapters.AnimalTrophyAdapter
 import com.univalle.pedrochacolla.databinding.FragmentCollectionBinding
-import com.univalle.pedrochacolla.ui.auth.AuthActivity
-import com.univalle.pedrochacolla.utils.device.DeviceCapabilityManager
+import com.univalle.pedrochacolla.utils.location.ParkBoundsUtil
 import com.univalle.pedrochacolla.utils.session.UserSession
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -48,6 +50,7 @@ class StatsFragment : Fragment() {
         setupNavigationButtons()
         setupCelebrationOverlay()
         applyDeviceTierUi()
+        checkParkProximity()
         observeState()
         viewModel.loadStats()
     }
@@ -168,18 +171,34 @@ class StatsFragment : Fragment() {
     }
 
     private fun applyDeviceTierUi() {
-        val isLowEnd = DeviceCapabilityManager.isLowEnd(requireContext())
         val isAdmin = UserSession.currentUser?.role == "admin"
+        binding.cardAdminNotice.visibility = if (isAdmin) View.VISIBLE else View.GONE
+    }
 
-        // Show admin notice card for admin users
-        binding.cardAdminNotice.visibility =
-            if (isAdmin) android.view.View.VISIBLE else android.view.View.GONE
+    private fun checkParkProximity() {
+        if (UserSession.currentUser?.role == "admin") return
 
-        if (isLowEnd || !isAdmin) {
-            // Hide Realidad Mixta card — low-end device or non-admin user
-            // UI adjustments for hiding the mixed-reality card can go here
-            return
-        }
+        val hasLocationPermission = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasLocationPermission) return
+
+        LocationServices.getFusedLocationProviderClient(requireContext())
+            .lastLocation
+            .addOnSuccessListener { location ->
+                val binding = _binding ?: return@addOnSuccessListener
+                if (location == null) return@addOnSuccessListener
+
+                val isInside = ParkBoundsUtil.isInsideParkBounds(
+                    requireContext(),
+                    location.latitude,
+                    location.longitude,
+                )
+                binding.bannerOutOfBounds.visibility =
+                    if (isInside) View.GONE else View.VISIBLE
+            }
     }
 
     override fun onDestroyView() {

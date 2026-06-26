@@ -1,0 +1,48 @@
+{
+  "codes": {
+    "VALIDATION_ERROR": "VALIDATION_ERROR",
+    "NOT_FOUND": "NOT_FOUND",
+    "UNAUTHORIZED": "UNAUTHORIZED",
+    "FORBIDDEN": "FORBIDDEN",
+    "CONFLICT": "CONFLICT",
+    "RATE_LIMITED": "RATE_LIMITED",
+    "INTERNAL_ERROR": "INTERNAL_ERROR",
+    "TOKEN_EXPIRED": "TOKEN_EXPIRED",
+    "TOKEN_INVALID": "TOKEN_INVALID",
+    "SESSION_EXPIRED": "SESSION_EXPIRED",
+    "DATABASE_UNAVAILABLE": "DATABASE_UNAVAILABLE",
+    "SERVICE_UNAVAILABLE": "SERVICE_UNAVAILABLE",
+    "TIMEOUT_ERROR": "TIMEOUT_ERROR",
+    "NETWORK_ERROR": "NETWORK_ERROR"
+  },
+  "messagesEs": {
+    "VALIDATION_ERROR": "Los datos proporcionados no son válidos",
+    "NOT_FOUND": "El recurso solicitado no fue encontrado",
+    "UNAUTHORIZED": "Credenciales inválidas o sesión expirada",
+    "FORBIDDEN": "No tienes permisos para realizar esta acción",
+    "CONFLICT": "El recurso ya existe o hay un conflicto",
+    "RATE_LIMITED": "Has excedido el límite de solicitudes. Intenta más tarde",
+    "INTERNAL_ERROR": "Error interno del servidor. Intenta más tarde",
+    "TOKEN_EXPIRED": "Tu sesión ha expirado. Inicia sesión nuevamente",
+    "TOKEN_INVALID": "Token de autenticación inválido",
+    "SESSION_EXPIRED": "Tu sesión ha expirado. Inicia sesión nuevamente",
+    "DATABASE_UNAVAILABLE": "El servicio de base de datos no está disponible temporalmente",
+    "SERVICE_UNAVAILABLE": "El servicio no está disponible temporalmente",
+    "TIMEOUT_ERROR": "La solicitud tardó demasiado. Intenta nuevamente",
+    "NETWORK_ERROR": "Error de conexión. Verifica tu conexión a internet"
+  },
+  "httpStatusToCode": {
+    "400": "VALIDATION_ERROR",
+    "401": "UNAUTHORIZED",
+    "403": "FORBIDDEN",
+    "404": "NOT_FOUND",
+    "408": "TIMEOUT_ERROR",
+    "409": "CONFLICT",
+    "422": "VALIDATION_ERROR",
+    "429": "RATE_LIMITED",
+    "500": "INTERNAL_ERROR",
+    "502": "SERVICE_UNAVAILABLE",
+    "503": "SERVICE_UNAVAILABLE",
+    "504": "TIMEOUT_ERROR"
+  }
+}

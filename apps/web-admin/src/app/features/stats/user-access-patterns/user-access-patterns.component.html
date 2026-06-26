@@ -1,15 +1,15 @@
 <div class="user-access-patterns">
   <!-- Header -->
   <div class="page-header">
-    <button mat-icon-button (click)="goBack()" matTooltip="Volver al dashboard">
+    <button mat-icon-button (click)="goBack()" [matTooltip]="'stats.back' | translate" [attr.aria-label]="'stats.back' | translate">
       <mat-icon>arrow_back</mat-icon>
     </button>
     <div class="header-info">
       <h2>
         <mat-icon class="header-icon">calendar_month</mat-icon>
-        Accesos por Usuario
+        {{ 'stats.userAccessTitle' | translate }}
       </h2>
-      <p class="subtitle">Calendario de actividad, historial de sesiones y patrones de acceso al sistema</p>
+      <p class="subtitle">{{ 'stats.userAccessSub' | translate }}</p>
     </div>
   </div>
 
@@ -18,14 +18,14 @@
     <mat-card-content>
       <div class="search-row">
         <mat-form-field appearance="outline" class="search-field">
-          <mat-label>Buscar usuario</mat-label>
+          <mat-label>{{ 'stats.searchUser' | translate }}</mat-label>
           <input matInput [(ngModel)]="userSearch"
                  (keyup.enter)="searchUsers()"
-                 placeholder="Usuario o email...">
+                 [placeholder]="'stats.searchUserPlaceholder' | translate">
           <mat-icon matPrefix>person_search</mat-icon>
         </mat-form-field>
         <button mat-raised-button color="primary" (click)="searchUsers()">
-          <mat-icon>search</mat-icon> Buscar
+          <mat-icon>search</mat-icon> {{ 'table.search' | translate }}
         </button>
       </div>
 
@@ -47,7 +47,7 @@
           <div class="selected-user-chip">
           <mat-icon>person</mat-icon>
           <span>{{ selectedUser.name || selectedUser.email }} &middot; {{ selectedUser.email }}</span>
-          <button mat-icon-button (click)="clearUser()" matTooltip="Quitar filtro de usuario">
+          <button mat-icon-button (click)="clearUser()" [matTooltip]="'stats.clearUserFilter' | translate" [attr.aria-label]="'stats.clearUserFilter' | translate">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -55,29 +55,29 @@
     </mat-card-content>
   </mat-card>
 
-  @if (selectedUser && !isLoading) {
+  @if (selectedUser) {
     <!-- All-time Summary -->
     <div class="summary-grid">
       <mat-card class="summary-card sessions">
         <mat-icon>login</mat-icon>
         <div class="summary-value">{{ allTimeSessions }}</div>
-        <div class="summary-label">Total Sesiones</div>
+        <div class="summary-label">{{ 'stats.totalSessions' | translate }}</div>
       </mat-card>
       <mat-card class="summary-card days">
         <mat-icon>event_available</mat-icon>
         <div class="summary-value">{{ allTimeActiveDays }}</div>
-        <div class="summary-label">Días Activos</div>
+        <div class="summary-label">{{ 'stats.activeDays' | translate }}</div>
       </mat-card>
       <mat-card class="summary-card web">
         <mat-icon>computer</mat-icon>
         <div class="summary-value">{{ allTimeWebPercent }}%</div>
-        <div class="summary-label">Web ({{ allTimeWebSessions }})</div>
+        <div class="summary-label">{{ 'stats.platformWeb' | translate }} ({{ allTimeWebSessions }})</div>
         <mat-progress-bar mode="determinate" [value]="allTimeWebPercent"></mat-progress-bar>
       </mat-card>
       <mat-card class="summary-card mobile">
         <mat-icon>phone_android</mat-icon>
         <div class="summary-value">{{ allTimeMobilePercent }}%</div>
-        <div class="summary-label">Móvil ({{ allTimeMobileSessions }})</div>
+        <div class="summary-label">{{ 'stats.mobileLabel' | translate }} ({{ allTimeMobileSessions }})</div>
         <mat-progress-bar mode="determinate" [value]="allTimeMobilePercent"></mat-progress-bar>
       </mat-card>
     </div>
@@ -85,7 +85,7 @@
     @if (firstAccessDate) {
       <div class="first-access-info">
         <mat-icon>schedule</mat-icon>
-        <span>Primer acceso: <strong>{{ firstAccessDate }}</strong></span>
+        <span>{{ 'stats.firstAccess' | translate }}: <strong>{{ firstAccessDate }}</strong></span>
       </div>
     }
 
@@ -94,14 +94,14 @@
       <!-- Calendar -->
       <mat-card class="calendar-card">
         <div class="calendar-header">
-          <button mat-icon-button (click)="navigateMonth(-1)" matTooltip="Mes anterior">
+          <button mat-icon-button (click)="navigateMonth(-1)" [matTooltip]="'stats.monthPrev' | translate" [attr.aria-label]="'stats.monthPrev' | translate">
             <mat-icon>chevron_left</mat-icon>
           </button>
           <h3 class="month-label">{{ monthLabel }}</h3>
-          <button mat-icon-button (click)="navigateMonth(1)" matTooltip="Mes siguiente">
+          <button mat-icon-button (click)="navigateMonth(1)" [matTooltip]="'stats.monthNext' | translate" [attr.aria-label]="'stats.monthNext' | translate">
             <mat-icon>chevron_right</mat-icon>
           </button>
-          <button mat-icon-button (click)="goToCurrentMonth()" matTooltip="Mes actual" class="today-btn">
+          <button mat-icon-button (click)="goToCurrentMonth()" [matTooltip]="'stats.currentMonth' | translate" [attr.aria-label]="'stats.currentMonth' | translate" class="today-btn">
             <mat-icon>today</mat-icon>
           </button>
         </div>
@@ -235,7 +235,7 @@
             <mat-icon>event</mat-icon>
             Sesiones del {{ formatDate(selectedDay.date) }}
           </h4>
-          <button mat-icon-button (click)="clearSelectedDay()">
+          <button mat-icon-button (click)="clearSelectedDay()" aria-label="Quitar día seleccionado">
             <mat-icon>close</mat-icon>
           </button>
         </div>
@@ -282,11 +282,6 @@
         </div>
       }
     </mat-card>
-  } @else if (isLoading) {
-    <div class="loading-state">
-      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
-      <p>Cargando datos de acceso...</p>
-    </div>
   } @else {
     <div class="placeholder-state">
       <mat-icon>calendar_month</mat-icon>

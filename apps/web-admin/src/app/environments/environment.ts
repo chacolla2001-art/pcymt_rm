@@ -37,7 +37,7 @@ export interface Environment {
  * Los valores se cargan desde variables de entorno (.env)
  */
 export const environment: Environment = {
-  apiUrl: 'http://localhost:5000',
+  apiUrl: 'https://pcymt-rm-api.vercel.app',
   authDurationMs: 24 * 60 * 60 * 1000, // 1 día
   googleMapsApiKey: '', // Not used in current version
   security: {

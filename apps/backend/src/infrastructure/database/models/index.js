@@ -4,6 +4,7 @@ const Location = require('./anchorPoint.model');
 const Interaction = require('./userInteraction.model');
 const Session = require('./userSession.model');
 const MapConfiguration = require('./mapConfiguration.model');
+const AppSetting = require('./appSetting.model');
 
 // Define associations with normalized foreign key names (snake_case)
 User.hasMany(Interaction, { foreignKey: 'user_id', as: 'interactions' });
@@ -31,4 +32,5 @@ module.exports = {
   Interaction,
   Session,
   MapConfiguration,
+  AppSetting,
 };

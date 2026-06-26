@@ -12,7 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.core.os.bundleOf
 import androidx.navigation.fragment.findNavController
-import com.univalle.pedrochacolla.MainActivity
+import com.univalle.pedrochacolla.utils.navigation.AppEntryNavigation
 import dagger.hilt.android.AndroidEntryPoint
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.databinding.FragmentLoginBinding
@@ -189,8 +189,7 @@ class LoginFragment : Fragment() {
     private fun onLoginSuccess() {
         loadingDialog?.dismiss()
         loadingDialog = null
-        startActivity(Intent(requireContext(), MainActivity::class.java))
-        requireActivity().finish()
+        AppEntryNavigation.openAfterAuth(requireContext())
     }
 
     private fun onMustChangePassword() {

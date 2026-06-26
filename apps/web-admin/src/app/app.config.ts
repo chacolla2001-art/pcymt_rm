@@ -4,7 +4,6 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors, withFetch } from '@angular/common/http';
 import { provideClientHydration } from '@angular/platform-browser';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { provideNgProgressOptions } from 'ngx-progressbar';
 import { progressInterceptor } from 'ngx-progressbar/http';
 
@@ -33,7 +32,6 @@ export const appConfig: ApplicationConfig = {
       withInterceptors([tokenInterceptor, errorInterceptor, progressInterceptor])
     ),
     provideAnimationsAsync(),
-    provideCharts(withDefaultRegisterables()),
     provideNgProgressOptions({}), provideServiceWorker('ngsw-worker.js', {
             enabled: !isDevMode(),
             registrationStrategy: 'registerWhenStable:30000'

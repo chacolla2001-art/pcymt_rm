@@ -1,9 +1,10 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ChangeDetectionStrategy, inject } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ChartData } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
 import { FormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -13,11 +14,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 import { DashboardMetricsService } from '../../dashboard/services/dashboard-metrics.service';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
 import { VirtualAsset } from '../../virtual-assets/models/virtual-asset.model';
 import { TopVirtualAsset } from '../../dashboard/models/dashboard-metrics.model';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 @Component({
   selector: 'app-interaction-stats',
@@ -35,7 +38,8 @@ import { TopVirtualAsset } from '../../dashboard/models/dashboard-metrics.model'
     MatInputModule,
     MatListModule,
     MatTooltipModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    TranslatePipe
   ],
   templateUrl: './interaction-stats.component.html',
   styleUrls: ['./interaction-stats.component.scss']
@@ -66,6 +70,7 @@ export class InteractionStatsComponent implements OnInit {
   @ViewChild('interactionChart') interactionChart?: BaseChartDirective;
 
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private metricsService: DashboardMetricsService,
@@ -79,9 +84,32 @@ export class InteractionStatsComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.isBrowser) return;
-    this.loadVirtualAssets();
     this.updateInteractionPeriodLabel();
-    this.loadRankings();
+    forkJoin({
+      assets: this.metricsService.loadVirtualAssets(),
+      rankings: this.metricsService.loadRankings(),
+    }).pipe(this.shellLoad.endNavigationWhenDone()).subscribe(({ assets, rankings }) => {
+      this.virtualAssets = assets;
+      this.filteredAssets = [...this.virtualAssets];
+      this.topVirtualAssets = rankings.topVirtualAssets;
+      this.maxRankingCount = Math.max(...this.topVirtualAssets.map(a => a.interactionCount), 1);
+      this.rankingBarChartData = {
+        labels: this.topVirtualAssets.map(a => a.name),
+        datasets: [{
+          data: this.topVirtualAssets.map(a => a.interactionCount),
+          label: 'Interacciones',
+          backgroundColor: [
+            'rgba(255, 193, 7, 0.85)',
+            'rgba(76, 175, 80, 0.85)',
+            'rgba(33, 150, 243, 0.85)',
+            'rgba(156, 39, 176, 0.85)',
+            'rgba(255, 87, 34, 0.85)'
+          ]
+        }]
+      };
+      this.updateInteractionChartForAll(this.selectedTimeRange);
+      this.cdr.markForCheck();
+    });
   }
 
   // — Ranking methods (from top-animals) —

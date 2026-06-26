@@ -1,6 +1,9 @@
-const { ResponseUtil } = require('../../shared/utils');
+const { getPublicAvatarList } = require('../../shared/constants/predefinedAvatars');
+const { loadParkData } = require('../../shared/data/parkData');
 const env = require('../../config/env');
+const logger = require('../../shared/utils/logger.util');
 const { ValidationError } = require('../../shared/errors');
+const { ResponseUtil } = require('../../shared/utils');
 const { GoogleAuth } = require('google-auth-library');
 const path = require('path');
 const fs = require('fs');
@@ -31,6 +34,10 @@ function getArcoreAuth() {
  * Serves non-sensitive configuration to clients and allows admin updates
  */
 class ConfigController {
+  constructor(appSettingsService = null) {
+    this.appSettingsService = appSettingsService;
+  }
+
   /**
    * Get public configuration
    * GET /api/config
@@ -41,6 +48,18 @@ class ConfigController {
         ? `${env.supabaseUrl}/storage/v1/object/public/${env.supabaseStorageBucket}`
         : null;
 
+      let cloudAnchorTtlDays = env.cloudAnchorTtlDays;
+      if (this.appSettingsService) {
+        try {
+          cloudAnchorTtlDays = await this.appSettingsService.getNumber(
+            'cloudAnchorTtlDays',
+            env.cloudAnchorTtlDays,
+          );
+        } catch {
+          // Table may not exist yet before migration — use env fallback
+        }
+      }
+
       const config = {
         google: {
           webClientId: env.googleClientId || null,
@@ -48,7 +67,7 @@ class ConfigController {
           mapsApiKey: env.googleMapsApiKey || null,
         },
         arcore: {
-          cloudAnchorTtlDays: env.cloudAnchorTtlDays,
+          cloudAnchorTtlDays,
         },
         storage: {
           enabled: !!storagePublicBaseUrl,
@@ -60,9 +79,23 @@ class ConfigController {
           mapsEnabled: !!env.googleMapsApiKey,
           supabaseStorageEnabled: !!storagePublicBaseUrl,
         },
+        avatars: getPublicAvatarList(),
       };
 
       return ResponseUtil.success(res, config, 'Configuration retrieved');
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  /**
+   * Get shared park geometry (boundary, sections, POIs)
+   * GET /api/config/park-data
+   */
+  getParkData = async (req, res, next) => {
+    try {
+      const parkData = loadParkData();
+      return ResponseUtil.success(res, parkData, 'Park data retrieved');
     } catch (error) {
       next(error);
     }
@@ -83,8 +116,23 @@ class ConfigController {
         if (isNaN(ttl) || ttl < 1 || ttl > 365) {
           throw new ValidationError('cloudAnchorTtlDays must be between 1 and 365');
         }
+
+        if (this.appSettingsService) {
+          try {
+            await this.appSettingsService.setValue('cloudAnchorTtlDays', ttl);
+          } catch (dbError) {
+            logger.warn('Failed to persist cloudAnchorTtlDays to DB, using runtime file', {
+              error: dbError.message,
+            });
+            env.cloudAnchorTtlDays = ttl;
+            env.saveRuntimeConfig('cloudAnchorTtlDays', ttl);
+          }
+        } else {
+          env.cloudAnchorTtlDays = ttl;
+          env.saveRuntimeConfig('cloudAnchorTtlDays', ttl);
+        }
+
         env.cloudAnchorTtlDays = ttl;
-        env.saveRuntimeConfig('cloudAnchorTtlDays', ttl);
         updated.cloudAnchorTtlDays = ttl;
       }
 

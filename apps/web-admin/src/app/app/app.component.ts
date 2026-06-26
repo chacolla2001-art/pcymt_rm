@@ -1,36 +1,37 @@
-
 import { RouterOutlet } from '@angular/router';
-import { ThemeManagerService } from '../core/services/theme-manager.service';
-import { PLATFORM_ID, Inject, Component, inject } from '@angular/core';
+import { PLATFORM_ID, Inject, Component, inject, AfterViewInit, ViewChild } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { NgProgressbar } from 'ngx-progressbar';
 import { NgProgressHttp } from 'ngx-progressbar/http';
 import { AuthService } from '../core/services/auth.service';
+import { ProgressBarService } from '../core/services/progress-bar.service';
+
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [RouterOutlet, NgProgressbar, NgProgressHttp],
   template: `
-  <ng-progress ngProgressHttp/>
-  <router-outlet></router-outlet>
+    <ng-progress #progressBar ngProgressHttp color="var(--sys-primary)" />
+    <router-outlet></router-outlet>
   `,
 })
-export class AppComponent {
-  private themeService = inject(ThemeManagerService);
+export class AppComponent implements AfterViewInit {
+  private readonly progressBarService = inject(ProgressBarService);
 
-  constructor(@Inject(PLATFORM_ID) private platformId: Object, private authService: AuthService) {
-    // Forzar inicialización del tema en el navegador
-    if (isPlatformBrowser(this.platformId)) {
-      // Tema inicializado automáticamente por ThemeManagerService
+  @ViewChild('progressBar') progressBar!: NgProgressbar;
+
+  constructor(
+    @Inject(PLATFORM_ID) private platformId: object,
+    private authService: AuthService
+  ) {}
+
+  ngAfterViewInit(): void {
+    if (isPlatformBrowser(this.platformId) && this.progressBar?.progressRef) {
+      this.progressBarService.setRef(this.progressBar.progressRef);
     }
   }
 
-  ngAfterViewInit() {
-
-
+  ngOnInit(): void {
+    this.authService.isUserAuthenticated();
   }
-  ngOnInit(){
-    this.authService.isUserAuthenticated(); // Esto fuerza la inicialización
-  }
-
 }

@@ -1,8 +1,8 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectionStrategy, ChangeDetectorRef, inject } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
+import { of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 
 import { MatCardModule } from '@angular/material/card';
@@ -16,6 +16,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatBadgeModule } from '@angular/material/badge';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 import { AnalyticsService } from '../../dashboard/services/analytics.service';
 import { DashboardMetricsService } from '../../dashboard/services/dashboard-metrics.service';
@@ -23,6 +24,7 @@ import { UserService } from '../../users/services/user.service';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
 import { User } from '../../users/models/user.model';
 import { VirtualAsset } from '../../virtual-assets/models/virtual-asset.model';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 export interface UserAssetInteraction {
   assetId: string;
@@ -53,7 +55,8 @@ export interface UserAssetInteraction {
     MatChipsModule,
     MatTooltipModule,
     MatProgressBarModule,
-    MatBadgeModule
+    MatBadgeModule,
+    TranslatePipe
   ],
   templateUrl: './user-interaction-stats.component.html',
   styleUrls: ['./user-interaction-stats.component.scss']
@@ -85,8 +88,8 @@ export class UserInteractionStatsComponent implements OnInit {
   mostInteractedAsset = '';
   leastInteractedAsset = '';
 
-  isLoading = false;
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private analyticsService: AnalyticsService,
@@ -102,14 +105,12 @@ export class UserInteractionStatsComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.isBrowser) return;
-    this.loadAllAssets();
-  }
-
-  loadAllAssets(): void {
-    this.metricsService.loadVirtualAssets().subscribe(assets => {
-      this.allAssets = assets;
-      this.cdr.markForCheck();
-    });
+    this.metricsService.loadVirtualAssets()
+      .pipe(this.shellLoad.endNavigationWhenDone())
+      .subscribe(assets => {
+        this.allAssets = assets;
+        this.cdr.markForCheck();
+      });
   }
 
   searchUsers(): void {
@@ -138,10 +139,9 @@ export class UserInteractionStatsComponent implements OnInit {
 
   private loadUserInteractions(): void {
     if (!this.selectedUser) return;
-    this.isLoading = true;
 
-    // Get all interactions and filter by user
     this.analyticsService.getAllUserInteractions().pipe(
+      this.shellLoad.refreshWhenDone('user-interactions'),
       map((interactions: any[]) => {
         // Filter interactions for this user
         const userInteractions = interactions.filter(
@@ -152,7 +152,6 @@ export class UserInteractionStatsComponent implements OnInit {
       catchError(() => of([]))
     ).subscribe((userInteractions: any[]) => {
       this.buildInteractionTable(userInteractions);
-      this.isLoading = false;
       this.cdr.markForCheck();
     });
   }

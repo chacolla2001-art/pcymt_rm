@@ -23,7 +23,7 @@ const createAuthRoutes = (authController, userController, authMiddleware, upload
   // Register - rate limited (delegates to user controller)
   router.post('/register',
     authLimiter,
-    uploadMiddleware.single('profile_picture_url'),
+    uploadMiddleware.profilePicture(),
     validateBody(userSchemas.create),
     userController.create,
   );

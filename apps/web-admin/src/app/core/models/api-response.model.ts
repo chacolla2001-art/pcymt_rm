@@ -1,25 +1,27 @@
 /**
  * Modelos de respuesta API estandarizados
- * Sincronizados con el backend para mantener consistencia
+ * Códigos y mensajes sincronizados con shared/constants/api-error-codes.json
  */
+import errorDefinitions from '@pcymt/error-codes';
 
-/** Códigos de error del backend */
-export const API_ERROR_CODES = {
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  NOT_FOUND: 'NOT_FOUND',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  CONFLICT: 'CONFLICT',
-  RATE_LIMITED: 'RATE_LIMITED',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
-  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
-  TOKEN_INVALID: 'TOKEN_INVALID',
-  SESSION_EXPIRED: 'SESSION_EXPIRED',
-  NETWORK_ERROR: 'NETWORK_ERROR',
-  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
-} as const;
+export const API_ERROR_CODES = errorDefinitions.codes as {
+  readonly VALIDATION_ERROR: 'VALIDATION_ERROR';
+  readonly NOT_FOUND: 'NOT_FOUND';
+  readonly UNAUTHORIZED: 'UNAUTHORIZED';
+  readonly FORBIDDEN: 'FORBIDDEN';
+  readonly CONFLICT: 'CONFLICT';
+  readonly RATE_LIMITED: 'RATE_LIMITED';
+  readonly INTERNAL_ERROR: 'INTERNAL_ERROR';
+  readonly TOKEN_EXPIRED: 'TOKEN_EXPIRED';
+  readonly TOKEN_INVALID: 'TOKEN_INVALID';
+  readonly SESSION_EXPIRED: 'SESSION_EXPIRED';
+  readonly DATABASE_UNAVAILABLE: 'DATABASE_UNAVAILABLE';
+  readonly SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE';
+  readonly TIMEOUT_ERROR: 'TIMEOUT_ERROR';
+  readonly NETWORK_ERROR: 'NETWORK_ERROR';
+};
 
-export type ApiErrorCode = typeof API_ERROR_CODES[keyof typeof API_ERROR_CODES];
+export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 
 /** Detalle de error de validación */
 export interface ValidationErrorDetail {
@@ -135,18 +137,6 @@ export function isErrorResponse(response: ApiResponse<unknown>): response is Api
   return response.success === false;
 }
 
-/** Mensajes de error amigables por código */
-export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
-  [API_ERROR_CODES.VALIDATION_ERROR]: 'Los datos proporcionados no son válidos',
-  [API_ERROR_CODES.NOT_FOUND]: 'El recurso solicitado no fue encontrado',
-  [API_ERROR_CODES.UNAUTHORIZED]: 'Credenciales inválidas o sesión expirada',
-  [API_ERROR_CODES.FORBIDDEN]: 'No tienes permisos para realizar esta acción',
-  [API_ERROR_CODES.CONFLICT]: 'El recurso ya existe o hay un conflicto',
-  [API_ERROR_CODES.RATE_LIMITED]: 'Has excedido el límite de solicitudes. Intenta más tarde',
-  [API_ERROR_CODES.INTERNAL_ERROR]: 'Error interno del servidor. Intenta más tarde',
-  [API_ERROR_CODES.TOKEN_EXPIRED]: 'Tu sesión ha expirado. Inicia sesión nuevamente',
-  [API_ERROR_CODES.TOKEN_INVALID]: 'Token de autenticación inválido',
-  [API_ERROR_CODES.SESSION_EXPIRED]: 'Tu sesión ha expirado. Inicia sesión nuevamente',
-  [API_ERROR_CODES.NETWORK_ERROR]: 'Error de conexión. Verifica tu conexión a internet',
-  [API_ERROR_CODES.TIMEOUT_ERROR]: 'La solicitud tardó demasiado. Intenta nuevamente',
-};
+/** Mensajes de error amigables por código (español, fuente compartida) */
+export const ERROR_MESSAGES: Record<ApiErrorCode, string> =
+  errorDefinitions.messagesEs as Record<ApiErrorCode, string>;

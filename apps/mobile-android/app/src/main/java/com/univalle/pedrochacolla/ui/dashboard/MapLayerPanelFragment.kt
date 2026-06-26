@@ -100,7 +100,7 @@ class MapLayerPanelFragment : BottomSheetDialogFragment() {
         btnSave?.setOnClickListener { savePublicConfig() }
         btnResetPoi?.setOnClickListener {
             onResetPoiPositions?.invoke()
-            BannerUtil.showBanner(requireActivity(), "Posiciones de POIs restablecidas")
+            BannerUtil.showBanner(requireActivity(), "Posiciones de referencias espaciales restablecidas")
         }
 
         fetchPublicConfig()

@@ -1,46 +1,44 @@
 <header class="app-header">
   <div class="header-left">
     <!-- Botón de menú lateral -->
-    <button mat-icon-button class="menu-btn" (click)="toggleDrawer()" matTooltip="Menú principal">
+    <button mat-icon-button class="menu-btn" (click)="toggleDrawer()" [matTooltip]="'header.menu' | translate" [attr.aria-label]="'header.menu' | translate">
       <mat-icon>menu</mat-icon>
     </button>
-
-    <div class="header-brand" (click)="openMainDashboard()">
-      <img src="assets/images/logo.png" alt="PCyMT Logo" class="header-logo">
-      <span class="header-title hide-mobile">Realidad Mixta</span>
-    </div>
   </div>
 
   <div class="header-right">
     <!-- Acciones rápidas -->
     <div class="header-actions">
       @if (!isFullscreen) {
-        <button mat-icon-button class="action-btn" (click)="openFullscreen()" matTooltip="Pantalla completa">
+        <button mat-icon-button class="action-btn" (click)="openFullscreen()"
+                [matTooltip]="'header.fullscreen' | translate" [attr.aria-label]="'header.fullscreen' | translate">
           <mat-icon>fullscreen</mat-icon>
         </button>
       }
       @if (isFullscreen) {
-        <button mat-icon-button class="action-btn" (click)="closeFullscreen()" matTooltip="Salir de pantalla completa">
+        <button mat-icon-button class="action-btn" (click)="closeFullscreen()"
+                [matTooltip]="'header.fullscreenExit' | translate" [attr.aria-label]="'header.fullscreenExit' | translate">
           <mat-icon>fullscreen_exit</mat-icon>
         </button>
       }
 
-      <button mat-icon-button [matMenuTriggerFor]="themeMenu" class="action-btn" matTooltip="Cambiar tema">
+      <button mat-icon-button [matMenuTriggerFor]="themeMenu" class="action-btn"
+              [matTooltip]="'header.theme' | translate" [attr.aria-label]="'header.theme' | translate">
         <mat-icon>{{ themeManager.getThemeModeIcon() }}</mat-icon>
       </button>
 
       <mat-menu #themeMenu="matMenu" class="theme-menu">
         <button mat-menu-item (click)="setThemeMode('light')">
           <mat-icon>light_mode</mat-icon>
-          <span>Claro</span>
+          <span>{{ 'header.themeLight' | translate }}</span>
         </button>
         <button mat-menu-item (click)="setThemeMode('dark')">
           <mat-icon>dark_mode</mat-icon>
-          <span>Oscuro</span>
+          <span>{{ 'header.themeDark' | translate }}</span>
         </button>
         <button mat-menu-item (click)="setThemeMode('system')">
           <mat-icon>contrast</mat-icon>
-          <span>Sistema</span>
+          <span>{{ 'header.themeSystem' | translate }}</span>
         </button>
       </mat-menu>
     </div>
@@ -51,13 +49,11 @@
     <button mat-button [matMenuTriggerFor]="belowMenu" class="user-menu-trigger">
       <div class="user-menu-content">
         <div class="user-avatar-button">
-          @if (profileImageUrl) {
-            <img [src]="profileImageUrl" alt="Avatar" class="avatar-mini" />
-          } @else {
-            <div class="avatar-placeholder">
-              {{ userFirstName.charAt(0).toUpperCase() }}
-            </div>
-          }
+          <img
+            [src]="userAvatar.displayUrl()"
+            (error)="userAvatar.onAvatarImageError($event)"
+            alt="Avatar"
+            class="avatar-mini" />
         </div>
         <div class="user-info hide-mobile">
           <span class="user-name">{{ userFirstName }}</span>
@@ -75,7 +71,11 @@
     <!-- Cabecera del perfil -->
     <div class="menu-profile-header" (click)="$event.stopPropagation()">
       <div class="profile-avatar-container" (click)="fileInput.click()">
-        <img [src]="profileImageUrl || 'assets/images/default-profile.png'" alt="Foto de perfil" class="avatar" />
+        <img
+          [src]="userAvatar.displayUrl()"
+          (error)="userAvatar.onAvatarImageError($event)"
+          alt="Foto de perfil"
+          class="avatar" />
         <div class="avatar-overlay">
           <mat-icon>camera_alt</mat-icon>
         </div>
@@ -93,16 +93,16 @@
       <button mat-menu-item class="menu-option" (click)="openDialogVerInfo()">
         <mat-icon class="menu-icon">person_outline</mat-icon>
         <div class="menu-option-content">
-          <span class="menu-option-title">Mi perfil</span>
-          <span class="menu-option-subtitle">Ver información personal</span>
+          <span class="menu-option-title">{{ 'header.profile' | translate }}</span>
+          <span class="menu-option-subtitle">{{ 'header.profileDesc' | translate }}</span>
         </div>
       </button>
 
       <button mat-menu-item class="menu-option" (click)="openDialogChangePass()">
         <mat-icon class="menu-icon">lock_outline</mat-icon>
         <div class="menu-option-content">
-          <span class="menu-option-title">Seguridad</span>
-          <span class="menu-option-subtitle">Cambiar contraseña</span>
+          <span class="menu-option-title">{{ 'header.security' | translate }}</span>
+          <span class="menu-option-subtitle">{{ 'header.securityDesc' | translate }}</span>
         </div>
       </button>
     </div>
@@ -112,7 +112,7 @@
     <!-- Cerrar sesión -->
     <button mat-menu-item class="menu-option logout-option" (click)="logout()">
       <mat-icon class="menu-icon logout-icon">logout</mat-icon>
-      <span class="menu-option-title">Cerrar sesión</span>
+      <span class="menu-option-title">{{ 'header.logout' | translate }}</span>
     </button>
   </mat-menu>
 </header>

@@ -2,15 +2,24 @@ const { Sequelize } = require('sequelize');
 const logger = require('../../shared/utils/logger.util');
 const env = require('../../config/env');
 
-// Configuration constants
+const isServerless = Boolean(process.env.VERCEL || process.env.VERCEL_ENV);
+
+// Configuration constants (tighter pool/retries on Vercel serverless)
 const DB_CONFIG = Object.freeze({
-  RETRY_ATTEMPTS: 5,
-  RETRY_DELAY_MS: 3000,
-  POOL_MAX: parseInt(process.env.DB_POOL_MAX, 10) || 10,
-  POOL_MIN: parseInt(process.env.DB_POOL_MIN, 10) || 2,
-  POOL_ACQUIRE: 30000,
-  POOL_IDLE: 10000,
+  RETRY_ATTEMPTS: isServerless ? 2 : 5,
+  RETRY_DELAY_MS: isServerless ? 1000 : 3000,
+  POOL_MAX: isServerless
+    ? 1
+    : parseInt(process.env.DB_POOL_MAX, 10) || 10,
+  POOL_MIN: isServerless
+    ? 0
+    : parseInt(process.env.DB_POOL_MIN, 10) || 2,
+  POOL_ACQUIRE: isServerless ? 10000 : 30000,
+  POOL_IDLE: isServerless ? 5000 : 10000,
 });
+
+/** @type {Promise<boolean>|null} */
+let dbConnectPromise = null;
 
 const connectionString = env.databaseUrl;
 const isProduction = env.isProduction;
@@ -156,9 +165,53 @@ const healthCheck = async () => {
   }
 };
 
+/**
+ * Start DB connection in the background (serverless cold start).
+ * Does not throw — failures are retried on the next ensureDB() call.
+ */
+const startDBConnection = () => {
+  if (dbConnectPromise) {
+    return dbConnectPromise;
+  }
+
+  dbConnectPromise = connectDB()
+    .then(() => true)
+    .catch((error) => {
+      logger.error('Background database connection failed', { error: error.message });
+      dbConnectPromise = null;
+      return false;
+    });
+
+  return dbConnectPromise;
+};
+
+/**
+ * Wait until the database is connected (used by serverless request middleware).
+ * @returns {Promise<boolean>}
+ */
+const ensureDB = async () => {
+  if (dbConnectPromise) {
+    const result = await dbConnectPromise;
+    if (result === true) {
+      return true;
+    }
+  }
+
+  dbConnectPromise = connectDB()
+    .then(() => true)
+    .catch((error) => {
+      dbConnectPromise = null;
+      throw error;
+    });
+
+  return dbConnectPromise;
+};
+
 module.exports = {
   sequelize,
   connectDB,
   closeDB,
   healthCheck,
+  startDBConnection,
+  ensureDB,
 };

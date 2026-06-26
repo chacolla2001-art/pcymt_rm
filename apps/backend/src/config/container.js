@@ -6,8 +6,15 @@ const {
   Interaction,
   Session,
   MapConfiguration,
+  AppSetting,
 } = require('../infrastructure/database/models');
-const { EmailService, GoogleAuthService, FileUploadService, SupabaseStorageService } = require('../infrastructure/external');
+const {
+  EmailService,
+  GoogleAuthService,
+  FileUploadService,
+  SupabaseStorageService,
+  HybridStorageService,
+} = require('../infrastructure/external');
 const logger = require('../shared/utils/logger.util');
 
 // Domain - Repositories
@@ -31,6 +38,8 @@ const {
   AnalyticsService,
   MapConfigurationService,
   MapTileService,
+  AppSettingsService,
+  ProfilePictureService,
 } = require('../domain/services');
 
 // API - Controllers
@@ -88,6 +97,20 @@ class Container {
       bucket: env.supabaseStorageBucket,
       serviceRoleKey: env.supabaseServiceRoleKey,
     });
+    this._instances.hybridStorageService = new HybridStorageService(
+      this._instances.fileUploadService,
+      this._instances.supabaseStorageService,
+      {
+        preferRemoteWrites: Boolean(env.supabaseServiceRoleKey && env.supabaseUrl),
+      },
+    );
+
+    this._instances.profilePictureService = new ProfilePictureService(
+      this._instances.hybridStorageService,
+      this._instances.fileUploadService,
+    );
+
+    this._instances.appSettingsService = new AppSettingsService(AppSetting);
 
     // Repositories
     this._instances.userRepository = new UserRepository(User);
@@ -149,8 +172,8 @@ class Container {
     // Controllers
     this._instances.userController = new UserController(
       this._instances.userService,
-      this._instances.fileUploadService,
       this._instances.authService,
+      this._instances.profilePictureService,
     );
 
     this._instances.authController = new AuthController(
@@ -162,7 +185,7 @@ class Container {
 
     this._instances.virtualAssetController = new VirtualAssetController(
       this._instances.virtualAssetService,
-      this._instances.fileUploadService,
+      this._instances.hybridStorageService,
     );
 
     this._instances.anchorPointController = new AnchorPointController(
@@ -181,7 +204,7 @@ class Container {
       this._instances.analyticsService,
     );
 
-    this._instances.configController = new ConfigController();
+    this._instances.configController = new ConfigController(this._instances.appSettingsService);
 
     this._instances.fileController = new FileController(
       env.uploadDir,
@@ -200,8 +223,21 @@ class Container {
     this._instances.authMiddleware = createAuthMiddleware(this._instances.jwtUtil);
 
     // Upload middleware wrapper
+    const { ALLOWED_IMAGE_MIMES, MAX_PROFILE_PICTURE_BYTES } = require('../shared/utils/avatar.util');
+    const imageOnlyFilter = (req, file, cb) => {
+      if (ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only JPEG, PNG, GIF and WebP images are allowed for profile pictures'), false);
+      }
+    };
+
     this._instances.uploadMiddleware = {
       single: (fieldName) => this._instances.fileUploadService.single(fieldName),
+      profilePicture: () => this._instances.fileUploadService.memorySingle('profile_picture_url', {
+        maxSize: MAX_PROFILE_PICTURE_BYTES,
+        fileFilter: imageOnlyFilter,
+      }),
       fields: (fields) => this._instances.fileUploadService.fields(fields),
       array: (fieldName, maxCount) => this._instances.fileUploadService.array(fieldName, maxCount),
     };

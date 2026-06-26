@@ -25,14 +25,14 @@ describe('Smoke Tests - API Routes', () => {
     app = createApp();
   });
 
-  test('should handle 404 for unknown routes', async () => {
-    const res = await request(app).get('/api/v1/nonexistent-route-xyz');
-    expect(res.statusCode).toBe(404);
-  });
-
   test('should respond to OPTIONS requests (CORS preflight)', async () => {
     const res = await request(app).options('/health');
     expect([200, 204]).toContain(res.statusCode);
+  });
+
+  test('should return 404 for unknown API routes', async () => {
+    const res = await request(app).get('/api/nonexistent-route-xyz');
+    expect(res.statusCode).toBe(404);
   });
 
   test('should set security headers', async () => {

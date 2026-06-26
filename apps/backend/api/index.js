@@ -1,27 +1,15 @@
 /**
- * Vercel serverless entry — Express app without listen().
+ * Vercel Serverless Function Entry Point
+ *
+ * Creates Express immediately so CORS/OPTIONS respond without waiting for PostgreSQL.
+ * DB connection starts in the background and is awaited only for routes that need it.
  */
 require('pg');
-require('pg-hstore');
 
 const { createApp } = require('../src/app');
-const { connectDB } = require('../src/infrastructure/database');
+const { startDBConnection } = require('../src/infrastructure/database');
 
-let app;
-let initPromise;
+const app = createApp();
+startDBConnection();
 
-async function bootstrap() {
-  if (!initPromise) {
-    initPromise = (async () => {
-      await connectDB();
-      app = createApp();
-    })();
-  }
-  await initPromise;
-  return app;
-}
-
-module.exports = async (req, res) => {
-  const expressApp = await bootstrap();
-  return expressApp(req, res);
-};
+module.exports = async (req, res) => app(req, res);

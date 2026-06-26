@@ -1,3 +1,6 @@
+const { ERROR_CODES } = require('../../shared/constants');
+const { buildErrorPayload } = require('../../shared/utils/errorResponse.util');
+
 /**
  * Request timeout middleware
  * Prevents long-running requests from blocking the server
@@ -19,10 +22,13 @@ const requestTimeout = (timeout = DEFAULT_TIMEOUT) => {
     // Create timeout handler
     const timeoutId = setTimeout(() => {
       if (!res.headersSent) {
-        res.status(408).json({
-          success: false,
-          message: 'Request timeout',
-        });
+        res.status(408).json(
+          buildErrorPayload({
+            message: 'Request timeout',
+            code: ERROR_CODES.TIMEOUT_ERROR,
+            statusCode: 408,
+          })
+        );
       }
     }, timeout);
 

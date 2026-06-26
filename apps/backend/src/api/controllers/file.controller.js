@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const { Readable } = require('stream');
 const logger = require('../../shared/utils/logger.util');
+const { getDefaultAvatarObjectPath } = require('../../shared/constants/predefinedAvatars');
 
 const MIME_OVERRIDES = {
   '.glb': 'model/gltf-binary',
@@ -62,7 +63,7 @@ class FileController {
       }
 
       if (this._localFileExists(resolvedPath)) {
-        return this._sendLocalFile(res, resolvedPath, sanitizedName, next);
+        return this._sendLocalFile(res, resolvedPath, sanitizedName, next, sanitizedName);
       }
 
       return res.status(404).json({
@@ -115,7 +116,12 @@ class FileController {
       }
 
       if (this._localFileExists(resolvedPath)) {
-        return this._sendLocalFile(res, resolvedPath, sanitizedName, next);
+        return this._sendLocalFile(res, resolvedPath, sanitizedName, next, objectPath);
+      }
+
+      if (sanitizedFolder === 'profile-pictures') {
+        const served = await this._serveDefaultProfileAvatar(req, res, next);
+        if (served) return;
       }
 
       return res.status(404).json({
@@ -154,7 +160,7 @@ class FileController {
     });
   }
 
-  _applyFileHeaders(res, filename) {
+  _applyFileHeaders(res, filename, objectPath = '') {
     const ext = path.extname(filename).toLowerCase();
 
     if (MIME_OVERRIDES[ext]) {
@@ -165,14 +171,19 @@ class FileController {
       res.set('Content-Disposition', `attachment; filename="${filename}"`);
     }
 
+    const isProfilePicture = objectPath.startsWith('profile-pictures/');
+    const cacheControl = isProfilePicture
+      ? 'private, no-cache, must-revalidate'
+      : 'private, max-age=86400';
+
     res.set({
-      'Cache-Control': 'private, max-age=86400',
+      'Cache-Control': cacheControl,
       'X-Content-Type-Options': 'nosniff',
     });
   }
 
-  _sendLocalFile(res, resolvedPath, filename, next) {
-    this._applyFileHeaders(res, filename);
+  _sendLocalFile(res, resolvedPath, filename, next, objectPath = '') {
+    this._applyFileHeaders(res, filename, objectPath);
     return res.sendFile(resolvedPath, (err) => {
       if (err && !res.headersSent) {
         if (next) {
@@ -182,6 +193,29 @@ class FileController {
         }
       }
     });
+  }
+
+  /**
+   * Missing custom profile photo → default park avatar (bear.png).
+   * @returns {Promise<boolean>}
+   */
+  async _serveDefaultProfileAvatar(req, res, next) {
+    const objectPath = getDefaultAvatarObjectPath();
+    const filename = path.basename(objectPath);
+    const resolvedPath = this._resolveLocalPath('model-icons', filename);
+
+    if (this.supabaseStorage?.isConfigured()) {
+      const served = await this._serveFromSupabase(req, res, objectPath, filename);
+      if (served) return true;
+    }
+
+    if (resolvedPath && this._localFileExists(resolvedPath)) {
+      this._sendLocalFile(res, resolvedPath, filename, next, objectPath);
+      return true;
+    }
+
+    logger.warn('Default profile avatar not found', { objectPath });
+    return false;
   }
 
   /**
@@ -217,7 +251,7 @@ class FileController {
     }
 
     const filename = path.basename(downloadName);
-    this._applyFileHeaders(res, filename);
+    this._applyFileHeaders(res, filename, objectPath);
 
     const remoteContentType = remoteResponse.headers.get('content-type');
     if (remoteContentType && !MIME_OVERRIDES[path.extname(filename).toLowerCase()]) {

@@ -41,6 +41,15 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.transition.Transition
 import com.google.android.gms.location.*
+import com.google.gson.Gson
+import android.graphics.BitmapFactory
+import android.graphics.drawable.GradientDrawable
+import android.util.Base64
+import android.widget.LinearLayout
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.univalle.pedrochacolla.data.local.ParkDataLoader
+import com.univalle.pedrochacolla.utils.map.ParkSectionResolver
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.data.model.Location
 import com.univalle.pedrochacolla.data.model.MapConfigData
@@ -63,6 +72,8 @@ class DashboardFragment : Fragment(), SensorEventListener {
     private val viewModel: MapViewModel by viewModels { MapViewModel.Factory() }
 
     private lateinit var parkMapView: ParkMapView
+    private var sectionEduCard: MaterialCardView? = null
+    private var selectedSectionIndex = -1
     private lateinit var carouselAdapter: IconCarouselAdapter
     private lateinit var poiOverlayManager: PoiOverlayManager
     private lateinit var stickerManager: StickerManager
@@ -97,6 +108,8 @@ class DashboardFragment : Fragment(), SensorEventListener {
     private val renderHandler = Handler(Looper.getMainLooper())
     private var lastGpsFixMs = 0L
     private val RENDER_INTERVAL_MS = 16L  // ~60 fps
+    private var lastSectionUpdateMs = 0L
+    private var lastSectionName: String? = null
     private val renderRunnable: Runnable = object : Runnable {
         override fun run() {
             if (!gpsKalmanFilter.isInitialized) {
@@ -104,11 +117,13 @@ class DashboardFragment : Fragment(), SensorEventListener {
                 return
             }
             val now = System.currentTimeMillis()
-            // Predict where the user is right now based on filter state
             val predicted = gpsKalmanFilter.predict(now)
             if (predicted != null) {
-                // Direct set — no animation, the 60 fps cadence IS the smoothing
                 parkMapView.setUserLocation(predicted.first, predicted.second, animDurationMs = 0L)
+                if (now - lastSectionUpdateMs >= 500L) {
+                    lastSectionUpdateMs = now
+                    updateSectionChip(predicted.first, predicted.second)
+                }
             }
             renderHandler.postDelayed(this, RENDER_INTERVAL_MS)
         }
@@ -213,6 +228,8 @@ class DashboardFragment : Fragment(), SensorEventListener {
         parkMapView.show2DOverlay = true
         parkMapView.showBackgroundImage = true  // Illustrated park background
 
+        setupSectionZoneUi(view)
+
         // Map for viewing captured animals only — no click interaction
         parkMapView.setMarkerClickListener(null)
 
@@ -275,6 +292,8 @@ class DashboardFragment : Fragment(), SensorEventListener {
         // Initialize POI metadata so the overlay has items to render/hit-test.
         // Positions are later overridden by `loadGlobalConfig()` via dynamic positions.
         poiOverlayManager.poiItems = createDefaultPoiItems()
+        applyDefaultPoiPositions()
+        poiOverlayManager.setOverlayVisible(true)
 
         // Sticker overlay — renders stickers from saved config onto the map
         stickerManager = StickerManager(requireContext())
@@ -282,25 +301,13 @@ class DashboardFragment : Fragment(), SensorEventListener {
         parkMapView.stickerOverlayManager = stickerOverlayManager
 
         val btnTogglePoi = view.findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.btn_toggle_poi)
-        btnTogglePoi.setOnClickListener {
-            val isVisible = poiOverlayManager.toggleOverlay()
-            // Update FAB tint to indicate active state
-            btnTogglePoi.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                if (isVisible) ContextCompat.getColor(requireContext(), com.google.android.material.R.color.design_default_color_primary)
-                else 0xFFFFFFFF.toInt()
-            )
-            btnTogglePoi.imageTintList = android.content.res.ColorStateList.valueOf(
-                if (isVisible) 0xFFFFFFFF.toInt() else 0xFF666666.toInt()
-            )
-            parkMapView.invalidate()
-            val msg = if (isVisible) "Puntos de interés activados" else "Puntos de interés desactivados"
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-        }
+        btnTogglePoi.setOnClickListener { showMapScenePanel() }
 
-        // POI click listener — show info toast
+        // POI click listener — ficha breve
         parkMapView.poiClickListener = object : ParkMapView.OnPoiClickListener {
             override fun onPoiClick(poi: PoiItem) {
-                Toast.makeText(requireContext(), "${poi.id}. ${poi.name}", Toast.LENGTH_SHORT).show()
+                val msg = poi.summary.ifBlank { poi.name }
+                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -317,7 +324,6 @@ class DashboardFragment : Fragment(), SensorEventListener {
         val isAdmin = UserSession.currentUser?.role == "admin"
         parkMapView.isAdminMode = isAdmin
         if (!isAdmin) {
-            btnTogglePoi.visibility = View.GONE
             view.findViewById<View>(R.id.btn_map_layers)?.visibility = View.GONE
         } else {
             // Admin banner: inform the user they are seeing ALL animals
@@ -343,6 +349,198 @@ class DashboardFragment : Fragment(), SensorEventListener {
      */
     private fun createDefaultPoiItems(): List<PoiItem> =
         PoiOverlayManager.createDefaultItems(resources, requireContext().packageName)
+
+    /** Posiciones desde assets/spatial-references.json (fuente compartida con web). */
+    private fun applyDefaultPoiPositions() {
+        if (!::poiOverlayManager.isInitialized) return
+        try {
+            val json = requireContext().assets.open("spatial-references.json").bufferedReader().use { it.readText() }
+            val file = Gson().fromJson(json, SpatialRefsFile::class.java)
+            val byName = file.references.associateBy { it.name }
+            val updated = poiOverlayManager.poiItems.map { poi ->
+                val ref = byName[poi.name]
+                if (ref != null) {
+                    poiOverlayManager.setPoiPosition(poi.id, ref.lat, ref.lng)
+                    poi.copy(
+                        category = ref.category,
+                        animation = ref.animation,
+                        summary = ref.summary,
+                        visible = ref.visible,
+                        imageAsset = ref.imageAsset,
+                        spriteSheet = ref.spriteSheet?.let {
+                            PoiSpriteSheet(
+                                assetPath = it.assetPath,
+                                frameWidth = it.frameWidth,
+                                frameHeight = it.frameHeight,
+                                frameCount = it.frameCount,
+                                fps = it.fps,
+                                columns = it.columns,
+                            )
+                        },
+                        displaySize = ref.displaySize ?: 48f,
+                    )
+                } else {
+                    poi
+                }
+            }
+            poiOverlayManager.poiItems = updated
+        } catch (e: Exception) {
+            timber.log.Timber.w(e, "DashboardFragment: spatial-references.json not loaded")
+        }
+    }
+
+    private data class SpatialRefsFile(val references: List<SpatialRefDto>)
+    private data class SpatialRefDto(
+        val id: String,
+        val name: String,
+        val lat: Double,
+        val lng: Double,
+        val category: String,
+        val animation: String,
+        val summary: String,
+        val visible: Boolean,
+        val imageAsset: String? = null,
+        val spriteSheet: SpriteSheetDto? = null,
+        val displaySize: Float? = null,
+    )
+
+    private data class SpriteSheetDto(
+        val assetPath: String,
+        val frameWidth: Int,
+        val frameHeight: Int,
+        val frameCount: Int,
+        val fps: Int = 8,
+        val columns: Int? = null,
+    )
+
+    private fun showMapScenePanel() {
+        val sections = ParkDataLoader.load(requireContext()).sections
+        val panel = MapScenePanelFragment.newInstance()
+        panel.rainZoneLabels = sections.map { it.name }
+        panel.initialState = MapScenePanelFragment.SceneState(
+            showSpatialReferences = poiOverlayManager.isOverlayVisible,
+            showRain = parkMapView.showRainEffect,
+            rainIntensity = parkMapView.rainIntensity,
+            rainSize = parkMapView.rainSize,
+            rainSectionIndex = parkMapView.rainSectionIndex,
+            animSpeed = parkMapView.spatialAnimSpeed,
+        )
+        panel.onSceneChanged = { state ->
+            poiOverlayManager.setOverlayVisible(state.showSpatialReferences)
+            parkMapView.setRainEffectEnabled(state.showRain)
+            parkMapView.setRainIntensity(state.rainIntensity)
+            parkMapView.setRainSize(state.rainSize)
+            parkMapView.setRainSectionIndex(state.rainSectionIndex)
+            parkMapView.setSpatialAnimSpeed(state.animSpeed)
+            parkMapView.notifySceneOptionsChanged()
+        }
+        panel.show(parentFragmentManager, MapScenePanelFragment.TAG)
+    }
+
+    private fun setupSectionZoneUi(root: View) {
+        val sections = ParkDataLoader.load(requireContext()).sections
+        val buttonRow = root.findViewById<LinearLayout>(R.id.section_zone_buttons)
+        sectionEduCard = root.findViewById(R.id.section_edu_card)
+
+        root.findViewById<View>(R.id.btn_close_section_edu)?.setOnClickListener {
+            sectionEduCard?.visibility = View.GONE
+            selectedSectionIndex = -1
+            parkMapView.highlightedSectionIndex = -1
+        }
+
+        parkMapView.setOnSectionClickListener { section, index ->
+            parkMapView.highlightedSectionIndex = index
+            parkMapView.focusOnSection(index)
+            showSectionEducationCard(root, section, index)
+        }
+
+        buttonRow.removeAllViews()
+        val strokePx = (3 * resources.displayMetrics.density).toInt()
+        val marginPx = (8 * resources.displayMetrics.density).toInt()
+
+        sections.forEachIndexed { index, section ->
+            val btn = MaterialButton(
+                requireContext(),
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle,
+            ).apply {
+                text = section.name
+                isAllCaps = false
+                textSize = 12f
+                strokeColor = android.content.res.ColorStateList.valueOf(section.chartColor)
+                strokeWidth = strokePx
+                setOnClickListener {
+                    parkMapView.highlightedSectionIndex = index
+                    parkMapView.focusOnSection(index)
+                    showSectionEducationCard(root, section, index)
+                }
+            }
+            buttonRow.addView(
+                btn,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { marginEnd = marginPx },
+            )
+        }
+    }
+
+    private fun showSectionEducationCard(
+        root: View,
+        section: ParkMapView.ParkSection,
+        index: Int,
+    ) {
+        selectedSectionIndex = index
+        val card = sectionEduCard ?: return
+        val title = root.findViewById<TextView>(R.id.section_edu_title)
+        val summary = root.findViewById<TextView>(R.id.section_edu_summary)
+        val image = root.findViewById<ImageView>(R.id.section_edu_image)
+        val colorBar = root.findViewById<View>(R.id.section_edu_color_bar)
+
+        title.text = section.name
+        summary.text = section.educationSummary.ifBlank {
+            getString(R.string.section_edu_empty)
+        }
+        (colorBar.background as? GradientDrawable)?.setColor(section.chartColor)
+            ?: colorBar.setBackgroundColor(section.chartColor)
+
+        val imageUrl = section.referenceImageUrl
+        if (!imageUrl.isNullOrBlank()) {
+            image.visibility = View.VISIBLE
+            if (imageUrl.startsWith("data:image")) {
+                runCatching {
+                    val base64 = imageUrl.substringAfter(',', imageUrl)
+                    val bytes = Base64.decode(base64, Base64.DEFAULT)
+                    image.setImageBitmap(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+                }.onFailure {
+                    image.visibility = View.GONE
+                }
+            } else {
+                Glide.with(this).load(imageUrl).into(image)
+            }
+        } else {
+            image.visibility = View.GONE
+        }
+
+        card.visibility = View.VISIBLE
+    }
+
+    private fun updateSectionChip(lat: Double, lng: Double) {
+        if (!isAdded) return
+        val chip = view?.findViewById<TextView>(R.id.chip_current_section) ?: return
+        val section = ParkSectionResolver.findSectionAt(requireContext(), lat, lng)
+        if (section == lastSectionName) return
+        lastSectionName = section
+        if (section != null) {
+            chip.text = getString(R.string.map_you_are_in_section, section)
+            chip.visibility = View.VISIBLE
+        } else if (ParkSectionResolver.isInsidePark(requireContext(), lat, lng)) {
+            chip.text = getString(R.string.map_section_unknown)
+            chip.visibility = View.VISIBLE
+        } else {
+            chip.visibility = View.GONE
+        }
+    }
 
     private fun observeState() {
         viewLifecycleOwner.lifecycleScope.launch {

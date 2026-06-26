@@ -16,7 +16,7 @@
     <item
         android:id="@+id/navigation_ar_map"
         android:icon="@drawable/ic_explorer"
-        android:title="Juku Go" />
+        android:title="Explorar" />
     <item
         android:id="@+id/navigation_profile"
         android:icon="@drawable/icon_usuario"

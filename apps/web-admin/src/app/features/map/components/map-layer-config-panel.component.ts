@@ -1,8 +1,12 @@
-import { Component, OnInit, OnDestroy, EventEmitter, Output, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, EventEmitter, Output, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Subject, takeUntil } from 'rxjs';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MapLayerConfigService } from '../services/map-layer-config.service';
 import { MapConfigData } from '../models/map-layer-config.model';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
+import { I18nService } from '../../../core/services/i18n.service';
 
 /**
  * Simplified map config panel — single global config per system.
@@ -14,81 +18,94 @@ import { MapConfigData } from '../models/map-layer-config.model';
 @Component({
   selector: 'app-map-layer-config-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatIconModule, MatProgressSpinnerModule, TranslatePipe],
   template: `
     <div class="config-panel" [class.open]="isOpen" [class.dark]="isDarkTheme" [class.hidden-toggle]="!showToggle">
-      <!-- Toggle button — only shown when showToggle is true -->
       @if (showToggle) {
-        <button class="toggle-btn" (click)="togglePanel()" title="Guardar / cargar configuración del mapa">
-          <span class="icon">💾</span>
+        <button class="toggle-btn" (click)="togglePanel()"
+          [attr.title]="'map.toggleConfig' | translate"
+          [attr.aria-label]="'map.toggleConfig' | translate"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="isOpen">
+          <mat-icon aria-hidden="true">save</mat-icon>
         </button>
       }
 
-      <div class="panel-body" *ngIf="isOpen && showToggle">
-        <h3 class="panel-title">📋 Config. del Mapa</h3>
+      @if (isOpen && showToggle) {
+        <div class="panel-body" role="region" [attr.aria-label]="'map.configTitle' | translate">
+          <h3 class="panel-title">
+            <mat-icon aria-hidden="true">tune</mat-icon>
+            {{ 'map.configTitle' | translate }}
+          </h3>
 
-        <!-- Last saved info -->
-        <div class="last-saved" *ngIf="lastSavedAt">
-          <span class="saved-label">Guardado</span>
-          <span class="saved-date">{{ lastSavedAt | date:'dd/MM/yy HH:mm' }}</span>
+          @if (lastSavedAt) {
+            <div class="last-saved">
+              <span class="saved-label">{{ 'map.saved' | translate }}</span>
+              <span class="saved-date">{{ lastSavedAt | date:'dd/MM/yy HH:mm' }}</span>
+            </div>
+          }
+          @if (!lastSavedAt && !loading) {
+            <div class="last-saved not-saved">{{ 'map.noConfigSaved' | translate }}</div>
+          }
+
+          <div class="actions">
+            <button class="btn-action btn-save"
+              (click)="saveConfig()"
+              [disabled]="saving"
+              [attr.title]="'map.saveHint' | translate">
+              @if (saving) {
+                <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+              } @else {
+                <mat-icon aria-hidden="true">save</mat-icon>
+              }
+              {{ saving ? ('map.saving' | translate) : ('map.saveCurrent' | translate) }}
+            </button>
+
+            <button class="btn-action btn-load"
+              (click)="loadConfig()"
+              [disabled]="loading || !lastSavedAt"
+              [attr.title]="'map.loadHint' | translate">
+              @if (loading) {
+                <mat-spinner diameter="16" aria-hidden="true"></mat-spinner>
+              } @else {
+                <mat-icon aria-hidden="true">folder_open</mat-icon>
+              }
+              {{ loading ? ('map.loading' | translate) : ('map.restoreSaved' | translate) }}
+            </button>
+          </div>
+
+          <div class="hint" aria-hidden="true">
+            <kbd>Ctrl</kbd>+<kbd>G</kbd> grilla &nbsp;
+            <kbd>Ctrl</kbd>+<kbd>L</kbd> etiquetas<br>
+            <kbd>Ctrl</kbd>+<kbd>±</kbd> zoom &nbsp;
+            <kbd>Ctrl</kbd>+<kbd>R</kbd> reset
+          </div>
         </div>
-        <div class="last-saved not-saved" *ngIf="!lastSavedAt && !loading">
-          Sin configuración guardada
-        </div>
+      }
 
-        <!-- Actions -->
-        <div class="actions">
-          <button class="btn-action btn-save"
-            (click)="saveConfig()"
-            [disabled]="saving"
-            title="Guarda posición, zoom, rotación y stickers actuales">
-            <span>{{ saving ? '⏳' : '💾' }}</span>
-            {{ saving ? 'Guardando...' : 'Guardar estado actual' }}
-          </button>
-
-          <button class="btn-action btn-load"
-            (click)="loadConfig()"
-            [disabled]="loading || !lastSavedAt"
-            title="Restaura la última configuración guardada">
-            <span>{{ loading ? '⏳' : '📂' }}</span>
-            {{ loading ? 'Cargando...' : 'Restaurar guardado' }}
-          </button>
-        </div>
-
-        <!-- Keyboard hint -->
-        <div class="hint">
-          <kbd>Ctrl</kbd>+<kbd>G</kbd> grilla &nbsp;
-          <kbd>Ctrl</kbd>+<kbd>L</kbd> etiquetas<br>
-          <kbd>Ctrl</kbd>+<kbd>±</kbd> zoom &nbsp;
-          <kbd>Ctrl</kbd>+<kbd>R</kbd> reset
-        </div>
-      </div>
-
-      <!-- Toast — always shown regardless of showToggle -->
-      <div class="toast" [class.visible]="showToast" [class.error]="toastIsError">{{ toastMessage }}</div>
+      <div class="toast" [class.visible]="showToast" [class.error]="toastIsError" role="status">{{ toastMessage }}</div>
     </div>
   `,
   styles: [`
     :host { display: block; }
 
     .config-panel {
-      --panel-bg: rgba(0, 0, 0, 0.9);
-      --panel-border: #444;
-      --text: #fff;
-      --text-secondary: #aaa;
-      --accent: #7c4dff;
-      --danger: #f44336;
-      --success: #4caf50;
+      --panel-bg: color-mix(in srgb, var(--sys-inverse-surface) 92%, transparent);
+      --panel-border: var(--sys-outline-variant);
+      --text: var(--sys-inverse-on-surface);
+      --text-secondary: color-mix(in srgb, var(--sys-inverse-on-surface) 70%, transparent);
+      --accent: var(--sys-primary);
+      --danger: var(--sys-error);
+      --success: var(--sys-tertiary);
 
       position: absolute;
       top: 10px;
       right: 10px;
       z-index: 10;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: Roboto, 'Segoe UI', sans-serif;
       font-size: 13px;
     }
 
-    /* When toggle button is hidden, only show toast centered at top */
     .config-panel.hidden-toggle {
       top: 10px;
       right: 50%;
@@ -100,10 +117,10 @@ import { MapConfigData } from '../models/map-layer-config.model';
     }
 
     .config-panel:not(.dark) {
-      --panel-bg: rgba(255, 255, 255, 0.95);
-      --panel-border: #ddd;
-      --text: #212121;
-      --text-secondary: #666;
+      --panel-bg: color-mix(in srgb, var(--sys-surface) 95%, transparent);
+      --panel-border: var(--sys-outline-variant);
+      --text: var(--sys-on-surface);
+      --text-secondary: var(--sys-on-surface-variant);
     }
 
     .toggle-btn {
@@ -117,13 +134,14 @@ import { MapConfigData } from '../models/map-layer-config.model';
       border-radius: 8px;
       color: var(--text);
       cursor: pointer;
-      font-size: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.15s;
+      transition: border-color 0.15s, transform 0.15s;
       backdrop-filter: blur(4px);
     }
+
+    .toggle-btn mat-icon { font-size: 20px; width: 20px; height: 20px; }
 
     .toggle-btn:hover {
       border-color: var(--accent);
@@ -143,18 +161,23 @@ import { MapConfigData } from '../models/map-layer-config.model';
     }
 
     .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       margin: 0 0 12px 0;
       font-size: 14px;
       font-weight: 600;
       color: var(--text);
     }
 
+    .panel-title mat-icon { font-size: 18px; width: 18px; height: 18px; opacity: 0.85; }
+
     .last-saved {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 6px 8px;
-      background: rgba(255,255,255,0.05);
+      background: color-mix(in srgb, var(--text) 5%, transparent);
       border-radius: 6px;
       margin-bottom: 10px;
       font-size: 11px;
@@ -180,9 +203,11 @@ import { MapConfigData } from '../models/map-layer-config.model';
       font-size: 12px;
       font-weight: 500;
       border: 1px solid transparent;
-      transition: all 0.15s;
+      transition: filter 0.15s, border-color 0.15s, color 0.15s;
       text-align: left;
     }
+
+    .btn-action mat-icon { font-size: 18px; width: 18px; height: 18px; }
 
     .btn-action:disabled {
       opacity: 0.4;
@@ -191,10 +216,10 @@ import { MapConfigData } from '../models/map-layer-config.model';
 
     .btn-save {
       background: var(--accent);
-      color: #fff;
+      color: var(--sys-on-primary);
     }
     .btn-save:not(:disabled):hover {
-      filter: brightness(1.15);
+      filter: brightness(1.1);
     }
 
     .btn-load {
@@ -212,7 +237,7 @@ import { MapConfigData } from '../models/map-layer-config.model';
       color: var(--text-secondary);
       line-height: 1.8;
       padding: 8px;
-      background: rgba(255,255,255,0.04);
+      background: color-mix(in srgb, var(--text) 4%, transparent);
       border-radius: 6px;
       margin-bottom: 4px;
     }
@@ -220,8 +245,8 @@ import { MapConfigData } from '../models/map-layer-config.model';
     kbd {
       display: inline-block;
       padding: 1px 4px;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
+      background: color-mix(in srgb, var(--text) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--text) 20%, transparent);
       border-radius: 3px;
       font-size: 10px;
       font-family: monospace;
@@ -234,9 +259,9 @@ import { MapConfigData } from '../models/map-layer-config.model';
       opacity: 0;
       max-height: 0;
       overflow: hidden;
-      transition: all 0.3s;
+      transition: opacity 0.3s, max-height 0.3s;
       background: var(--success);
-      color: #fff;
+      color: var(--sys-on-tertiary);
       text-align: center;
     }
 
@@ -246,20 +271,17 @@ import { MapConfigData } from '../models/map-layer-config.model';
       margin-top: 8px;
     }
 
-    .toast.error { background: var(--danger); }
+    .toast.error { background: var(--danger); color: var(--sys-on-error); }
   `]
 })
 export class MapLayerConfigPanelComponent implements OnInit, OnDestroy {
   @Input() isDarkTheme = true;
-  /** When false, hides the toggle button — save/load is triggered externally */
   @Input() showToggle = true;
 
-  /** Emits the config data to apply to the map */
   @Output() configLoaded = new EventEmitter<MapConfigData>();
-
-  /** Request current map state (parent should respond via captureState) */
   @Output() captureStateRequest = new EventEmitter<void>();
 
+  private readonly i18n = inject(I18nService);
   private destroy$ = new Subject<void>();
 
   isOpen = false;
@@ -272,7 +294,6 @@ export class MapLayerConfigPanelComponent implements OnInit, OnDestroy {
   toastIsError = false;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /** Set by parent when captureState is requested */
   private pendingState: MapConfigData | null = null;
 
   constructor(private configService: MapLayerConfigService) {}
@@ -305,13 +326,11 @@ export class MapLayerConfigPanelComponent implements OnInit, OnDestroy {
       });
   }
 
-  /** Called by parent to provide captured state for saving */
   receiveState(state: MapConfigData): void {
     this.pendingState = state;
     this.doSave(state);
   }
 
-  /** User pressed "Save" button */
   saveConfig(): void {
     this.captureStateRequest.emit();
   }
@@ -324,16 +343,15 @@ export class MapLayerConfigPanelComponent implements OnInit, OnDestroy {
         next: (saved) => {
           this.saving = false;
           this.lastSavedAt = saved.updatedAt;
-          this.toast('✅ Configuración guardada');
+          this.toast(this.i18n.t('map.configSaved'));
         },
         error: () => {
           this.saving = false;
-          this.toast('❌ Error al guardar', true);
+          this.toast(this.i18n.t('map.saveError'), true);
         }
       });
   }
 
-  /** User pressed "Load" button */
   loadConfig(): void {
     if (this.loading) return;
     this.loading = true;
@@ -344,14 +362,14 @@ export class MapLayerConfigPanelComponent implements OnInit, OnDestroy {
           this.loading = false;
           if (config?.configData) {
             this.configLoaded.emit(config.configData);
-            this.toast('✅ Configuración restaurada');
+            this.toast(this.i18n.t('map.configRestored'));
           } else {
-            this.toast('No hay configuración guardada', true);
+            this.toast(this.i18n.t('map.noConfigSaved'), true);
           }
         },
         error: () => {
           this.loading = false;
-          this.toast('❌ Error al cargar', true);
+          this.toast(this.i18n.t('map.loadError'), true);
         }
       });
   }

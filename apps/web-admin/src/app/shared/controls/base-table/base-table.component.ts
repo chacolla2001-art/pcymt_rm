@@ -12,10 +12,10 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatPaginator, MatPaginatorIntl, MatPaginatorModule } from '@angular/material/paginator';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { AlertService } from '../../../core/services/alert.service';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 import { CreateDialogComponent, DialogData } from '../../modal-dialogs/create-dialog';
 import { ModelViewerComponent } from '../../../features/virtual-assets/components/model-viewer/model-viewer.component';
@@ -48,8 +48,7 @@ export type TableElement = any;
     MatTableModule,
     MatIconModule,
     MatFormFieldModule,
-    MatInputModule,
-    MatProgressSpinnerModule
+    MatInputModule
   ],
   providers: [
     { provide: MatPaginatorIntl, useValue: getSpanishPaginatorIntl() }
@@ -60,6 +59,7 @@ export abstract class BaseTableComponent<T = any> implements OnInit, AfterViewIn
   protected readonly dialog = inject(MatDialog);
   public readonly apiRoutes = inject(ApiRoutesService);
   protected readonly alertService = inject(AlertService);
+  protected readonly shellLoad = inject(AppShellLoadService);
   protected readonly http = inject(HttpClient);
   protected readonly isBrowser: boolean;
 
@@ -221,6 +221,22 @@ export abstract class BaseTableComponent<T = any> implements OnInit, AfterViewIn
     return dateB - dateA;
   }
 
+  protected startTableLoad(): void {
+    this.isLoading = true;
+    if (!this.shellLoad.hasActiveNavigation()) {
+      this.shellLoad.beginRefresh(this.currentLoadType ?? 'table');
+    }
+  }
+
+  protected finishTableLoad(): void {
+    this.isLoading = false;
+    if (this.shellLoad.hasActiveNavigation()) {
+      this.shellLoad.endNavigation();
+    } else {
+      this.shellLoad.completeRefresh();
+    }
+  }
+
   /**
    * Configura el datasource con datos y paginador
    */
@@ -249,7 +265,7 @@ export abstract class BaseTableComponent<T = any> implements OnInit, AfterViewIn
       this.dataSource.paginator = this.paginator;
     });
 
-    this.isLoading = false;
+    this.finishTableLoad();
   }
 
   /**

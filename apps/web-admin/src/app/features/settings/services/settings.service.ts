@@ -3,6 +3,12 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
 
+export interface PredefinedAvatar {
+  id: string;
+  label: string;
+  url: string;
+}
+
 export interface AppConfig {
   google: {
     webClientId: string | null;
@@ -16,6 +22,7 @@ export interface AppConfig {
     googleAuthEnabled: boolean;
     mapsEnabled: boolean;
   };
+  avatars?: PredefinedAvatar[];
 }
 
 interface ApiResponse<T> {

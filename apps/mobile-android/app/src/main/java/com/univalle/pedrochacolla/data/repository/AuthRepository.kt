@@ -7,8 +7,9 @@ import com.univalle.pedrochacolla.data.remote.api.DeleteAccountRequest
 import com.univalle.pedrochacolla.data.remote.api.EmailRequest
 import com.univalle.pedrochacolla.data.remote.api.ForgotPasswordRequest
 import com.univalle.pedrochacolla.data.remote.api.RefreshTokenRequest
-import com.univalle.pedrochacolla.data.remote.api.RegisterResponse
 import com.univalle.pedrochacolla.data.remote.api.RegisterRequest
+import com.univalle.pedrochacolla.data.remote.api.RegisterResponse
+import com.univalle.pedrochacolla.data.remote.api.SetAvatarRequest
 import com.univalle.pedrochacolla.data.remote.api.UserResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -254,6 +255,25 @@ class AuthRepository {
         }
     }
 
+    suspend fun setPredefinedAvatar(userId: String, avatarId: String): Result<String> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = userApi.setAvatar(userId, SetAvatarRequest(avatarId))
+                if (response.isSuccessful && response.body()?.success == true) {
+                    val rawUrl = response.body()?.data?.get("avatar_url")
+                        ?: response.body()?.data?.get("profile_picture_url")
+                    if (rawUrl == null) {
+                        return@withContext Result.failure(Exception("Avatar URL not found"))
+                    }
+                    Result.success(com.univalle.pedrochacolla.utils.image.AvatarResolver.normalizePath(rawUrl))
+                } else {
+                    Result.failure(Exception(response.body()?.message ?: "HTTP ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
     suspend fun uploadProfilePhoto(userId: String, file: File): Result<String> =
         withContext(Dispatchers.IO) {
             Timber.d("uploadProfilePhoto: Uploading photo for userId=$userId, size=${file.length()} bytes")
@@ -264,14 +284,14 @@ class AuthRepository {
                 val response = userApi.updateProfilePhoto(userId, photoPart)
 
                 if (response.isSuccessful && response.body()?.success == true) {
-                    val avatarUrl = response.body()?.data?.get("avatar_url")
+                    val rawUrl = response.body()?.data?.get("avatar_url")
                         ?: response.body()?.data?.get("profile_picture_url")
-                    if (avatarUrl == null) {
+                    if (rawUrl == null) {
                         Timber.e("uploadProfilePhoto: No avatar URL in response")
                         return@withContext Result.failure(Exception("Avatar URL not found"))
                     }
                     Timber.i("uploadProfilePhoto: Success - photo uploaded")
-                    Result.success(avatarUrl)
+                    Result.success(com.univalle.pedrochacolla.utils.image.AvatarResolver.normalizePath(rawUrl))
                 } else {
                     val errorMsg = response.body()?.message ?: "HTTP ${response.code()}"
                     Timber.w("uploadProfilePhoto: API error - $errorMsg")

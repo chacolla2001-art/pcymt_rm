@@ -1,6 +1,7 @@
 const express = require('express');
 const { virtualAssetSchemas } = require('../../../shared/validators');
 const { validateBody } = require('../../middlewares');
+const { staffOnly } = require('../../middlewares/authorize.middleware');
 
 /**
  * Create virtual asset routes
@@ -25,6 +26,7 @@ const createVirtualAssetRoutes = (virtualAssetController, authMiddleware, upload
   // Protected routes
   router.post('/',
     authMiddleware,
+    staffOnly,
     uploadMiddleware.fields(fileFields),
     validateBody(virtualAssetSchemas.create),
     virtualAssetController.create,
@@ -32,14 +34,15 @@ const createVirtualAssetRoutes = (virtualAssetController, authMiddleware, upload
 
   router.put('/:id',
     authMiddleware,
+    staffOnly,
     uploadMiddleware.fields(fileFields),
     validateBody(virtualAssetSchemas.update),
     virtualAssetController.update,
   );
 
-  router.delete('/:id', authMiddleware, virtualAssetController.delete);
+  router.delete('/:id', authMiddleware, staffOnly, virtualAssetController.delete);
 
-  router.patch('/:id/deactivate', authMiddleware, virtualAssetController.deactivate);
+  router.patch('/:id/deactivate', authMiddleware, staffOnly, virtualAssetController.deactivate);
 
   return router;
 };

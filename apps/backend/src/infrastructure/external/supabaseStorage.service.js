@@ -61,6 +61,71 @@ class SupabaseStorageService {
     if (!response.ok) return null;
     return response;
   }
+
+  /**
+   * Upload or replace an object in Supabase Storage.
+   * @param {string} objectPath
+   * @param {Buffer} body
+   * @param {string} contentType
+   */
+  async uploadObject(objectPath, body, contentType = 'application/octet-stream') {
+    if (!this.isConfigured() || !this.serviceRoleKey) {
+      throw new Error('Supabase Storage upload requires SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    const encoded = objectPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+
+    const url = `${this.url}/storage/v1/object/${this.bucket}/${encoded}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.serviceRoleKey,
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Supabase upload failed (${response.status}): ${text}`);
+    }
+
+    return objectPath;
+  }
+
+  /**
+   * Delete an object from Supabase Storage.
+   * @param {string} objectPath
+   * @returns {Promise<boolean>} true when deleted or object did not exist
+   */
+  async deleteObject(objectPath) {
+    if (!this.isConfigured() || !this.serviceRoleKey) {
+      return false;
+    }
+
+    const encoded = objectPath
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => encodeURIComponent(segment))
+      .join('/');
+
+    const url = `${this.url}/storage/v1/object/${this.bucket}/${encoded}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.serviceRoleKey,
+      },
+    });
+
+    return response.ok || response.status === 404;
+  }
 }
 
 module.exports = SupabaseStorageService;

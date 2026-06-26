@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewChild, ChangeDetectorRef, ChangeDetectionStrategy, inject } from '@angular/core';
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { ChartData } from 'chart.js';
@@ -14,10 +14,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 import { DashboardMetricsService } from '../../dashboard/services/dashboard-metrics.service';
 import { AnalyticsService } from '../../dashboard/services/analytics.service';
 import { InteractionsBySection } from '../../dashboard/models/dashboard-metrics.model';
+import { PARK_SECTION_CHART_COLORS } from '../../map/data/park-geometry';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 
 @Component({
   selector: 'app-zone-visits',
@@ -34,7 +37,8 @@ import { InteractionsBySection } from '../../dashboard/models/dashboard-metrics.
     MatInputModule,
     MatListModule,
     MatTooltipModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    TranslatePipe
   ],
   templateUrl: './zone-visits.component.html',
   styleUrls: ['./zone-visits.component.scss']
@@ -66,14 +70,12 @@ export class ZoneVisitsComponent implements OnInit {
   };
 
   readonly sectionColors: Record<string, string> = {
-    'Tierras Altas': '#8D6E63',
-    'Tierras Medias': '#66BB6A',
-    'Tierras Bajas': '#42A5F5',
-    'Mitos y Leyendas': '#AB47BC',
-    'Sin clasificar': '#9E9E9E'
+    ...PARK_SECTION_CHART_COLORS,
+    'Sin clasificar': '#9E9E9E',
   };
 
   private readonly isBrowser: boolean;
+  private readonly shellLoad = inject(AppShellLoadService);
 
   constructor(
     private metricsService: DashboardMetricsService,
@@ -87,18 +89,16 @@ export class ZoneVisitsComponent implements OnInit {
 
   ngOnInit(): void {
     if (!this.isBrowser) return;
-    this.loadData();
     this.updateZonePeriodLabel();
-    this.loadZoneBarChart();
-  }
-
-  loadData(): void {
-    this.metricsService.loadRankings().subscribe(rankings => {
-      this.sections = rankings.interactionsBySection;
-      this.maxInteractionCount = Math.max(...this.sections.map(s => Number(s.interactionCount)), 1);
-      this.doughnutChartData = this.metricsService.buildSectionChartData(this.sections);
-      this.cdr.markForCheck();
-    });
+    this.metricsService.loadRankings()
+      .pipe(this.shellLoad.endNavigationWhenDone())
+      .subscribe(rankings => {
+        this.sections = rankings.interactionsBySection;
+        this.maxInteractionCount = Math.max(...this.sections.map(s => Number(s.interactionCount)), 1);
+        this.doughnutChartData = this.metricsService.buildSectionChartData(this.sections);
+        this.loadZoneBarChart();
+        this.cdr.markForCheck();
+      });
   }
 
   getProgress(count: number): number {

@@ -13,8 +13,12 @@ import {
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
 import { TilesetPanelComponent, TilesetConfig, TilesetSelection, TilePaintTool } from '../components/tileset-panel.component';
 import { StickerLayerService } from '../services/sticker-layer.service';
+import { MapSessionService } from '../services/map-session.service';
 import { StickerInstance, StickerLayer } from '../models/sticker.model';
-import { MapConfigData } from '../models/map-layer-config.model';
+import { MapConfigData, MAP_CONFIG_VERSION, MapCheckpointSummary } from '../models/map-layer-config.model';
+import type { ParkSectionRecord } from '../data/park-geometry';
+import type { SpatialReference } from '../data/spatial-reference';
+import { findAmbientScenario } from '../data/ambient-scenarios';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -43,6 +47,18 @@ import { AuthService } from '../../../core/services/auth.service';
         [mapViewInfo]="currentViewInfo"
         [tileEditorActive]="tileEditorMode"
         [coordPickerActive]="coordPickerActive"
+        [editableSections]="editableSections"
+        [sectionEditorActive]="sectionEditorMode"
+        [activeSectionIndex]="sectionEditorIndex"
+        [selectedVertexIndex]="sectionEditorSelectedVertex"
+        [addVertexMode]="sectionEditorAddVertexMode"
+        [spatialReferences]="spatialReferences"
+        [spatialPlaceIndex]="spatialPlaceIndex"
+        [activeSpatialRefIndex]="activeSpatialRefIndex"
+        [sceneOpts]="sceneOpts"
+        [spatialRefsOpts]="spatialRefsOpts"
+        [checkpoints]="checkpoints"
+        [sessionSavedAt]="sessionSavedAt"
         (stickerSelected)="onPaletteStickerSelected($event)"
         (stickerChanged)="onStickerPropertyChanged($event)"
         (stickerRemoved)="onStickerRemoved($event)"
@@ -74,7 +90,9 @@ import { AuthService } from '../../../core/services/auth.service';
           (loadRequest)="onLoadRequest()"
           (clearRequest)="onClearRequest()"
           (tilePickerPicked)="onTilePickerPicked($event)"
-          (tilePaintToolChange)="onTilePaintToolChange($event)">
+          (tilePaintToolChange)="onTilePaintToolChange($event)"
+          (sectionsChanged)="onSectionsChanged($event)"
+          (spatialReferencesChanged)="onSpatialReferencesChanged($event)">
         </app-map-control>
 
         <app-tileset-panel *ngIf="tileEditorMode"
@@ -105,11 +123,11 @@ import { AuthService } from '../../../core/services/auth.service';
       position: relative;
     }
     app-map-control { flex: 1; min-width: 0; }
-    .map-area { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--bg, #1e1e2e); }
+    .map-area { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--sys-surface); }
     .map-area app-map-control { flex: 1; min-width: 0; }
     app-sticker-panel { flex-shrink: 0; }
     :host-context(.map-fullscreen) .container-wrapper {
-      position: fixed; inset: 0; z-index: 9999; background: var(--bg, #1e1e2e);
+      position: fixed; inset: 0; z-index: 9999; background: var(--sys-surface);
     }
   `]
 })
@@ -131,13 +149,58 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   coordPickerActive = false;
   isFullscreen = false;
 
+  sectionEditorMode = false;
+  sectionEditorIndex = 0;
+  sectionEditorSelectedVertex: number | null = null;
+  sectionEditorAddVertexMode = false;
+  editableSections: ParkSectionRecord[] = [];
+
+  spatialReferences: SpatialReference[] = [];
+  spatialPlaceIndex = -1;
+  activeSpatialRefIndex = 0;
+  sceneOpts = {
+    activeScenarioId: null as string | null,
+    showRainEffect: false,
+    rainIntensityPercent: 45,
+    rainSizePercent: 100,
+    rainSectionIndex: -1,
+    showFogEffect: false,
+    fogIntensityPercent: 35,
+    fogSizePercent: 100,
+    showMotesEffect: false,
+    motesIntensityPercent: 40,
+    motesSizePercent: 100,
+    showCloudShadows: false,
+    cloudShadowIntensityPercent: 40,
+    cloudShadowSizePercent: 100,
+    showLeavesEffect: false,
+    leavesIntensityPercent: 45,
+    leavesSizePercent: 100,
+    showTreesEffect: false,
+    treesIntensityPercent: 55,
+    treesSizePercent: 100,
+    showLightningEffect: false,
+    showNightMistEffect: false,
+    nightMistIntensityPercent: 35,
+    ambientWindDeg: 245,
+    ambientWindStrengthPercent: 45,
+  };
+  spatialRefsOpts = {
+    showSpatialReferences: true,
+    spatialAnimPercent: 100,
+  };
+
+  checkpoints: MapCheckpointSummary[] = [];
+  sessionSavedAt: string | null = null;
+
   // ── Tile painting state ────────────────────────────────────
   selectedTileDataUrl: string | null = null;
   selectedMultiTiles: { col: number; row: number; dataUrl: string }[] | undefined = undefined;
 
-  private readonly MAP_STATE_KEY = 'pcymt_map_state_v3';
-  private readonly STICKER_STATE_KEY = 'pcymt_sticker_layers_v1';
   private readonly isBrowser: boolean;
+  private sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly SESSION_SAVE_DEBOUNCE_MS = 1200;
+  private restoringSession = false;
 
   /** Latest map view info from the canvas — passed down to the sticker panel */
   currentViewInfo: MapViewInfo | null = null;
@@ -145,6 +208,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private router: Router,
     private stickerService: StickerLayerService,
+    private mapSession: MapSessionService,
     private themeService: ThemeManagerService,
     private authService: AuthService,
     @Inject(PLATFORM_ID) platformId: Object
@@ -165,16 +229,27 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       .subscribe(layers => {
         this.stickerLayers = layers;
         setTimeout(() => this.mapControl?.refreshStickers(), 0);
+        if (!this.restoringSession) this.scheduleSessionSave();
       });
+
+    this.mapSession.checkpoints$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((list) => { this.checkpoints = list; });
 
   }
 
   ngAfterViewInit(): void {
     if (!this.isBrowser) return;
-    if (this.shouldAutoLoadConfig()) {
-      // Load global config if local cache is empty (e.g., after clearing browser cache)
+    this.restoringSession = true;
+    const session = this.mapSession.loadSession();
+    if (session) {
+      this.applyFullState(session, { fromAutoRestore: true });
+    } else if (this.shouldAutoLoadConfig()) {
       setTimeout(() => this.configPanel?.loadConfig(), 0);
     }
+    this.restoringSession = false;
+    this.sessionSavedAt = this.mapSession.lastSavedAt;
+    this.syncSceneStateFromMap();
   }
 
   ngOnDestroy(): void {
@@ -183,13 +258,119 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private shouldAutoLoadConfig(): boolean {
-    try {
-      const mapState = localStorage.getItem(this.MAP_STATE_KEY);
-      const stickerState = localStorage.getItem(this.STICKER_STATE_KEY);
-      return !mapState && !stickerState;
-    } catch {
-      // If storage is blocked, fall back to loading from backend
-      return true;
+    return !this.mapSession.hasSession();
+  }
+
+  private scheduleSessionSave(): void {
+    if (!this.isBrowser || this.restoringSession || !this.mapControl) return;
+    if (this.sessionSaveTimer) clearTimeout(this.sessionSaveTimer);
+    this.sessionSaveTimer = setTimeout(() => {
+      this.sessionSaveTimer = null;
+      const data = this.captureFullState();
+      if (this.mapSession.saveSession(data)) {
+        this.sessionSavedAt = this.mapSession.lastSavedAt;
+      }
+    }, this.SESSION_SAVE_DEBOUNCE_MS);
+  }
+
+  private captureFullState(): MapConfigData {
+    const map = this.mapControl.exportMapPersistedState();
+    const stickerLayers = this.stickerService.layers.map((l) => ({
+      id: l.id,
+      name: l.name,
+      visible: l.visible,
+      stickers: l.stickers.map((s) => ({
+        stickerKey: s.stickerKey,
+        lat: s.lat,
+        lng: s.lng,
+        scale: s.scale,
+        rotation: s.rotation,
+        opacity: s.opacity,
+      })),
+    }));
+
+    return {
+      version: MAP_CONFIG_VERSION,
+      mapState: map.mapState,
+      stickerLayers,
+      activeStickerLayerId: this.stickerService.activeLayerId,
+      canvasGrid: {
+        cellW: map.mapState.canvasGridCellW ?? 32,
+        cellH: map.mapState.canvasGridCellH ?? 32,
+        opacity: map.mapState.canvasGridOpacity ?? 0.35,
+        color: map.mapState.canvasGridColor || '#ffffff',
+        style: map.mapState.canvasGridStyle ?? 'solid',
+      },
+      paintedTiles: map.paintedTiles,
+      layerOffsets: map.layerOffsets,
+      activeMovableLayer: map.activeMovableLayer,
+      sections: map.sections,
+      spatialReferences: map.spatialReferences,
+      ambientScene: map.ambientScene,
+      refImageDataUrl: map.refImageDataUrl ?? undefined,
+      refImageOpacity: map.refImageOpacity,
+      themeMode: this.themeService.isDarkMode() ? 'dark' : 'light',
+    };
+  }
+
+  private applyFullState(configData: MapConfigData, opts?: { fromAutoRestore?: boolean }): void {
+    if (!this.mapControl) return;
+    this.restoringSession = true;
+
+    if (configData.themeMode) {
+      this.themeService.setThemeMode(configData.themeMode);
+    }
+
+    const scenarioId = configData.ambientScene?.activeScenarioId;
+    if (scenarioId) {
+      const scenario = findAmbientScenario(scenarioId);
+      if (scenario?.theme) this.themeService.setThemeMode(scenario.theme);
+    }
+
+    this.mapControl.applyMapPersistedState({
+      mapState: configData.mapState,
+      layerOffsets: configData.layerOffsets,
+      activeMovableLayer: configData.activeMovableLayer,
+      sections: configData.sections,
+      spatialReferences: configData.spatialReferences,
+      paintedTiles: configData.paintedTiles,
+      refImageDataUrl: configData.refImageDataUrl,
+      refImageOpacity: configData.refImageOpacity,
+      ambientScene: configData.ambientScene,
+    }, { skipLegacySave: true });
+
+    if (scenarioId) {
+      const scenario = findAmbientScenario(scenarioId);
+      if (scenario?.theme) this.themeService.setThemeMode(scenario.theme);
+      this.mapControl.applyAmbientScenarioTint(scenarioId);
+    }
+
+    if (configData.stickerLayers?.length) {
+      const layers: StickerLayer[] = configData.stickerLayers.map((l) => ({
+        id: l.id,
+        name: l.name,
+        visible: l.visible,
+        opacity: 1,
+        stickers: l.stickers.map((s) => ({
+          id: `${l.id}_${s.stickerKey}_${s.lat}_${s.lng}`,
+          stickerKey: s.stickerKey,
+          lat: s.lat,
+          lng: s.lng,
+          scale: s.scale,
+          rotation: s.rotation,
+          opacity: s.opacity,
+        })),
+      }));
+      this.stickerService.importLayers(layers);
+    }
+
+    this.editableSections = this.mapControl.getEditableSections();
+    this.syncSceneStateFromMap();
+    setTimeout(() => this.mapControl?.refreshStickers(), 0);
+
+    this.restoringSession = false;
+    if (!opts?.fromAutoRestore) {
+      this.scheduleSessionSave();
     }
   }
 
@@ -197,6 +378,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onViewInfo(info: MapViewInfo): void {
     this.currentViewInfo = info;
+    this.scheduleSessionSave();
   }
 
   // ── Map control events from sticker panel ─────────────────
@@ -210,6 +392,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'rotateRight':  this.mapControl.rotateOnce('right'); break;
       case 'reset':        this.mapControl.resetView(); break;
       case 'optionChange': this.mapControl.setMapOption(event.option, event.value); break;
+      case 'groundTilePxChange': this.mapControl.setGroundTilePx(event.value); break;
       case 'centerMap':    this.mapControl.centerMap(); break;
       case 'toggleCoordPicker': this.mapControl.toggleCoordPicker(); this.coordPickerActive = this.mapControl.coordPickerMode; break;
       case 'saveConfig':   this.onSaveRequest(); break;
@@ -228,7 +411,233 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'loadTileset':        this.onLoadTilesetFromPanel(event.tileset); break;
       case 'refImage':           this.mapControl.setRefImage(event.dataUrl); break;
       case 'refImageOpacity':    this.mapControl.setRefImageOpacity(event.value); break;
+      case 'toggleSectionEditor':
+        this.sectionEditorMode = !this.sectionEditorMode;
+        if (this.sectionEditorMode) {
+          this.tileEditorMode = false;
+          this.stickerEditMode = false;
+          this.stickerService.setEditMode(false);
+        }
+        this.mapControl.setSectionEditorMode(this.sectionEditorMode);
+        break;
+      case 'setSectionEditorIndex':
+        this.sectionEditorIndex = event.index;
+        this.mapControl.setSectionEditorIndex(event.index);
+        break;
+      case 'setSectionEditorVertex':
+        this.sectionEditorSelectedVertex = event.vertexIndex;
+        this.mapControl.setSectionEditorSelectedVertex(event.vertexIndex);
+        break;
+      case 'setSectionEditorAddVertex':
+        this.sectionEditorAddVertexMode = event.enabled;
+        this.mapControl.setSectionEditorAddVertexMode(event.enabled);
+        break;
+      case 'updateSectionVertex':
+        this.mapControl.updateSectionVertex(event.sectionIndex, event.vertexIndex, event.lat, event.lng);
+        break;
+      case 'deleteSectionVertex':
+        this.mapControl.deleteSectionVertex(event.sectionIndex, event.vertexIndex);
+        this.sectionEditorSelectedVertex = null;
+        break;
+      case 'exportSectionsJson':
+        this.mapControl.downloadSectionsJson();
+        break;
+      case 'resetSections':
+        this.mapControl.resetSectionsToDefault();
+        this.sectionEditorSelectedVertex = null;
+        break;
+      case 'updateSectionColor':
+        this.mapControl.updateSectionColor(event.sectionIndex, event.hex);
+        break;
+      case 'updateSectionFillOpacity':
+        this.mapControl.updateSectionFillOpacity(event.sectionIndex, event.which, event.opacity);
+        break;
+      case 'sceneOptionChange':
+        this.onManualSceneEdit();
+        this.mapControl.setMapSceneOption(event.option, event.value);
+        this.syncSceneStateFromMap();
+        break;
+      case 'spatialRefsOptionChange':
+        this.mapControl.setMapSceneOption('showSpatialReferences', event.value);
+        this.syncSceneStateFromMap();
+        break;
+      case 'applyAmbientScenario': {
+        const scenario = findAmbientScenario(event.scenarioId);
+        if (!scenario) break;
+        if (scenario.theme) this.themeService.setThemeMode(scenario.theme);
+        this.mapControl.applyAmbientScenario(scenario);
+        this.syncSceneStateFromMap();
+        this.sceneOpts.activeScenarioId = scenario.id;
+        break;
+      }
+      case 'rainIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setRainIntensity(event.value);
+        this.sceneOpts.rainIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'rainSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setRainSize(event.value);
+        this.sceneOpts.rainSizePercent = Math.round(event.value * 100);
+        break;
+      case 'fogIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setFogIntensity(event.value);
+        this.sceneOpts.fogIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'fogSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setFogSize(event.value);
+        this.sceneOpts.fogSizePercent = Math.round(event.value * 100);
+        break;
+      case 'motesIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setMotesIntensity(event.value);
+        this.sceneOpts.motesIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'motesSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setMotesSize(event.value);
+        this.sceneOpts.motesSizePercent = Math.round(event.value * 100);
+        break;
+      case 'cloudShadowIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setCloudShadowIntensity(event.value);
+        this.sceneOpts.cloudShadowIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'cloudShadowSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setCloudShadowSize(event.value);
+        this.sceneOpts.cloudShadowSizePercent = Math.round(event.value * 100);
+        break;
+      case 'leavesIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setLeavesIntensity(event.value);
+        this.sceneOpts.leavesIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'leavesSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setLeavesSize(event.value);
+        this.sceneOpts.leavesSizePercent = Math.round(event.value * 100);
+        break;
+      case 'treesIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setTreesIntensity(event.value);
+        this.sceneOpts.treesIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'treesSizeChange':
+        this.onManualSceneEdit();
+        this.mapControl.setTreesSize(event.value);
+        this.sceneOpts.treesSizePercent = Math.round(event.value * 100);
+        break;
+      case 'nightMistIntensityChange':
+        this.onManualSceneEdit();
+        this.mapControl.setNightMistIntensity(event.value);
+        this.sceneOpts.nightMistIntensityPercent = Math.round(event.value * 100);
+        break;
+      case 'ambientWindDirectionChange':
+        this.onManualSceneEdit();
+        this.mapControl.setAmbientWindDirection(event.deg);
+        this.sceneOpts.ambientWindDeg = event.deg;
+        break;
+      case 'ambientWindStrengthChange':
+        this.onManualSceneEdit();
+        this.mapControl.setAmbientWindStrength(event.value);
+        this.sceneOpts.ambientWindStrengthPercent = Math.round(event.value * 100);
+        break;
+      case 'rainSectionChange':
+        this.onManualSceneEdit();
+        this.mapControl.setRainSectionIndex(event.sectionIndex);
+        this.sceneOpts.rainSectionIndex = event.sectionIndex;
+        break;
+      case 'spatialAnimSpeedChange':
+        this.mapControl.setSpatialAnimSpeed(event.value);
+        this.spatialRefsOpts.spatialAnimPercent = Math.round(event.value * 100);
+        break;
+      case 'selectSpatialReferenceIndex':
+        this.activeSpatialRefIndex = event.index;
+        this.mapControl.setSelectedSpatialReferenceIndex(event.index);
+        break;
+      case 'updateSpatialReference':
+        this.mapControl.updateSpatialReference(event.index, event.patch);
+        this.spatialReferences = this.mapControl.getSpatialReferences();
+        break;
+      case 'setSpatialReferencePlaceIndex':
+        this.spatialPlaceIndex = event.index;
+        this.mapControl.setSpatialReferencePlaceIndex(event.index);
+        break;
+      case 'exportSpatialReferencesJson':
+        this.mapControl.downloadSpatialReferencesJson();
+        break;
+      case 'saveCheckpoint':
+        this.onSaveCheckpoint(event.label);
+        break;
+      case 'restoreCheckpoint':
+        this.onRestoreCheckpoint(event.id);
+        break;
+      case 'deleteCheckpoint':
+        this.onDeleteCheckpoint(event.id);
+        break;
+      case 'renameCheckpoint':
+        this.onRenameCheckpoint(event.id, event.label);
+        break;
     }
+    this.scheduleSessionSave();
+  }
+
+  onSpatialReferencesChanged(refs: SpatialReference[]): void {
+    this.spatialReferences = refs;
+    this.scheduleSessionSave();
+  }
+
+  private onManualSceneEdit(): void {
+    this.mapControl?.clearAmbientScenarioVisuals();
+    this.sceneOpts.activeScenarioId = null;
+  }
+
+  private syncSceneStateFromMap(): void {
+    if (!this.mapControl) return;
+    const scene = this.mapControl.getSceneOptions();
+    this.sceneOpts = {
+      activeScenarioId: this.mapControl.getActiveAmbientScenarioId(),
+      showRainEffect: scene.showRainEffect,
+      rainIntensityPercent: Math.round(scene.rainIntensity * 100),
+      rainSizePercent: Math.round(scene.rainSize * 100),
+      rainSectionIndex: scene.rainSectionIndex,
+      showFogEffect: scene.showFogEffect,
+      fogIntensityPercent: Math.round(scene.fogIntensity * 100),
+      fogSizePercent: Math.round(scene.fogSize * 100),
+      showMotesEffect: scene.showMotesEffect,
+      motesIntensityPercent: Math.round(scene.motesIntensity * 100),
+      motesSizePercent: Math.round(scene.motesSize * 100),
+      showCloudShadows: scene.showCloudShadows,
+      cloudShadowIntensityPercent: Math.round(scene.cloudShadowIntensity * 100),
+      cloudShadowSizePercent: Math.round(scene.cloudShadowSize * 100),
+      showLeavesEffect: scene.showLeavesEffect,
+      leavesIntensityPercent: Math.round(scene.leavesIntensity * 100),
+      leavesSizePercent: Math.round(scene.leavesSize * 100),
+      showTreesEffect: scene.showTreesEffect,
+      treesIntensityPercent: Math.round(scene.treesIntensity * 100),
+      treesSizePercent: Math.round(scene.treesSize * 100),
+      showLightningEffect: scene.showLightningEffect,
+      showNightMistEffect: scene.showNightMistEffect,
+      nightMistIntensityPercent: Math.round(scene.nightMistIntensity * 100),
+      ambientWindDeg: scene.ambientWindDeg,
+      ambientWindStrengthPercent: Math.round(scene.ambientWindStrength * 100),
+    };
+    this.spatialRefsOpts = {
+      showSpatialReferences: scene.showSpatialReferences,
+      spatialAnimPercent: Math.round(scene.spatialAnimSpeed * 100),
+    };
+    this.spatialReferences = this.mapControl.getSpatialReferences();
+    this.spatialPlaceIndex = this.mapControl.spatialReferencePlaceIndex;
+    this.activeSpatialRefIndex = this.mapControl.selectedSpatialReferenceIndex;
+  }
+
+  onSectionsChanged(sections: ParkSectionRecord[]): void {
+    this.editableSections = sections;
+    this.sectionEditorSelectedVertex = this.mapControl?.sectionEditorSelectedVertex ?? null;
+    this.scheduleSessionSave();
   }
 
   // ── Sticker panel events ───────────────────────────────────
@@ -259,6 +668,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onLayersChanged(): void {
     this.mapControl?.refreshStickers();
+    this.scheduleSessionSave();
   }
 
   onPanelToggled(): void {
@@ -390,50 +800,27 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onCaptureStateRequest(): void {
-    const mapState = this.mapControl?.getMapViewState() ?? {
-      scale: 1.2,
-      rotation: -52 * Math.PI / 180,
-      offsetX: 0, offsetY: 0,
-      showSections: true, showLabels: true
-    };
-
-    const activeLayer = this.stickerService.getActiveLayer();
-    const stickerLayers = activeLayer ? [{
-      id: activeLayer.id,
-      name: activeLayer.name,
-      visible: activeLayer.visible,
-      stickers: activeLayer.stickers.map(s => ({
-        stickerKey: s.stickerKey, lat: s.lat, lng: s.lng,
-        scale: s.scale, rotation: s.rotation, opacity: s.opacity
-      }))
-    }] : [];
-
-    const configData: MapConfigData = { mapState, stickerLayers };
-
-    this.configPanel?.receiveState(configData);
+    this.configPanel?.receiveState(this.captureFullState());
   }
 
   onConfigLoaded(configData: MapConfigData): void {
-    if (configData.mapState) {
-      this.mapControl?.setMapViewState(configData.mapState);
-    }
+    this.applyFullState(configData);
+  }
 
-    if (configData.stickerLayers?.length > 0) {
-      const activeLayer = this.stickerService.getActiveLayer();
-      if (activeLayer) {
-        this.stickerService.clearAllStickers(activeLayer.id);
-        for (const layerData of configData.stickerLayers) {
-          for (const s of layerData.stickers) {
-            const instance = this.stickerService.addSticker(
-              activeLayer.id, s.stickerKey, s.lat, s.lng
-            );
-            this.stickerService.updateSticker(activeLayer.id, {
-              ...instance, scale: s.scale, rotation: s.rotation, opacity: s.opacity
-            });
-          }
-        }
-      }
-      setTimeout(() => this.mapControl?.refreshStickers(), 0);
-    }
+  onSaveCheckpoint(label?: string): void {
+    this.mapSession.saveCheckpoint(this.captureFullState(), label);
+  }
+
+  onRestoreCheckpoint(id: string): void {
+    const data = this.mapSession.restoreCheckpoint(id);
+    if (data) this.applyFullState(data);
+  }
+
+  onDeleteCheckpoint(id: string): void {
+    this.mapSession.deleteCheckpoint(id);
+  }
+
+  onRenameCheckpoint(id: string, label: string): void {
+    this.mapSession.renameCheckpoint(id, label);
   }
 }

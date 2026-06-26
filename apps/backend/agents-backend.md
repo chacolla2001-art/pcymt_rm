@@ -1,18 +1,34 @@
 # Backend — Contexto para IA
 
-Documentación completa del backend en [`../../AGENTS.md`](../../AGENTS.md) (secciones 4, 8, 9, 14).
+API REST Node.js + Express + Sequelize en `apps/backend/`.
 
-Este componente vive en `apps/backend/`.
+## Documentación
+
+| Archivo | Contenido |
+|---------|-----------|
+| [`../../AGENTS.md`](../../AGENTS.md) §4, 8, 9 | Endpoints, tablas, flujos |
+| [`../../docs/project-audit.md`](../../docs/project-audit.md) §3 | Auditoría: RBAC, Vercel, uploads |
+
+## Estado rápido (Jun 2026)
+
+- **Deploy:** Vercel serverless (`api/index.js`); PostgreSQL cloud (Supabase/Neon).
+- **Archivos:** lectura híbrida local/Supabase; **escritura Multer local** — problemática en Vercel.
+- **Avatares:** `predefinedAvatars.js`, `PATCH /api/users/:id/avatar`, listado en `GET /api/config`.
+- **Crítico:** RBAC casi ausente; tests integración con rutas legacy `/api/v1/`.
 
 ## Setup Supabase (cloud)
 
-Desde la raíz del monorepo:
-
 ```bash
-./scripts/supabase-login.sh          # autenticar CLI (una vez)
-./scripts/setup-supabase.sh          # uploads + migrate + seed
+./scripts/supabase-login.sh
+./scripts/setup-supabase.sh
 ```
 
-Variables opcionales: `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`.
+Variables: `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `SUPABASE_ACCESS_TOKEN`.
 
-Ver también: [`../../scripts/setup-supabase.sh`](../../scripts/setup-supabase.sh)
+## Comandos
+
+```bash
+cd apps/backend && npm install && npm run dev   # :5000
+npm test
+npm run db:reset
+```

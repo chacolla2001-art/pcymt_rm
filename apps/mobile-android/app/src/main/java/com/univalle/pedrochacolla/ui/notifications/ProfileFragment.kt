@@ -2,18 +2,24 @@ package com.univalle.pedrochacolla.ui.notifications
 
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.GridLayoutManager
+import com.bumptech.glide.Glide
 import com.univalle.pedrochacolla.databinding.FragmentProfileBinding
 import com.univalle.pedrochacolla.ui.auth.AuthActivity
+import com.univalle.pedrochacolla.utils.image.ImageUrlHelper
+import com.univalle.pedrochacolla.utils.image.AvatarResolver
 import com.univalle.pedrochacolla.utils.loading_screen.LoadingDialogFragment
 import com.univalle.pedrochacolla.utils.session.SessionManager
 import com.univalle.pedrochacolla.utils.session.UserSession
@@ -33,6 +39,23 @@ class ProfileFragment : Fragment() {
     }
 
     private var loadingDialog: LoadingDialogFragment? = null
+    private lateinit var avatarAdapter: AvatarPickerAdapter
+    private var selectedAvatarId: String? = null
+
+    private val pickProfilePhoto = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        val userId = UserSession.currentUser?.id ?: return@registerForActivityResult
+        val tempFile = uriToTempFile(uri) ?: run {
+            showError("No se pudo leer la imagen")
+            return@registerForActivityResult
+        }
+        if (tempFile.length() > 5 * 1024 * 1024) {
+            tempFile.delete()
+            showError("La imagen no debe superar 5 MB")
+            return@registerForActivityResult
+        }
+        viewModel.updatePhoto(userId, tempFile)
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -49,6 +72,10 @@ class ProfileFragment : Fragment() {
 
         populateUserData()
         configurePasswordSection()
+        setupAvatarPicker()
+        viewModel.loadAvatars()
+
+        binding.imgProfileAvatar.setOnClickListener { pickProfilePhoto.launch("image/*") }
 
         binding.btnBack.setOnClickListener { findNavController().popBackStack() }
 
@@ -63,6 +90,35 @@ class ProfileFragment : Fragment() {
     }
 
     /** Si el usuario autenticó con Google, la sección de contraseña no aplica. */
+    private fun setupAvatarPicker() {
+        avatarAdapter = AvatarPickerAdapter { avatar ->
+            val userId = UserSession.currentUser?.id ?: return@AvatarPickerAdapter
+            selectedAvatarId = avatar.id
+            avatarAdapter.submitList(viewModel.avatars.value, selectedAvatarId)
+            viewModel.setAvatar(userId, avatar.id)
+        }
+
+        binding.rvAvatarPicker.apply {
+            layoutManager = GridLayoutManager(requireContext(), 4)
+            adapter = avatarAdapter
+        }
+    }
+
+    private fun loadProfileAvatar(url: String?) {
+        var fullUrl = ImageUrlHelper.buildUrl(url) ?: ImageUrlHelper.buildDefaultUrl()
+        if (AvatarResolver.isUserScopedProfilePicture(url ?: "")) {
+            val separator = if (fullUrl.contains("?")) "&" else "?"
+            fullUrl = "$fullUrl${separator}v=${System.currentTimeMillis()}"
+        }
+        Glide.with(this)
+            .load(fullUrl)
+            .circleCrop()
+            .error(com.univalle.pedrochacolla.R.drawable.ic_launcher_foreground)
+            .fallback(com.univalle.pedrochacolla.R.drawable.ic_launcher_foreground)
+            .placeholder(com.univalle.pedrochacolla.R.drawable.ic_launcher_foreground)
+            .into(binding.imgProfileAvatar)
+    }
+
     private fun configurePasswordSection() {
         val isGoogleUser = !UserSession.currentUser?.googleId.isNullOrBlank()
         if (isGoogleUser) {
@@ -190,6 +246,30 @@ class ProfileFragment : Fragment() {
                         is ProfileUiState.Loading -> {
                             if (loadingDialog == null) showLoading()
                         }
+                        is ProfileUiState.AvatarsLoaded -> {
+                            selectedAvatarId = AvatarResolver.resolveSelectedId(
+                                UserSession.currentUser?.avatarUrl,
+                                state.avatars,
+                            )
+                            avatarAdapter.submitList(state.avatars, selectedAvatarId)
+                        }
+                        is ProfileUiState.AvatarUpdated -> {
+                            hideLoading()
+                            loadProfileAvatar(state.newUrl)
+                            selectedAvatarId = AvatarResolver.resolveSelectedId(
+                                state.newUrl,
+                                viewModel.avatars.value,
+                            )
+                            avatarAdapter.submitList(viewModel.avatars.value, selectedAvatarId)
+                            showSuccess("Avatar actualizado")
+                        }
+                        is ProfileUiState.PhotoUpdated -> {
+                            hideLoading()
+                            loadProfileAvatar(state.newUrl)
+                            selectedAvatarId = null
+                            avatarAdapter.submitList(viewModel.avatars.value, null)
+                            showSuccess("Foto de perfil actualizada")
+                        }
                         is ProfileUiState.PasswordChanged -> {
                             hideLoading()
                             showSuccess("Contraseña actualizada correctamente")
@@ -218,6 +298,18 @@ class ProfileFragment : Fragment() {
 
         if (user.name.isValid()) binding.etProfileUsername.setText(user.name)
         if (user.email.isValid()) binding.etProfileEmail.setText(user.email)
+        loadProfileAvatar(user.avatarUrl)
+    }
+
+    private fun uriToTempFile(uri: Uri): java.io.File? {
+        return try {
+            val input = requireContext().contentResolver.openInputStream(uri) ?: return null
+            val temp = java.io.File.createTempFile("profile_", ".jpg", requireContext().cacheDir)
+            temp.outputStream().use { output -> input.use { it.copyTo(output) } }
+            temp
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override fun onDestroyView() {

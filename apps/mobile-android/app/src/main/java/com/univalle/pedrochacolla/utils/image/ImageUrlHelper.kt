@@ -26,7 +26,9 @@ object ImageUrlHelper {
      * @return Full URL string, or `null` when input is blank.
      */
     fun buildUrl(relativePath: String?): String? {
-        if (relativePath.isNullOrBlank()) return null
+        if (relativePath.isNullOrBlank()) {
+            return Constants.URL_BASE + AvatarResolver.DEFAULT_AVATAR_PATH
+        }
 
         // External URL — return untouched
         if (relativePath.startsWith("http://") || relativePath.startsWith("https://")) {
@@ -34,12 +36,16 @@ object ImageUrlHelper {
         }
 
         // Normalise legacy /uploads/ paths → /api/files/
-        val normalised = if (relativePath.startsWith("/uploads/")) {
+        var normalised = if (relativePath.startsWith("/uploads/")) {
             relativePath.replaceFirst("/uploads/", "/api/files/")
         } else {
             relativePath
         }
 
+        normalised = AvatarResolver.normalizePath(normalised)
+
         return Constants.URL_BASE + normalised
     }
+
+    fun buildDefaultUrl(): String = Constants.URL_BASE + AvatarResolver.DEFAULT_AVATAR_PATH
 }

@@ -1,43 +1,55 @@
 <!-- Dashboard Principal -->
 <div class="dashboard-container">
 
+  @if (loadError) {
+    <div class="dashboard-error" role="alert">
+      <mat-icon>cloud_off</mat-icon>
+      <h2>{{ 'dashboard.loadErrorTitle' | translate }}</h2>
+      <p>{{ 'dashboard.loadErrorDesc' | translate }}</p>
+      <button mat-flat-button color="primary" type="button" (click)="retryLoad()">
+        <mat-icon>refresh</mat-icon>
+        {{ 'dashboard.retry' | translate }}
+      </button>
+    </div>
+  } @else if (!isLoadingMetrics) {
+
   <!-- ── Welcome Banner ── -->
   <div class="welcome-banner">
     <div class="welcome-text">
-      <p class="welcome-eyebrow">Parque de las Culturas y de la Madre Tierra</p>
-      <h1 class="welcome-title">Panel de Administración</h1>
+      <p class="welcome-eyebrow">{{ 'dashboard.eyebrow' | translate }}</p>
+      <h1 class="welcome-title">{{ 'dashboard.title' | translate }}</h1>
       <p class="welcome-date">{{ today | date:"EEEE, d 'de' MMMM 'de' yyyy" }}</p>
     </div>
 
     <div class="kpi-row">
-      <div class="kpi-chip" (click)="navigateToTable('users')">
+      <button type="button" class="kpi-chip" (click)="navigateToTable('users')" aria-label="Ver usuarios activos">
         <div class="kpi-icon users"><mat-icon>verified_user</mat-icon></div>
         <div class="kpi-content">
           <span class="kpi-value">{{ activeUsersCount }}</span>
-          <span class="kpi-label">Usuarios activos</span>
+          <span class="kpi-label">{{ 'dashboard.activeUsers' | translate }}</span>
         </div>
-      </div>
-      <div class="kpi-chip" (click)="navigateToTable('virtualAssets')">
+      </button>
+      <button type="button" class="kpi-chip" (click)="navigateToTable('virtualAssets')" aria-label="Ver modelos 3D">
         <div class="kpi-icon assets"><mat-icon>view_in_ar</mat-icon></div>
         <div class="kpi-content">
           <span class="kpi-value">{{ totalVirtualAssets }}</span>
-          <span class="kpi-label">Modelos 3D</span>
+          <span class="kpi-label">{{ 'dashboard.models3d' | translate }}</span>
         </div>
-      </div>
-      <div class="kpi-chip" (click)="navigateToTable('anchorPoints')">
+      </button>
+      <button type="button" class="kpi-chip" (click)="navigateToTable('anchorPoints')" aria-label="Ver ubicaciones">
         <div class="kpi-icon anchors"><mat-icon>place</mat-icon></div>
         <div class="kpi-content">
           <span class="kpi-value">{{ totalAnchorPoints }}</span>
-          <span class="kpi-label">Ubicaciones</span>
+          <span class="kpi-label">{{ 'dashboard.locations' | translate }}</span>
         </div>
-      </div>
-      <div class="kpi-chip" (click)="navigateToStats('interaction-stats')">
+      </button>
+      <button type="button" class="kpi-chip" (click)="navigateToStats('interaction-stats')" aria-label="Ver interacciones">
         <div class="kpi-icon interactions"><mat-icon>touch_app</mat-icon></div>
         <div class="kpi-content">
           <span class="kpi-value">{{ totalUserInteractions }}</span>
-          <span class="kpi-label">Interacciones</span>
+          <span class="kpi-label">{{ 'dashboard.interactions' | translate }}</span>
         </div>
-      </div>
+      </button>
     </div>
   </div>
 
@@ -45,55 +57,55 @@
   <section>
     <h2 class="section-heading">
       <mat-icon>apps</mat-icon>
-      Acceso Rápido
+      {{ 'dashboard.quickAccess' | translate }}
     </h2>
     <div class="quick-grid">
-      <button class="quick-card" (click)="navigateToTable('users')">
+      <button type="button" class="quick-card" (click)="navigateToTable('users')">
         <div class="qc-icon-wrap color-users"><mat-icon>group</mat-icon></div>
-        <span class="qc-title">Usuarios</span>
-        <span class="qc-sub">Gestión de cuentas</span>
+        <span class="qc-title">{{ 'dashboard.quickUsers' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickUsersSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateToTable('virtualAssets')">
+      <button type="button" class="quick-card" (click)="navigateToTable('virtualAssets')">
         <div class="qc-icon-wrap color-assets"><mat-icon>view_in_ar</mat-icon></div>
-        <span class="qc-title">Contenido 3D</span>
-        <span class="qc-sub">Animales virtuales</span>
+        <span class="qc-title">{{ 'dashboard.quickAssets' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickAssetsSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateToTable('anchorPoints')">
+      <button type="button" class="quick-card" (click)="navigateToTable('anchorPoints')">
         <div class="qc-icon-wrap color-anchors"><mat-icon>place</mat-icon></div>
-        <span class="qc-title">Ubicaciones</span>
-        <span class="qc-sub">Puntos de anclaje AR</span>
+        <span class="qc-title">{{ 'dashboard.quickAnchors' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickAnchorsSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateTo('/map')">
+      <button type="button" class="quick-card" (click)="navigateTo('/map')">
         <div class="qc-icon-wrap color-map"><mat-icon>map</mat-icon></div>
-        <span class="qc-title">Mapa del Parque</span>
-        <span class="qc-sub">Vista cartográfica</span>
+        <span class="qc-title">{{ 'dashboard.quickMap' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickMapSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateTo('/animator')">
+      <button type="button" class="quick-card" (click)="navigateTo('/animator')">
         <div class="qc-icon-wrap color-animator"><mat-icon>animation</mat-icon></div>
-        <span class="qc-title">Animador 3D</span>
-        <span class="qc-sub">Editor de modelos</span>
+        <span class="qc-title">{{ 'dashboard.quickAnimator' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickAnimatorSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateToStats('session-history')">
+      <button type="button" class="quick-card" (click)="navigateToStats('session-history')">
         <div class="qc-icon-wrap color-sessions"><mat-icon>login</mat-icon></div>
-        <span class="qc-title">Historial de Accesos</span>
-        <span class="qc-sub">Sesiones por usuario</span>
+        <span class="qc-title">{{ 'dashboard.quickSessions' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickSessionsSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateToStats('interaction-stats')">
+      <button type="button" class="quick-card" (click)="navigateToStats('interaction-stats')">
         <div class="qc-icon-wrap color-stats"><mat-icon>analytics</mat-icon></div>
-        <span class="qc-title">Interacciones</span>
-        <span class="qc-sub">Estadísticas por animal</span>
+        <span class="qc-title">{{ 'dashboard.quickStats' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickStatsSub' | translate }}</span>
       </button>
 
-      <button class="quick-card" (click)="navigateToStats('zone-visits')">
+      <button type="button" class="quick-card" (click)="navigateToStats('zone-visits')">
         <div class="qc-icon-wrap color-zones"><mat-icon>donut_large</mat-icon></div>
-        <span class="qc-title">Visitas por Zona</span>
-        <span class="qc-sub">Distribución del parque</span>
+        <span class="qc-title">{{ 'dashboard.quickZones' | translate }}</span>
+        <span class="qc-sub">{{ 'dashboard.quickZonesSub' | translate }}</span>
       </button>
     </div>
   </section>
@@ -101,33 +113,38 @@
   <!-- ── Actividad Reciente ── -->
   <h2 class="section-heading">
     <mat-icon>leaderboard</mat-icon>
-    Actividad Reciente
+    {{ 'dashboard.recentActivity' | translate }}
   </h2>
   <div class="rankings-grid">
     <!-- Top Animales Virtuales -->
-    <mat-card appearance="outlined" class="ranking-card clickable-ranking" (click)="navigateToStats('interaction-stats')">
+    <mat-card appearance="outlined" class="ranking-card">
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">pets</mat-icon>
-        <mat-card-title>Animales Más Visitados</mat-card-title>
-        <mat-card-subtitle>Top 5 por interacciones • Clic para ver detalle</mat-card-subtitle>
+        <mat-card-title>{{ 'dashboard.topAnimals' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'dashboard.topAnimalsSub' | translate }}</mat-card-subtitle>
+        <button mat-icon-button type="button" class="ranking-detail-btn"
+                [attr.aria-label]="'dashboard.viewDetail' | translate"
+                (click)="navigateToStats('interaction-stats')">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
       </mat-card-header>
       <mat-card-content>
         <mat-nav-list class="ranking-list">
           @for (asset of topVirtualAssets; track asset.id; let i = $index) {
-            <mat-list-item (click)="navigateToVirtualAsset(asset.id)" class="clickable-item">
+            <button mat-list-item type="button" (click)="navigateToVirtualAsset(asset.id)" class="clickable-item">
               @if (asset.icon_url) {
                 <img matListItemAvatar [src]="apiRoutes.getAssetUrl(asset.icon_url)" [alt]="asset.name" class="ranking-asset-icon" />
               } @else {
                 <span matListItemIcon class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
               }
               <span matListItemTitle>{{ asset.name }}</span>
-              <span matListItemMeta class="interaction-count">{{ asset.interactionCount }} visitas</span>
-            </mat-list-item>
+              <span matListItemMeta class="interaction-count">{{ asset.interactionCount }} {{ 'dashboard.visits' | translate }}</span>
+            </button>
           }
           @empty {
             <mat-list-item>
               <mat-icon matListItemIcon>info</mat-icon>
-              <span matListItemTitle>Aún no hay interacciones registradas</span>
+              <span matListItemTitle>{{ 'dashboard.noAnimalInteractions' | translate }}</span>
             </mat-list-item>
           }
         </mat-nav-list>
@@ -135,25 +152,30 @@
     </mat-card>
 
     <!-- Top Usuarios -->
-    <mat-card appearance="outlined" class="ranking-card clickable-ranking" (click)="navigateToStats('session-history')">
+    <mat-card appearance="outlined" class="ranking-card">
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">emoji_events</mat-icon>
-        <mat-card-title>Usuarios Más Activos</mat-card-title>
-        <mat-card-subtitle>Top 5 jugadores • Clic para ver detalle</mat-card-subtitle>
+        <mat-card-title>{{ 'dashboard.topUsers' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'dashboard.topUsersSub' | translate }}</mat-card-subtitle>
+        <button mat-icon-button type="button" class="ranking-detail-btn"
+                [attr.aria-label]="'dashboard.viewDetail' | translate"
+                (click)="navigateToStats('session-history')">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
       </mat-card-header>
       <mat-card-content>
         <mat-nav-list class="ranking-list">
           @for (user of topUsers; track user.id; let i = $index) {
-            <mat-list-item (click)="navigateToUser(user.id)" class="clickable-item">
+            <button mat-list-item type="button" (click)="navigateToUser(user.id)" class="clickable-item">
               <span matListItemIcon class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
               <span matListItemTitle>{{ user.name || user.email }}</span>
-              <span matListItemMeta class="interaction-count">{{ user.interactionCount }} interacciones</span>
-            </mat-list-item>
+              <span matListItemMeta class="interaction-count">{{ user.interactionCount }} {{ 'dashboard.userInteractions' | translate }}</span>
+            </button>
           }
           @empty {
             <mat-list-item>
               <mat-icon matListItemIcon>info</mat-icon>
-              <span matListItemTitle>Aún no hay actividad de usuarios</span>
+              <span matListItemTitle>{{ 'dashboard.noUserActivity' | translate }}</span>
             </mat-list-item>
           }
         </mat-nav-list>
@@ -161,18 +183,23 @@
     </mat-card>
 
     <!-- Distribución por Zona -->
-    <mat-card appearance="outlined" class="ranking-card chart-card clickable-ranking" (click)="navigateToStats('zone-visits')">
+    <mat-card appearance="outlined" class="ranking-card chart-card">
       <mat-card-header>
         <mat-icon mat-card-avatar class="metric-icon">donut_large</mat-icon>
-        <mat-card-title>Visitas por Zona</mat-card-title>
-        <mat-card-subtitle>Distribución geográfica • Clic para ver detalle</mat-card-subtitle>
+        <mat-card-title>{{ 'dashboard.zoneVisits' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'dashboard.zoneVisitsSub' | translate }}</mat-card-subtitle>
+        <button mat-icon-button type="button" class="ranking-detail-btn"
+                [attr.aria-label]="'dashboard.viewDetail' | translate"
+                (click)="navigateToStats('zone-visits')">
+          <mat-icon>open_in_new</mat-icon>
+        </button>
       </mat-card-header>
       <mat-card-content>
         <div class="section-buttons">
-          <button mat-stroked-button class="section-btn section-1" (click)="navigateToSection('Tierras Altas')">Tierras Altas</button>
-          <button mat-stroked-button class="section-btn section-2" (click)="navigateToSection('Tierras Medias')">Tierras Medias</button>
-          <button mat-stroked-button class="section-btn section-3" (click)="navigateToSection('Tierras Bajas')">Tierras Bajas</button>
-          <button mat-stroked-button class="section-btn section-4" (click)="navigateToSection('Mitos y Leyendas')">Mitos y Leyendas</button>
+          <button mat-stroked-button type="button" class="section-btn section-1" (click)="navigateToSection('Tierras Altas')">{{ 'dashboard.sectionHighlands' | translate }}</button>
+          <button mat-stroked-button type="button" class="section-btn section-2" (click)="navigateToSection('Tierras Medias')">{{ 'dashboard.sectionMidlands' | translate }}</button>
+          <button mat-stroked-button type="button" class="section-btn section-3" (click)="navigateToSection('Tierras Bajas')">{{ 'dashboard.sectionLowlands' | translate }}</button>
+          <button mat-stroked-button type="button" class="section-btn section-4" (click)="navigateToSection('Mitos y Leyendas')">{{ 'dashboard.sectionMyths' | translate }}</button>
         </div>
         <div class="chart-container-small">
           <canvas baseChart [data]="sectionChartData" [type]="'doughnut'"></canvas>
@@ -180,5 +207,7 @@
       </mat-card-content>
     </mat-card>
   </div>
+
+  }
 
 </div>

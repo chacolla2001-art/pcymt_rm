@@ -2,6 +2,7 @@ import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiErrorCode, API_ERROR_CODES, ApiErrorResponse } from '../models/api-response.model';
+import { codeFromHttpStatus } from '../utils/api-error.util';
 
 /** Niveles de log */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -176,16 +177,7 @@ export class LoggerService {
 
   /** Mapea código HTTP a código de error de la API */
   private getCodeFromStatus(status: number): ApiErrorCode {
-    const mapping: Record<number, ApiErrorCode> = {
-      400: API_ERROR_CODES.VALIDATION_ERROR,
-      401: API_ERROR_CODES.UNAUTHORIZED,
-      403: API_ERROR_CODES.FORBIDDEN,
-      404: API_ERROR_CODES.NOT_FOUND,
-      409: API_ERROR_CODES.CONFLICT,
-      422: API_ERROR_CODES.VALIDATION_ERROR,
-      429: API_ERROR_CODES.RATE_LIMITED,
-    };
-    return mapping[status] || API_ERROR_CODES.INTERNAL_ERROR;
+    return codeFromHttpStatus(status);
   }
 
   /** Escribe una entrada de log */

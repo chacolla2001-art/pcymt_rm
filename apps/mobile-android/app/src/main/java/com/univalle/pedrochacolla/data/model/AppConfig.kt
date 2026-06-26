@@ -9,7 +9,14 @@ import com.google.gson.annotations.SerializedName
 data class AppConfig(
     val google: GoogleConfig? = null,
     val arcore: ARCoreConfig? = null,
-    val features: FeaturesConfig? = null
+    val features: FeaturesConfig? = null,
+    val avatars: List<PredefinedAvatar>? = null
+)
+
+data class PredefinedAvatar(
+    val id: String,
+    val label: String,
+    val url: String
 )
 
 data class GoogleConfig(

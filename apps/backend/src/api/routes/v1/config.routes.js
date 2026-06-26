@@ -1,4 +1,5 @@
 const express = require('express');
+const { staffOnly } = require('../../middlewares/authorize.middleware');
 
 /**
  * Create config routes
@@ -12,11 +13,14 @@ const createConfigRoutes = (configController, authMiddleware) => {
   // GET /api/config - Get public configuration (no auth)
   router.get('/', configController.getPublicConfig);
 
-  // PUT /api/config - Update mutable config (auth required)
-  router.put('/', authMiddleware, configController.updateConfig);
+  // GET /api/config/park-data - Shared park geometry (no auth)
+  router.get('/park-data', configController.getParkData);
 
-  // POST /api/config/arcore-token - Generate ARCore session token (auth required)
-  router.post('/arcore-token', authMiddleware, configController.getArcoreToken);
+  // PUT /api/config - Update mutable config (auth required)
+  router.put('/', authMiddleware, staffOnly, configController.updateConfig);
+
+  // POST /api/config/arcore-token - Generate ARCore session token (staff only)
+  router.post('/arcore-token', authMiddleware, staffOnly, configController.getArcoreToken);
 
   return router;
 };

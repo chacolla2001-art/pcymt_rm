@@ -1,0 +1,76 @@
+// Semantic color tokens — KPI tiles, roles, badges, park sections, rankings.
+// Use var(--semantic-*) in components instead of hardcoded hex values.
+
+:root {
+  // KPI icons (on gradient hero)
+  --semantic-kpi-users-bg: color-mix(in srgb, var(--sys-tertiary) 30%, transparent);
+  --semantic-kpi-assets-bg: color-mix(in srgb, var(--sys-primary) 30%, transparent);
+  --semantic-kpi-anchors-bg: color-mix(in srgb, var(--sys-secondary) 30%, transparent);
+  --semantic-kpi-interactions-bg: color-mix(in srgb, var(--sys-error) 25%, transparent);
+
+  // Quick-access tile accents
+  --semantic-qc-users-bg: color-mix(in srgb, var(--sys-tertiary) 18%, var(--sys-surface));
+  --semantic-qc-users-fg: var(--sys-tertiary);
+  --semantic-qc-assets-bg: color-mix(in srgb, var(--sys-primary) 18%, var(--sys-surface));
+  --semantic-qc-assets-fg: var(--sys-primary);
+  --semantic-qc-anchors-bg: color-mix(in srgb, var(--sys-secondary) 18%, var(--sys-surface));
+  --semantic-qc-anchors-fg: var(--sys-secondary);
+  --semantic-qc-map-bg: color-mix(in srgb, var(--sys-tertiary) 14%, var(--sys-surface));
+  --semantic-qc-map-fg: var(--sys-tertiary);
+  --semantic-qc-animator-bg: color-mix(in srgb, var(--sys-primary) 14%, var(--sys-surface-container));
+  --semantic-qc-animator-fg: var(--sys-primary);
+  --semantic-qc-sessions-bg: color-mix(in srgb, var(--sys-primary) 12%, var(--sys-surface-container-high));
+  --semantic-qc-sessions-fg: var(--sys-primary);
+  --semantic-qc-stats-bg: color-mix(in srgb, var(--sys-error) 12%, var(--sys-surface));
+  --semantic-qc-stats-fg: var(--sys-error);
+  --semantic-qc-zones-bg: color-mix(in srgb, var(--sys-secondary) 14%, var(--sys-surface));
+  --semantic-qc-zones-fg: var(--sys-secondary);
+
+  // Park section brand palette
+  --semantic-section-1: #8D6E63;
+  --semantic-section-1-fg: #5D4037;
+  --semantic-section-1-hover: #EFEBE9;
+  --semantic-section-2: #66BB6A;
+  --semantic-section-2-fg: #2E7D32;
+  --semantic-section-2-hover: #E8F5E9;
+  --semantic-section-3: #42A5F5;
+  --semantic-section-3-fg: #1565C0;
+  --semantic-section-3-hover: #E3F2FD;
+  --semantic-section-4: #AB47BC;
+  --semantic-section-4-fg: #7B1FA2;
+  --semantic-section-4-hover: #F3E5F5;
+  --semantic-section-unknown: #9E9E9E;
+
+  // User roles
+  --semantic-role-admin: var(--sys-error);
+  --semantic-role-moderator: var(--sys-primary);
+  --semantic-role-user: var(--sys-tertiary);
+
+  // User status badges
+  --semantic-status-active-bg: color-mix(in srgb, var(--sys-tertiary) 12%, transparent);
+  --semantic-status-active-fg: var(--sys-tertiary);
+  --semantic-status-inactive-bg: color-mix(in srgb, var(--sys-on-surface-variant) 12%, transparent);
+  --semantic-status-inactive-fg: var(--sys-on-surface-variant);
+
+  // Ranking medals (top 3)
+  --semantic-rank-gold: #FFD700;
+  --semantic-rank-gold-fg: #333333;
+  --semantic-rank-silver: #C0C0C0;
+  --semantic-rank-silver-fg: #333333;
+  --semantic-rank-bronze: #CD7F32;
+  --semantic-rank-bronze-fg: #ffffff;
+  --semantic-rank-gold-soft: color-mix(in srgb, var(--semantic-rank-gold) 25%, transparent);
+  --semantic-rank-silver-soft: color-mix(in srgb, var(--semantic-rank-silver) 25%, transparent);
+  --semantic-rank-bronze-soft: color-mix(in srgb, var(--semantic-rank-bronze) 25%, transparent);
+}
+
+html.dark-theme {
+  --semantic-section-1-fg: #BCAAA4;
+  --semantic-section-2-fg: #A5D6A7;
+  --semantic-section-3-fg: #90CAF9;
+  --semantic-section-4-fg: #CE93D8;
+  --semantic-section-1-hover: color-mix(in srgb, var(--semantic-section-1) 20%, transparent);
+  --semantic-section-2-hover: color-mix(in srgb, var(--semantic-section-2) 20%, transparent);
+  --semantic-section-3-hover: color-mix(in srgb, var(--semantic-section-3) 20%, transparent);
+  --semantic-section-4-hover: color-mix(in srgb, var(--semantic-section-4) 20%, transparent);
+}

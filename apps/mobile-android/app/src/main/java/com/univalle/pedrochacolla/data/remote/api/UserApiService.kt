@@ -27,6 +27,12 @@ interface UserApiService {
         @Part photo: MultipartBody.Part
     ): Response<ApiResponse<Map<String, String>>>
 
+    @PATCH("api/users/{id}/avatar")
+    suspend fun setAvatar(
+        @Path("id") id: String,
+        @Body request: SetAvatarRequest
+    ): Response<ApiResponse<Map<String, String>>>
+
     @POST("api/users/check-email")
     suspend fun checkEmailExists(
         @Body request: Map<String, String>
@@ -79,4 +85,8 @@ data class ChangePasswordRequest(
 
 data class DeleteAccountRequest(
     val currentPassword: String? = null
+)
+
+data class SetAvatarRequest(
+    val avatar_id: String
 )

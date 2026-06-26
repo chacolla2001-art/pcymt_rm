@@ -48,6 +48,12 @@ jobs:
         working-directory: ./apps/backend
         run: npm ci
 
+      - name: Run database migrations
+        working-directory: ./apps/backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: npx sequelize-cli db:migrate
+
       - name: Run linter
         working-directory: ./apps/backend
         run: npm run lint
@@ -58,7 +64,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           JWT_SECRET: test-jwt-secret-for-ci-pipeline-minimum-64-characters-required
           NODE_ENV: test
-        run: npm run test:coverage
+        run: npm test
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3

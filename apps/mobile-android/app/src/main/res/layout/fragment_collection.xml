@@ -218,6 +218,22 @@
 
             </LinearLayout>
 
+            <TextView
+                android:id="@+id/banner_out_of_bounds"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginTop="10dp"
+                android:background="#CCB71C1C"
+                android:gravity="center"
+                android:padding="10dp"
+                android:text="@string/out_of_park_banner"
+                android:textColor="#FFFFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
             <!-- ════════════════════════════════
                  ANIMALES CAPTURADOS (trofeos)
                  ════════════════════════════════ -->
@@ -317,7 +333,7 @@
                             android:id="@+id/tvCardExplorerTitle"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="JUGAR"
+                            android:text="EXPLORAR EL PARQUE"
                             android:textSize="20sp"
                             android:textStyle="bold"
                             android:fontFamily="sans-serif-black"
@@ -329,7 +345,7 @@
                             android:id="@+id/tvCardExplorerSubtitle"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Busca animales en el parque"
+                            android:text="Encuentra animales con Juku Go"
                             android:textSize="11sp"
                             android:textColor="#DDF2C4BF" />
 

@@ -5,9 +5,9 @@ const { SYSTEM_USER } = require('../../shared/constants');
  * VirtualAsset Controller - HTTP request handlers
  */
 class VirtualAssetController {
-  constructor(virtualAssetService, fileUploadService) {
+  constructor(virtualAssetService, hybridStorageService) {
     this.service = virtualAssetService;
-    this.uploadService = fileUploadService;
+    this.storage = hybridStorageService;
   }
 
   /**
@@ -62,15 +62,17 @@ class VirtualAssetController {
     try {
       const changedBy = req.user?.id || SYSTEM_USER;
 
-      // Validate required files exist with proper array check
       if (!req.files?.model_url?.[0] || !req.files?.icon_url?.[0]) {
         return ResponseUtil.error(res, 'model_url and icon_url files are required', 400);
       }
 
+      const modelUrl = await this.storage.persistDiskFile(req.files.model_url[0]);
+      const iconUrl = await this.storage.persistDiskFile(req.files.icon_url[0]);
+
       const data = {
         ...req.body,
-        model_url: this.uploadService.getPublicUrl(req.files.model_url[0].filename),
-        icon_url: this.uploadService.getPublicUrl(req.files.icon_url[0].filename),
+        model_url: modelUrl,
+        icon_url: iconUrl,
       };
 
       const asset = await this.service.create(data, changedBy);
@@ -96,10 +98,10 @@ class VirtualAssetController {
       };
 
       if (req.files?.model_url?.[0]) {
-        data.model_url = this.uploadService.getPublicUrl(req.files.model_url[0].filename);
+        data.model_url = await this.storage.persistDiskFile(req.files.model_url[0]);
       }
       if (req.files?.icon_url?.[0]) {
-        data.icon_url = this.uploadService.getPublicUrl(req.files.icon_url[0].filename);
+        data.icon_url = await this.storage.persistDiskFile(req.files.icon_url[0]);
       }
 
       const asset = await this.service.update(req.params.id, data, changedBy);
@@ -124,7 +126,7 @@ class VirtualAssetController {
   };
 
   /**
-   * Soft delete virtual asset
+   * Deactivate virtual asset
    * PATCH /api/virtual-assets/:id/deactivate
    */
   deactivate = async (req, res, next) => {

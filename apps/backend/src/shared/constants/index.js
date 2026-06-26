@@ -1,5 +1,6 @@
 const HTTP_STATUS = require('./httpStatus');
 const { ROLES, ROLE_VALUES } = require('./roles');
+const API_ERROR_DEFINITIONS = require('./api-error-codes.json');
 
 // System constants
 const SYSTEM_USER = 'sistema';
@@ -32,16 +33,8 @@ const PATTERNS = Object.freeze({
   SLUG: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
 });
 
-// Error codes for client handling
-const ERROR_CODES = Object.freeze({
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  NOT_FOUND: 'NOT_FOUND',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  CONFLICT: 'CONFLICT',
-  RATE_LIMITED: 'RATE_LIMITED',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
-});
+// Error codes for client handling (sync: shared/constants/api-error-codes.json)
+const ERROR_CODES = Object.freeze({ ...API_ERROR_DEFINITIONS.codes });
 
 // Platform types for sessions
 const PLATFORMS = Object.freeze({

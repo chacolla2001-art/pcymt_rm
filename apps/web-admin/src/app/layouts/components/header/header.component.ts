@@ -1,4 +1,4 @@
-import { Component, inject, Output, EventEmitter } from '@angular/core';
+import { Component, inject, Output, EventEmitter, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +14,9 @@ import { UserService } from '../../../features/users/services/user.service';
 import { AlertService } from '../../../core/services/alert.service';
 import { ApiRoutesService } from '../../../core/services/api-routes.service';
 import { CreateDialogComponent } from '@shared/modal-dialogs/create-dialog';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
+import { UserAvatarService } from '../../../core/services/user-avatar.service';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 /**
  * REFACTORED HeaderComponent
@@ -38,13 +41,16 @@ import { CreateDialogComponent } from '@shared/modal-dialogs/create-dialog';
     MatButtonModule,
     MatMenuModule,
     MatDividerModule,
-    MatTooltipModule
+    MatTooltipModule,
+    TranslatePipe,
   ]
 })
-export class HeaderComponent {
+export class HeaderComponent implements OnInit {
   readonly dialog = inject(MatDialog);
   readonly themeManager = inject(ThemeManagerService);
   readonly apiRoutes = inject(ApiRoutesService);
+  private readonly shellLoad = inject(AppShellLoadService);
+  readonly userAvatar = inject(UserAvatarService);
 
   // Event emitters for navigation (if parent wants to handle it)
   @Output() navigateTo = new EventEmitter<string>();
@@ -55,8 +61,6 @@ export class HeaderComponent {
   userRol: string = '';
   /** Primer nombre del usuario */
   userFirstName: string = '';
-  /** URL de la imagen de perfil */
-  profileImageUrl: string | null = null;
 
   get isDarkMode(): boolean {
     return this.themeManager.isDarkMode();
@@ -94,28 +98,11 @@ export class HeaderComponent {
   }
 
   ngOnInit(): void {
-    // Inicializar la imagen de perfil
-    this.initProfileImage();
+    this.shellLoad.warmImageCache(this.userAvatar.displayUrl());
 
-    // Escucha los cambios de pantalla completa (activado/desactivado)
-    document.addEventListener("fullscreenchange", () => {
+    document.addEventListener('fullscreenchange', () => {
       this.isFullscreen = !!document.fullscreenElement;
     });
-  }
-
-  private initProfileImage(): void {
-    const rawUrl = this.authService.currentUser?.avatar_url ?? '';
-    if (!rawUrl) {
-      this.profileImageUrl = null;
-      return;
-    }
-
-    // Si la URL viene de Google, úsala tal cual; si no, antepone el API URL
-    if (rawUrl.includes('googleusercontent.com')) {
-      this.profileImageUrl = rawUrl;
-    } else {
-      this.profileImageUrl = this.apiRoutes.getAssetUrl(rawUrl);
-    }
   }
 
   toggleDrawer() {
@@ -168,23 +155,9 @@ export class HeaderComponent {
     }
 
     this.userService.updateProfilePicture(userId, file).subscribe({
-      next: (response: { profile_picture_url: string }) => {
-        // Actualizar la URL de la imagen con cache-busting
-        const rawUrl = response.profile_picture_url ?? '';
-        const cacheBuster = `&t=${Date.now()}`;
-        if (rawUrl.includes('googleusercontent.com')) {
-          this.profileImageUrl = rawUrl;
-        } else {
-          this.profileImageUrl = this.apiRoutes.getAssetUrl(rawUrl) + cacheBuster;
-        }
-
-        // Actualizar el usuario en el AuthService
-        const currentUser = this.authService.currentUser;
-        if (currentUser) {
-          currentUser.avatar_url = rawUrl;
-          this.authService.updateCurrentUser(currentUser);
-        }
-
+      next: (response: { profile_picture_url: string; avatar_url?: string }) => {
+        const rawUrl = response.avatar_url ?? response.profile_picture_url ?? '';
+        this.userAvatar.applyAvatar(rawUrl);
         this.alertService.showAlert('Foto de perfil actualizada correctamente', 'success');
       },
       error: () => {

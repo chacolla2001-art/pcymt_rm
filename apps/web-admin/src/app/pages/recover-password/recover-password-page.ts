@@ -1,16 +1,15 @@
-import { Component, Inject, PLATFORM_ID, OnDestroy } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar } from '@angular/material/snack-bar';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { ThemeManagerService } from '../../core/services/theme-manager.service';
 import { UserService } from '../../features/users/services/user.service';
-import { AlertService } from '../../core/services/alert.service';
+
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 @Component({
   selector: 'app-recover-password-page',
@@ -26,6 +25,7 @@ import { AlertService } from '../../core/services/alert.service';
     MatIconModule,
     ReactiveFormsModule,
     MatProgressSpinnerModule,
+    TranslatePipe,
   ],
 })
 export class RecoverPasswordPageComponent implements OnDestroy {
@@ -34,47 +34,37 @@ export class RecoverPasswordPageComponent implements OnDestroy {
   showSuccessMessage = false;
   canResend = true;
   countdown = 0;
-  private countdownInterval: any;
+  private countdownInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
-    private fb: FormBuilder,
-    private snackBar: MatSnackBar,
-    private router: Router,
-    private userService: UserService,
-    @Inject(PLATFORM_ID) private platformId: Object,
-    private themeService: ThemeManagerService,
-    private alertService: AlertService
+    private readonly fb: FormBuilder,
+    private readonly userService: UserService,
   ) {
     this.recoverPasswordForm = this.fb.group({
       email: ['', [Validators.required, Validators.email]],
     });
   }
 
-  get email() {
-    return this.recoverPasswordForm.get('email');
+  onSubmit(): void {
+    if (!this.recoverPasswordForm.valid || !this.canResend) {
+      return;
+    }
+
+    this.isLoading = true;
+    this.recoverPasswordForm.disable();
+
+    const email = this.recoverPasswordForm.value.email;
+    this.userService.recoverPassword(email).subscribe({
+      next: () => this.onRequestFinished(),
+      error: () => this.onRequestFinished(),
+    });
   }
 
-  onSubmit(): void {
-    if (this.recoverPasswordForm.valid && this.canResend) {
-      this.isLoading = true;
-      this.recoverPasswordForm.disable();
-
-      const email = this.recoverPasswordForm.value.email;
-      this.userService.recoverPassword(email).subscribe({
-        next: () => {
-          this.isLoading = false;
-          this.recoverPasswordForm.enable();
-          this.showSuccessMessage = true;
-          this.startCountdown();
-        },
-        error: () => {
-          this.isLoading = false;
-          this.recoverPasswordForm.enable();
-          this.showSuccessMessage = true;
-          this.startCountdown();
-        },
-      });
-    }
+  private onRequestFinished(): void {
+    this.isLoading = false;
+    this.recoverPasswordForm.enable();
+    this.showSuccessMessage = true;
+    this.startCountdown();
   }
 
   private startCountdown(): void {
@@ -82,10 +72,13 @@ export class RecoverPasswordPageComponent implements OnDestroy {
     this.countdown = 60;
 
     this.countdownInterval = setInterval(() => {
-      this.countdown--;
+      this.countdown -= 1;
       if (this.countdown <= 0) {
         this.canResend = true;
-        clearInterval(this.countdownInterval);
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
       }
     }, 1000);
   }

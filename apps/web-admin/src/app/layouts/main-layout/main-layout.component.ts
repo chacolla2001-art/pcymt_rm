@@ -1,6 +1,6 @@
 import { isPlatformBrowser } from '@angular/common';
-import { Component, ViewChild, HostListener, Inject, PLATFORM_ID } from '@angular/core';
-import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
+import { Component, ViewChild, HostListener, Inject, PLATFORM_ID, inject, AfterViewInit } from '@angular/core';
+import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationStart } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDrawer, MatSidenavModule } from '@angular/material/sidenav';
@@ -9,6 +9,8 @@ import { DrawerService } from '../../core/services/drawer.service';
 import { HeaderComponent } from '../components/header/header.component';
 import { FooterComponent } from '../components/footer/footer.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { AppShellLoadService } from '../../core/services/app-shell-load.service';
+import { ShellLoadOverlayComponent } from '../../shared/components/shell-load-overlay/shell-load-overlay.component';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -39,15 +41,19 @@ const MOBILE_BREAKPOINT = 768;
   standalone: true,
   imports: [
     RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
     MatIconModule,
     MatSidenavModule,
     MatButtonModule,
     HeaderComponent,
     FooterComponent,
     TranslatePipe,
+    ShellLoadOverlayComponent,
   ]
 })
-export class MainLayoutComponent {
+export class MainLayoutComponent implements AfterViewInit {
+  readonly shellLoad = inject(AppShellLoadService);
   @ViewChild('drawer') drawer!: MatDrawer;
 
   // Responsive: detectar si es móvil
@@ -69,10 +75,18 @@ export class MainLayoutComponent {
 
     // Listen to route changes to highlight active nav item
     if (this.isBrowser) {
+      this.activeRoute = this.router.url.split('?')[0];
+      this.shellLoad.warmImageCache('assets/images/logo.png');
+
+      if (this.router.navigated) {
+        this.shellLoad.beginNavigation(this.router.url);
+      }
+
       this.router.events
-        .pipe(filter(event => event instanceof NavigationEnd))
-        .subscribe((event: any) => {
-          this.activeRoute = event.urlAfterRedirects.split('?')[0];
+        .pipe(filter(event => event instanceof NavigationStart))
+        .subscribe((event: NavigationStart) => {
+          this.activeRoute = event.url.split('?')[0];
+          this.shellLoad.beginNavigation(event.url);
         });
     }
   }
@@ -89,33 +103,19 @@ export class MainLayoutComponent {
   }
 
   ngAfterViewInit() {
-    // Solo ejecutar en el navegador
     if (!this.isBrowser) return;
 
     this.drawerService.setDrawer(this.drawer);
 
-    // Open drawer by default on desktop
     if (!this.isMobile) {
       this.drawer.open();
     }
   }
 
-  /**
-   * Navigate to a specific route
-   * Called by nav buttons in the sidenav
-   */
-  navigateTo(route: string): void {
-    this.router.navigate([`/${route}`]);
+  closeDrawerIfMobile(): void {
     if (this.isMobile) {
       this.drawer.close();
     }
-  }
-
-  /**
-   * Check if a route is currently active
-   */
-  isRouteActive(route: string): boolean {
-    return this.activeRoute.includes(route);
   }
 
   /** Whether user is currently on the map page (hide footer to maximize space) */

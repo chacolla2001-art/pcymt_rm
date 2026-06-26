@@ -1,4 +1,5 @@
 const { ROLES } = require('../../shared/constants');
+const { WEB_ALLOWED_ROLES } = require('../../shared/constants/roles');
 const { ForbiddenError } = require('../../shared/errors');
 
 /**
@@ -29,6 +30,11 @@ const authorize = (...allowedRoles) => {
 const adminOnly = authorize(ROLES.ADMIN);
 
 /**
+ * Staff middleware — admin and moderator (web panel / content management)
+ */
+const staffOnly = authorize(...WEB_ALLOWED_ROLES);
+
+/**
  * Any authenticated user middleware (just checks if user exists)
  */
 const authenticated = (req, res, next) => {
@@ -41,5 +47,6 @@ const authenticated = (req, res, next) => {
 module.exports = {
   authorize,
   adminOnly,
+  staffOnly,
   authenticated,
 };

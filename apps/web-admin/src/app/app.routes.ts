@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { LoginRedirectGuard } from './core/guards/login-redirect.guard';
 import { AuthGuard } from './core/guards/auth.guard';
+import { StaffGuard } from './core/guards/staff.guard';
+import { CHART_ROUTE_PROVIDERS } from './core/providers/chart.providers';
 
 /**
  * RESTRUCTURED ROUTES - Angular Best Practices
@@ -23,16 +25,22 @@ export const routes: Routes = [
     path: 'recover-password',
     loadComponent: () => import('./pages/recover-password/recover-password-page').then(m => m.RecoverPasswordPageComponent)
   },
+  {
+    path: 'access-denied',
+    loadComponent: () => import('./pages/access-denied/access-denied-page').then(m => m.AccessDeniedPageComponent),
+    canActivate: [AuthGuard]
+  },
 
   // Main application routes (with layout)
   {
     path: '',
     loadComponent: () => import('./layouts/main-layout/main-layout.component').then(m => m.MainLayoutComponent),
-    canActivate: [AuthGuard],
+    canActivate: [AuthGuard, StaffGuard],
     children: [
       {
         path: 'dashboard',
         loadComponent: () => import('./features/dashboard/containers/dashboard-container.component').then(m => m.DashboardContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Dashboard' }
       },
       {
@@ -64,27 +72,32 @@ export const routes: Routes = [
       {
         path: 'stats/session-history',
         loadComponent: () => import('./features/stats/containers/session-history-container.component').then(m => m.SessionHistoryContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Historial de Accesos' }
       },
       {
         path: 'stats/interaction-stats',
         loadComponent: () => import('./features/stats/containers/interaction-stats-container.component').then(m => m.InteractionStatsContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Interacciones por Animal' }
       },
       {
         path: 'stats/zone-visits',
         loadComponent: () => import('./features/stats/containers/zone-visits-container.component').then(m => m.ZoneVisitsContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Visitas por Zona' }
       },
       // — Estadísticas por Usuario —
       {
         path: 'stats/user-interactions',
         loadComponent: () => import('./features/stats/containers/user-interaction-stats-container.component').then(m => m.UserInteractionStatsContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Interacciones por Usuario' }
       },
       {
         path: 'stats/user-access',
         loadComponent: () => import('./features/stats/containers/user-access-patterns-container.component').then(m => m.UserAccessPatternsContainerComponent),
+        providers: [CHART_ROUTE_PROVIDERS],
         data: { title: 'Accesos por Usuario' }
       },
       {

@@ -48,9 +48,4 @@ object NetworkModule {
     @Singleton
     fun provideUserApi(retrofit: Retrofit): UserApiService =
         retrofit.create(UserApiService::class.java)
-
-    @Provides
-    @Singleton
-    fun provideMapTileApi(retrofit: Retrofit): MapTileApiService =
-        retrofit.create(MapTileApiService::class.java)
 }

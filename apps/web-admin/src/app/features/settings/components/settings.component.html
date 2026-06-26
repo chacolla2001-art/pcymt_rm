@@ -9,11 +9,57 @@
     </div>
   </div>
 
-  @if (loading) {
-    <div class="loading-container">
-      <mat-spinner diameter="48"></mat-spinner>
-    </div>
-  } @else {
+  @if (!loading) {
+
+    <!-- Perfil / Avatar -->
+    <mat-card class="settings-card" appearance="outlined">
+      <mat-card-header>
+        <mat-icon mat-card-avatar class="card-icon profile-icon">account_circle</mat-icon>
+        <mat-card-title>{{ 'settings.profile' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'settings.profileDesc' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="avatar-current-row">
+          <button type="button" class="avatar-current-btn" (click)="photoInput.click()" [attr.aria-label]="'settings.avatarUpload' | translate">
+            <img
+              [src]="currentAvatarUrl || userAvatar.displayUrl()"
+              (error)="userAvatar.onAvatarImageError($event)"
+              alt=""
+              class="avatar-current" />
+            <span class="avatar-upload-badge"><mat-icon>photo_camera</mat-icon></span>
+          </button>
+          <input #photoInput type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden (change)="onPhotoSelected($event)" />
+          <div>
+            <p class="setting-label">{{ 'settings.avatarCurrent' | translate }}</p>
+            <p class="setting-description">{{ authService.currentUser?.name }} · {{ authService.currentUser?.email }}</p>
+            <p class="setting-hint">{{ 'settings.avatarUploadHint' | translate }}</p>
+          </div>
+        </div>
+
+        <p class="setting-label avatar-grid-label">{{ 'settings.avatarSelect' | translate }}</p>
+        <div class="avatar-grid">
+          @for (avatar of avatars; track avatar.id) {
+            <button
+              type="button"
+              class="avatar-option"
+              [class.selected]="isAvatarSelected(avatar)"
+              [disabled]="savingAvatar"
+              (click)="selectAvatar(avatar)"
+              [attr.aria-label]="avatar.label">
+          <img [src]="userAvatar.buildPredefinedUrl(avatar)" [alt]="avatar.label" loading="lazy" />
+              <span>{{ avatar.label }}</span>
+            </button>
+          }
+        </div>
+        @if (savingAvatar) {
+          <div class="avatar-saving">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span>{{ 'settings.avatarSaving' | translate }}</span>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
 
     <!-- ARCore Cloud Anchors Section -->
     <mat-card class="settings-card" appearance="outlined">
@@ -99,6 +145,32 @@
       </mat-card-header>
 
       <mat-card-content>
+        <div class="setting-group">
+          <label class="setting-label">{{ 'settings.theme' | translate }}</label>
+          <p class="setting-description">{{ 'settings.themeDesc' | translate }}</p>
+
+          <div class="language-grid theme-grid">
+            <button mat-stroked-button class="lang-btn" type="button"
+                    [class.active]="themeManager.themeMode() === 'light'"
+                    (click)="setThemeMode('light')">
+              <mat-icon>light_mode</mat-icon>
+              <span class="lang-label">{{ 'settings.themeLight' | translate }}</span>
+            </button>
+            <button mat-stroked-button class="lang-btn" type="button"
+                    [class.active]="themeManager.themeMode() === 'dark'"
+                    (click)="setThemeMode('dark')">
+              <mat-icon>dark_mode</mat-icon>
+              <span class="lang-label">{{ 'settings.themeDark' | translate }}</span>
+            </button>
+            <button mat-stroked-button class="lang-btn" type="button"
+                    [class.active]="themeManager.themeMode() === 'system'"
+                    (click)="setThemeMode('system')">
+              <mat-icon>contrast</mat-icon>
+              <span class="lang-label">{{ 'settings.themeSystem' | translate }}</span>
+            </button>
+          </div>
+        </div>
+
         <div class="setting-group">
           <label class="setting-label">{{ 'settings.language' | translate }}</label>
           <p class="setting-description">{{ 'settings.languageDesc' | translate }}</p>

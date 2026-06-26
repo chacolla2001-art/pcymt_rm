@@ -8,7 +8,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.findNavController
 import com.univalle.pedrochacolla.databinding.ActivityMainBinding
+import com.univalle.pedrochacolla.ui.onboarding.OnboardingActivity
 import com.univalle.pedrochacolla.ui.ar.ArFragment
+import com.univalle.pedrochacolla.utils.onboarding.OnboardingPreferences
 import com.univalle.pedrochacolla.ui.auth.AuthActivity
 import com.univalle.pedrochacolla.utils.ar.ArDeviceCompatibility
 import com.univalle.pedrochacolla.utils.ar.InteractionTracker
@@ -31,6 +33,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (!OnboardingPreferences(this).isCompleted()) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+            return
+        }
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)

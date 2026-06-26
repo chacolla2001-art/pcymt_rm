@@ -1,160 +1,171 @@
 package com.univalle.pedrochacolla.data.remote.error
 
 import com.univalle.pedrochacolla.data.model.ApiResponse
+import org.json.JSONArray
 import org.json.JSONObject
 import retrofit2.Response
 import timber.log.Timber
 
-/**
- * ApiErrorMapper - Extension functions to convert Retrofit responses to ApiError
- *
- * Usage in Repository:
- * ```
- * val response = api.getData()
- * if (!response.isSuccessful) {
- *     return Result.failure(response.toApiError())
- * }
- * ```
- */
+private data class ParsedApiError(
+    val message: String?,
+    val code: String?,
+    val fieldErrors: Map<String, String>?,
+)
 
 /**
- * Convert Retrofit Response to ApiError
- *
- * Classifies errors into specific types based on:
- * - HTTP status code (401, 403, 404, 500, etc.)
- * - Response body (API message if available)
- * - Network errors (timeout, no connection)
- *
- * @return ApiError with appropriate subtype
+ * Convert Retrofit Response to ApiError using shared API error codes.
  */
 fun <T> Response<T>.toApiError(): ApiError {
-    val code = this.code()
+    val httpCode = this.code()
     val errorBody = this.errorBody()?.string()
 
-    Timber.w("toApiError: HTTP $code - ${errorBody?.take(200)}")
+    Timber.w("toApiError: HTTP $httpCode - ${errorBody?.take(200)}")
 
-    // Try to extract message from API response
-    val apiMessage = try {
-        errorBody?.let {
-            val json = JSONObject(it)
-            json.optString("message", "").takeIf { msg -> msg.isNotEmpty() }
-        }
-    } catch (e: Exception) {
-        null
-    }
+    val parsed = parseErrorBody(errorBody)
+    val code = parsed.code ?: ApiErrorCodes.codeFromHttpStatus(httpCode)
+    val message = ApiErrorCodes.messageFor(code, parsed.message)
+    val firstFieldMessage = parsed.fieldErrors?.values?.firstOrNull { it.isNotBlank() }
+    val userMessage = firstFieldMessage ?: message
 
-    return when (code) {
+    return when (httpCode) {
         400 -> ApiError.BadRequest(
-            message = apiMessage ?: "Solicitud inválida",
+            message = userMessage,
+            apiCode = code,
+            fieldErrors = parsed.fieldErrors,
             cause = Exception("HTTP 400")
         )
 
         401 -> ApiError.Unauthorized(
-            message = apiMessage ?: "Sesión expirada. Inicia sesión nuevamente",
+            message = userMessage,
+            apiCode = code,
             cause = Exception("HTTP 401")
         )
 
         403 -> ApiError.Forbidden(
-            message = apiMessage ?: "No tienes permiso para realizar esta acción",
+            message = userMessage,
+            apiCode = code,
             cause = Exception("HTTP 403")
         )
 
         404 -> ApiError.NotFound(
-            message = apiMessage ?: "Recurso no encontrado",
+            message = userMessage,
+            apiCode = code,
             cause = Exception("HTTP 404")
         )
 
+        408 -> ApiError.Timeout(
+            message = userMessage,
+            apiCode = code,
+            cause = Exception("HTTP 408")
+        )
+
         409 -> ApiError.Conflict(
-            message = apiMessage ?: "El recurso ya existe",
+            message = userMessage,
+            apiCode = code,
             cause = Exception("HTTP 409")
         )
 
-        422 -> {
-            // Try to extract field errors for validation
-            val fieldErrors = try {
-                errorBody?.let {
-                    val json = JSONObject(it)
-                    val errorsJson = json.optJSONObject("errors")
-                    errorsJson?.let { errors ->
-                        val map = mutableMapOf<String, String>()
-                        errors.keys().forEach { key ->
-                            map[key] = errors.optString(key)
-                        }
-                        map
-                    }
-                }
-            } catch (e: Exception) {
-                null
-            }
+        422 -> ApiError.ValidationError(
+            message = userMessage,
+            apiCode = code,
+            fieldErrors = parsed.fieldErrors,
+            cause = Exception("HTTP 422")
+        )
 
-            ApiError.ValidationError(
-                message = apiMessage ?: "Datos de entrada inválidos",
-                fieldErrors = fieldErrors,
-                cause = Exception("HTTP 422")
-            )
-        }
+        429 -> ApiError.RateLimited(
+            message = userMessage,
+            apiCode = code,
+            cause = Exception("HTTP 429")
+        )
 
         in 500..599 -> {
-            if (code == 503) {
+            if (httpCode == 503 || code == ApiErrorCodes.DATABASE_UNAVAILABLE || code == ApiErrorCodes.SERVICE_UNAVAILABLE) {
                 ApiError.ServiceUnavailable(
-                    message = apiMessage ?: "Servicio temporalmente no disponible",
-                    cause = Exception("HTTP $code")
+                    message = userMessage,
+                    apiCode = code,
+                    cause = Exception("HTTP $httpCode")
                 )
             } else {
                 ApiError.ServerError(
-                    message = apiMessage ?: "Error del servidor. Intenta de nuevo más tarde",
-                    cause = Exception("HTTP $code")
+                    message = userMessage,
+                    apiCode = code,
+                    cause = Exception("HTTP $httpCode")
                 )
             }
         }
 
         else -> ApiError.Unknown(
-            message = apiMessage ?: "Error desconocido (HTTP $code)",
-            cause = Exception("HTTP $code")
+            message = userMessage,
+            apiCode = code,
+            cause = Exception("HTTP $httpCode")
         )
     }
 }
 
-/**
- * Convert ApiResponse<T> to ApiError when success=false
- *
- * Use when response.isSuccessful == true but response.body()?.success == false
- *
- * @return ApiError.BusinessError with API message
- */
+private fun parseErrorBody(errorBody: String?): ParsedApiError {
+    if (errorBody.isNullOrBlank()) {
+        return ParsedApiError(null, null, null)
+    }
+
+    return try {
+        val json = JSONObject(errorBody)
+        ParsedApiError(
+            message = json.optString("message", "").takeIf { it.isNotEmpty() },
+            code = json.optString("code", "").takeIf { it.isNotEmpty() },
+            fieldErrors = parseFieldErrors(json),
+        )
+    } catch (e: Exception) {
+        ParsedApiError(null, null, null)
+    }
+}
+
+private fun parseFieldErrors(json: JSONObject): Map<String, String>? {
+    if (!json.has("errors")) return null
+
+    return try {
+        when (val errors = json.get("errors")) {
+            is JSONArray -> {
+                val map = linkedMapOf<String, String>()
+                for (i in 0 until errors.length()) {
+                    val item = errors.optJSONObject(i) ?: continue
+                    val field = item.optString("field", "").ifBlank { "field_$i" }
+                    val message = item.optString("message", "")
+                    if (message.isNotBlank()) {
+                        map[field] = message
+                    }
+                }
+                map.takeIf { it.isNotEmpty() }
+            }
+
+            is JSONObject -> {
+                val map = linkedMapOf<String, String>()
+                errors.keys().forEach { key ->
+                    val message = errors.optString(key, "")
+                    if (message.isNotBlank()) {
+                        map[key] = message
+                    }
+                }
+                map.takeIf { it.isNotEmpty() }
+            }
+
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
+}
+
 fun <T> ApiResponse<T>.toBusinessError(): ApiError {
     Timber.w("toBusinessError: API returned success=false - ${this.message}")
     return ApiError.BusinessError(
         message = this.message ?: "Error en la operación",
+        apiCode = this.code,
         cause = Exception("Business Error")
     )
 }
 
-/**
- * Handle ApiError in ViewModel and return user-friendly message
- *
- * Usage:
- * ```
- * result.onFailure { error ->
- *     val userMessage = (error as? ApiError)?.getUserMessage() ?: error.message
- *     _state.value = ErrorState(userMessage)
- * }
- * ```
- */
-fun ApiError.getUserMessage(): String {
-    return this.message
-}
+fun ApiError.getUserMessage(): String = this.message
 
-/**
- * Determine if error should show retry button
- */
-fun ApiError.shouldShowRetry(): Boolean {
-    return this.isRetryable()
-}
+fun ApiError.shouldShowRetry(): Boolean = this.isRetryable()
 
-/**
- * Determine if error should trigger logout
- */
-fun ApiError.shouldLogout(): Boolean {
-    return this.requiresLogout()
-}
+fun ApiError.shouldLogout(): Boolean = this.requiresLogout()

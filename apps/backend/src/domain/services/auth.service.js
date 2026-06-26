@@ -1,6 +1,7 @@
 const { UnauthorizedError, ForbiddenError } = require('../../shared/errors');
 const { WEB_ALLOWED_ROLES } = require('../../shared/constants/roles');
 const { StringUtil } = require('../../shared/utils');
+const { formatAvatarForResponse } = require('../../shared/utils/avatar.util');
 const logger = require('../../shared/utils/logger.util');
 const env = require('../../config/env');
 
@@ -85,7 +86,7 @@ class AuthService {
    * @param {object} userService
    * @returns {Promise<{ token: string, refreshToken: string, user: object }>}
    */
-  async loginWithGoogle(googleToken, googleAuthService, userService) {
+  async loginWithGoogle(googleToken, googleAuthService, userService, platform = 'mobile') {
     const googleProfile = await googleAuthService.verifyToken(googleToken);
     const { user, action } = await userService.findOrCreateGoogleUser(googleProfile);
 
@@ -93,10 +94,15 @@ class AuthService {
       throw new ForbiddenError('Account is inactive');
     }
 
+    if (platform === 'web' && !WEB_ALLOWED_ROLES.includes(user.role)) {
+      logger.warn('Web access denied for Google user role', { email: user.email, role: user.role });
+      throw new ForbiddenError('Tu cuenta no tiene acceso al panel web. Usa la aplicación móvil.');
+    }
+
     const userPayload = this.#buildUserPayload(user);
     const tokens = this.jwt.generateTokenPair(userPayload);
 
-    await this.#createSession(user.id, user.role, 'web');
+    await this.#createSession(user.id, user.role, platform);
 
     if ((action === 'created' || action === 'restored') && userService.emailService?.isConfigured()) {
       setImmediate(async () => {
@@ -278,7 +284,7 @@ class AuthService {
       google_id: user.google_id || null,
       created_at: user.created_at,
       updated_at: user.updated_at,
-      avatar_url: user.avatar_url || null,
+      avatar_url: formatAvatarForResponse(user.avatar_url),
       email_verified_at: user.email_verified_at,
       last_login_at: user.last_login_at,
     };

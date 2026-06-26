@@ -1,6 +1,7 @@
 const express = require('express');
 const { anchorPointSchemas } = require('../../../shared/validators');
 const { validateBody } = require('../../middlewares');
+const { staffOnly } = require('../../middlewares/authorize.middleware');
 
 /**
  * Create anchor point routes
@@ -21,17 +22,19 @@ const createAnchorPointRoutes = (anchorPointController, authMiddleware) => {
   // Protected routes
   router.post('/',
     authMiddleware,
+    staffOnly,
     validateBody(anchorPointSchemas.create),
     anchorPointController.create,
   );
 
   router.put('/:id',
     authMiddleware,
+    staffOnly,
     validateBody(anchorPointSchemas.update),
     anchorPointController.update,
   );
 
-  router.delete('/:id', authMiddleware, anchorPointController.delete);
+  router.delete('/:id', authMiddleware, staffOnly, anchorPointController.delete);
 
   return router;
 };

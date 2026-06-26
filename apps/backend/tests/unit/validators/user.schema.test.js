@@ -4,7 +4,7 @@ describe('User Validators', () => {
   describe('create schema', () => {
     test('should validate correct user data', () => {
       const validUser = {
-        username: 'testuser',
+        name: 'Test User',
         email: 'test@example.com',
         password_hash: 'SecurePass123!',
         role: 'user',

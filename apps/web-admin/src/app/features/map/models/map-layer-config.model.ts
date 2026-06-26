@@ -1,3 +1,6 @@
+import type { ParkSectionRecord } from '../data/park-geometry';
+import type { SpatialReference } from '../data/spatial-reference';
+
 /**
  * Map Layer Configuration — Data Models
  *
@@ -5,6 +8,8 @@
  * including map view state and sticker layers.
  * Frontend configs use platform='web'.
  */
+
+export const MAP_CONFIG_VERSION = 2;
 
 /** A saved map configuration from the backend */
 export interface MapLayerConfig {
@@ -27,6 +32,67 @@ export interface MapConfigData {
   canvasGrid?: CanvasGridConfig;
   paintedTiles?: PaintedTileData[];
   tilesets?: TilesetRefData[];
+  /** v2 — offsets per movable layer */
+  layerOffsets?: LayerOffsetsData;
+  activeMovableLayer?: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers';
+  sections?: ParkSectionRecord[];
+  spatialReferences?: SpatialReference[];
+  ambientScene?: AmbientSceneData;
+  refImageDataUrl?: string;
+  refImageOpacity?: number;
+  activeStickerLayerId?: string | null;
+  themeMode?: 'light' | 'dark';
+}
+
+/** Named manual save slot (local checkpoints) */
+export interface MapCheckpoint {
+  id: string;
+  label: string;
+  savedAt: string;
+  data: MapConfigData;
+}
+
+export interface MapCheckpointSummary {
+  id: string;
+  label: string;
+  savedAt: string;
+}
+
+export interface LayerOffsetsData {
+  grid: { x: number; y: number };
+  boundary: { x: number; y: number };
+  sections: { x: number; y: number };
+  markers: { x: number; y: number };
+}
+
+export interface AmbientSceneData {
+  activeScenarioId: string | null;
+  showSpatialReferences: boolean;
+  showRainEffect: boolean;
+  rainIntensity: number;
+  rainSize: number;
+  rainSectionIndex: number;
+  showFogEffect: boolean;
+  fogIntensity: number;
+  fogSize: number;
+  showMotesEffect: boolean;
+  motesIntensity: number;
+  motesSize: number;
+  showCloudShadows: boolean;
+  cloudShadowIntensity: number;
+  cloudShadowSize: number;
+  showLeavesEffect: boolean;
+  leavesIntensity: number;
+  leavesSize: number;
+  showTreesEffect: boolean;
+  treesIntensity: number;
+  treesSize: number;
+  showLightningEffect: boolean;
+  showNightMistEffect: boolean;
+  nightMistIntensity: number;
+  ambientWindDeg: number;
+  ambientWindStrength: number;
+  spatialAnimSpeed: number;
 }
 
 /** Map view state snapshot */
@@ -38,9 +104,20 @@ export interface MapViewState {
   showSections: boolean;
   showLabels: boolean;
   showCanvasGrid?: boolean;
+  showTilemap?: boolean;
+  showGroundTextures?: boolean;
+  groundTilePx?: number;
+  showBoundary?: boolean;
+  showMarkers?: boolean;
   markerSize?: number;
   lockedGrid?: boolean;
   lockedBoundary?: boolean;
+  canvasGridCellW?: number;
+  canvasGridCellH?: number;
+  canvasGridOpacity?: number;
+  canvasGridColor?: string;
+  canvasGridStyle?: 'solid' | 'dashed' | 'dotted';
+  canvasGridRotation?: number;
 }
 
 /** Canvas grid configuration */

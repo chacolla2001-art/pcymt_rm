@@ -57,7 +57,7 @@ android {
         // Maps API Key removed - using custom ParkMapView
 
         // Single build — admin features via user role, TTL extended via CLI
-        resValue("string", "app_name", "Realidad Mixta")
+        resValue("string", "app_name", "Juku Go")
         buildConfigField("String", "ARCORE_API_KEY", "\"$arcoreApiKey\"")
         manifestPlaceholders["ARCORE_API_KEY"] = arcoreApiKey
     }
@@ -105,6 +105,15 @@ android {
     buildFeatures {
         viewBinding = true
         buildConfig = true
+    }
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs(
+                "src/main/assets",
+                rootProject.file("../../shared/data").absolutePath,
+            )
+        }
     }
 }
 
@@ -161,11 +170,6 @@ dependencies {
     // Dependency Injection (Hilt)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-
-    // Room (Local Database)
-    implementation(libs.room.runtime)
-    implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
 
     // SVG rendering (for map stickers)
     implementation(libs.androidsvg)

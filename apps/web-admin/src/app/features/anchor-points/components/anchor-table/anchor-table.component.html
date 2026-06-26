@@ -1,50 +1,46 @@
-@if (isLoading) {
-  <div class="spinner-container">
-    <mat-spinner diameter="60"></mat-spinner>
-  </div>
-} @else {
+@if (!isLoading) {
   <div class="tools-container">
     <!-- Search Controls -->
     <div class="search-controls">
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="search-input">
-        <mat-label>Buscar</mat-label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search-input">
+        <mat-label>{{ 'anchors.search' | translate }}</mat-label>
         <input #searchInput matInput [placeholder]="searchPlaceholder" (keydown.enter)="applyFilter(searchInput.value)">
       </mat-form-field>
 
-      <button mat-raised-button class="control-button" (click)="applyFilter(searchInput.value)">
+      <button mat-stroked-button class="control-button" (click)="applyFilter(searchInput.value)">
         <mat-icon>search</mat-icon>
-        <span class="label">Buscar</span>
+        <span class="label">{{ 'anchors.search' | translate }}</span>
       </button>
 
-      <mat-form-field appearance="fill" subscriptSizing="dynamic" class="status-filter">
-        <mat-label>Estados</mat-label>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic" class="status-filter">
+        <mat-label>{{ 'anchors.status' | translate }}</mat-label>
         <mat-select [(value)]="selectedStatus" (selectionChange)="applyStatusFilter()">
-          <mat-option value="all">Todos</mat-option>
-          <mat-option value="active">Activos</mat-option>
-          <mat-option value="inactive">Inactivos</mat-option>
+          <mat-option value="all">{{ 'anchors.statusAll' | translate }}</mat-option>
+          <mat-option value="active">{{ 'anchors.statusActive' | translate }}</mat-option>
+          <mat-option value="inactive">{{ 'anchors.statusInactive' | translate }}</mat-option>
         </mat-select>
       </mat-form-field>
     </div>
 
     <!-- Action Buttons -->
     @if (currentLoadType !== 'anchorPoints') {
-      <button mat-raised-button color="primary" class="control-button" (click)="openDialog()">
+      <button mat-flat-button color="primary" class="control-button" (click)="openDialog()">
         <mat-icon>add</mat-icon>
-        <span class="label">Nuevo registro</span>
+        <span class="label">{{ 'anchors.newRecord' | translate }}</span>
       </button>
     }
 
     @if (isFilteredById) {
-      <button mat-raised-button color="accent" class="control-button" (click)="clearIdFilter()">
+      <button mat-stroked-button color="primary" class="control-button" (click)="clearIdFilter()">
         <mat-icon>filter_list_off</mat-icon>
-        <span class="label">Mostrar todos</span>
+        <span class="label">{{ 'anchors.showAll' | translate }}</span>
       </button>
     }
 
     @if (isFilteredBySection) {
-      <button mat-raised-button color="accent" class="control-button" (click)="clearSectionFilter()">
+      <button mat-stroked-button color="primary" class="control-button" (click)="clearSectionFilter()">
         <mat-icon>filter_list_off</mat-icon>
-        <span class="label">Mostrar todas las secciones</span>
+        <span class="label">{{ 'anchors.showAllSections' | translate }}</span>
       </button>
     }
   </div>
@@ -62,12 +58,12 @@
               <mat-icon>{{ element.showInMap ? 'visibility' : 'visibility_off' }}</mat-icon>
             }
             @case ('edit') {
-              <button mat-icon-button (click)="onEdit(element)">
+              <button mat-icon-button (click)="onEdit(element)" [attr.aria-label]="'anchors.edit' | translate">
                 <mat-icon>edit</mat-icon>
               </button>
             }
             @case ('active') {
-              <mat-checkbox [disabled]="true" [checked]="element.active">Activo</mat-checkbox>
+              <mat-checkbox [disabled]="true" [checked]="element.active">{{ 'anchors.active' | translate }}</mat-checkbox>
             }
             @case ('virtualAssetId') {
               @if (getVirtualAssetById(element.virtualAssetId); as asset) {
@@ -76,7 +72,7 @@
                   <span>{{ asset.name }}</span>
                 </div>
               } @else {
-                <span>Sin modelo</span>
+                <span>{{ 'anchors.noModel' | translate }}</span>
               }
             }
             @default {
@@ -91,7 +87,5 @@
     <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
   </table>
 
-  <div class="paginator-container">
-    <mat-paginator #paginator [pageSizeOptions]="[5, 10, 20]" showFirstLastButtons aria-label="Seleccionar página"></mat-paginator>
-  </div>
+  <mat-paginator [pageSizeOptions]="[5, 10, 25, 50]" showFirstLastButtons></mat-paginator>
 }

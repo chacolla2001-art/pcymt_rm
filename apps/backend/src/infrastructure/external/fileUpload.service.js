@@ -135,6 +135,45 @@ class FileUploadService {
   };
 
   /**
+   * Create a single file upload middleware (memory — for serverless / profile pictures)
+   * @param {string} fieldName
+   * @param {object} options
+   * @returns {Function}
+   */
+  memorySingle(fieldName, options = {}) {
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: options.maxSize || 10 * 1024 * 1024,
+      },
+      fileFilter: options.fileFilter || this.#defaultFileFilter,
+    });
+
+    return upload.single(fieldName);
+  }
+
+  /**
+   * Verify buffer content matches declared MIME type using magic bytes
+   * @param {Buffer} buffer
+   * @param {string} declaredMime
+   * @returns {Promise<boolean>}
+   */
+  async verifyBufferContent(buffer, declaredMime) {
+    try {
+      const expectedBytes = MAGIC_BYTES[declaredMime];
+      if (!expectedBytes) {
+        return true;
+      }
+
+      return expectedBytes.every((byte, i) => buffer[i] === byte);
+    } catch (error) {
+      const logger = require('../../shared/utils/logger.util');
+      logger.warn('Buffer content verification failed', { declaredMime, error: error.message });
+      return false;
+    }
+  }
+
+  /**
    * Get public URL for an uploaded file
    * Returns a path through the authenticated API endpoint
    * @param {string} filename - Filename

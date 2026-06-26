@@ -1,5 +1,14 @@
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
+const { ERROR_CODES } = require('../../shared/constants');
+const { buildErrorPayload } = require('../../shared/utils/errorResponse.util');
+
+const rateLimitBody = (message) =>
+  buildErrorPayload({
+    message,
+    code: ERROR_CODES.RATE_LIMITED,
+    statusCode: 429,
+  });
 
 /**
  * Rate limiter configuration options
@@ -8,10 +17,7 @@ const { ipKeyGenerator } = require('express-rate-limit');
 const DEFAULT_OPTIONS = {
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests, please try again later',
-  },
+  message: rateLimitBody('Too many requests, please try again later'),
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
@@ -36,10 +42,7 @@ const authLimiter = rateLimit({
   ...DEFAULT_OPTIONS,
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // Only 10 attempts per 15 minutes
-  message: {
-    success: false,
-    message: 'Too many authentication attempts, please try again after 15 minutes',
-  },
+  message: rateLimitBody('Too many authentication attempts, please try again after 15 minutes'),
   skipFailedRequests: false,
 });
 
@@ -50,10 +53,7 @@ const passwordResetLimiter = rateLimit({
   ...DEFAULT_OPTIONS,
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // Only 3 password reset requests per hour
-  message: {
-    success: false,
-    message: 'Too many password reset requests, please try again after 1 hour',
-  },
+  message: rateLimitBody('Too many password reset requests, please try again after 1 hour'),
 });
 
 /**
@@ -63,10 +63,7 @@ const uploadLimiter = rateLimit({
   ...DEFAULT_OPTIONS,
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 50, // 50 uploads per hour
-  message: {
-    success: false,
-    message: 'Upload limit reached, please try again later',
-  },
+  message: rateLimitBody('Upload limit reached, please try again later'),
 });
 
 /**

@@ -37,7 +37,7 @@ const { Op } = require('sequelize');
 // ─── Repository mock ──────────────────────────────────────────────────────────
 const mockUserRepository = {
   findByEmail: jest.fn(),
-  findByUsername: jest.fn(),
+  findByEmailAny: jest.fn(),
   findByGoogleId: jest.fn(),
   findById: jest.fn(),
   findDeleted: jest.fn(),
@@ -47,7 +47,6 @@ const mockUserRepository = {
   findAll: jest.fn(),
   findAndCountAll: jest.fn(),
   emailExists: jest.fn(),
-  usernameExists: jest.fn(),
   count: jest.fn(),
 };
 
@@ -258,13 +257,14 @@ describe('UserService', () => {
     test('crea usuario con contraseña hasheada', async () => {
       const userData = {
         email: 'new@example.com',
-        username: 'newuser',
+        name: 'New User',
         password_hash: 'PlainPass@1',
         role: 'user',
       };
       const hashed = '$2b$10$hashed';
       const created = makeUser({ ...userData, password_hash: hashed });
 
+      mockUserRepository.findByEmailAny.mockResolvedValue(null);
       mockEncryptionUtil.hash.mockResolvedValue(hashed);
       mockUserRepository.create.mockResolvedValue(created);
 
@@ -274,37 +274,35 @@ describe('UserService', () => {
       expect(mockUserRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           email: userData.email,
-          username: userData.username,
           password_hash: hashed,
         })
       );
     });
 
     test('genera contraseña aleatoria si no se provee', async () => {
-      const userData = { email: 'auto@example.com', username: 'autouser', role: 'user' };
+      const userData = { email: 'auto@example.com', name: 'Auto User', role: 'user' };
       const created = makeUser(userData);
 
+      mockUserRepository.findByEmailAny.mockResolvedValue(null);
       mockEncryptionUtil.hash.mockResolvedValue('$2b$10$auto');
       mockUserRepository.create.mockResolvedValue(created);
 
       await userService.create(userData);
 
-      // StringUtil.generateRandomPassword fue mockeado arriba — debe haberse hasheado su resultado
       expect(mockEncryptionUtil.hash).toHaveBeenCalledWith('Random@Pass1');
     });
   });
 
   describe('update', () => {
-    test('actualiza correctamente sin modificar email/username', async () => {
+    test('actualiza correctamente sin modificar email', async () => {
       const user = makeUser();
       mockUserRepository.findById.mockResolvedValue(user);
 
-      await userService.update('user-1', { role: 'moderator', email: 'NEW@x.com', username: 'hacked' });
+      await userService.update('user-1', { role: 'moderator', email: 'NEW@x.com' });
 
       const updateArg = user.update.mock.calls[0][0];
       expect(updateArg).toHaveProperty('role', 'moderator');
       expect(updateArg).not.toHaveProperty('email');
-      expect(updateArg).not.toHaveProperty('username');
     });
 
     test('hashea la nueva contraseña si se envía', async () => {
@@ -333,23 +331,22 @@ describe('UserService', () => {
     });
   });
 
-  describe('emailExists / usernameExists', () => {
-    test('emailExists delega al repositorio', async () => {
-      mockUserRepository.emailExists.mockResolvedValue(true);
+  describe('emailExists', () => {
+    test('emailExists devuelve true para email activo', async () => {
+      mockUserRepository.findByEmailAny.mockResolvedValue(makeUser());
 
       const exists = await userService.emailExists('taken@example.com');
 
       expect(exists).toBe(true);
-      expect(mockUserRepository.emailExists).toHaveBeenCalledWith('taken@example.com');
+      expect(mockUserRepository.findByEmailAny).toHaveBeenCalledWith('taken@example.com');
     });
 
-    test('usernameExists delega al repositorio', async () => {
-      mockUserRepository.usernameExists.mockResolvedValue(false);
+    test('emailExists devuelve false cuando no hay registro', async () => {
+      mockUserRepository.findByEmailAny.mockResolvedValue(null);
 
-      const exists = await userService.usernameExists('available');
+      const exists = await userService.emailExists('free@example.com');
 
       expect(exists).toBe(false);
-      expect(mockUserRepository.usernameExists).toHaveBeenCalledWith('available');
     });
   });
 });

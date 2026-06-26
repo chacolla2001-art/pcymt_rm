@@ -1,47 +1,23 @@
-/* ==================== SETTINGS PAGE ==================== */
-.settings-page {
-  max-width: 780px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-/* ==================== PAGE HEADER ==================== */
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+/* Settings-specific overrides (base layout in styles/_page-layout.scss) */
+.settings-page .page-header {
   padding-bottom: 8px;
 }
 
-.header-icon {
+.settings-page .header-icon {
   font-size: 36px;
   width: 36px;
   height: 36px;
-  color: var(--sys-primary);
   opacity: 0.85;
 }
 
-.page-title {
-  margin: 0;
+.settings-page .page-title {
   font-size: 1.6rem;
-  font-weight: 600;
-  color: var(--sys-on-surface);
   letter-spacing: -0.3px;
 }
 
-.page-subtitle {
-  margin: 2px 0 0;
+.settings-page .page-subtitle {
+  margin-top: 2px;
   font-size: 0.88rem;
-  color: var(--sys-on-surface-variant);
-}
-
-/* ==================== LOADING ==================== */
-.loading-container {
-  display: flex;
-  justify-content: center;
-  padding: 80px 0;
 }
 
 /* ==================== SETTINGS CARD ==================== */
@@ -83,6 +59,128 @@
 .lang-icon {
   background-color: color-mix(in srgb, var(--sys-tertiary) 12%, transparent);
   color: var(--sys-tertiary);
+}
+
+.profile-icon {
+  background-color: color-mix(in srgb, var(--sys-secondary) 12%, transparent);
+  color: var(--sys-secondary);
+}
+
+.avatar-current-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.avatar-current-btn {
+  position: relative;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+
+  &:focus-visible {
+    outline: 2px solid var(--sys-primary);
+    outline-offset: 2px;
+  }
+}
+
+.avatar-upload-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sys-primary);
+  color: var(--sys-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.setting-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--sys-on-surface-variant);
+}
+
+.avatar-current {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--sys-primary);
+  background: var(--sys-surface-container);
+}
+
+.avatar-grid-label {
+  margin-bottom: 12px;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 12px;
+}
+
+.avatar-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 2px solid var(--sys-outline-variant);
+  border-radius: 14px;
+  background: var(--sys-surface-container-low);
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+
+  img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+  }
+
+  span {
+    font-size: 0.68rem;
+    text-align: center;
+    color: var(--sys-on-surface-variant);
+    line-height: 1.2;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: var(--sys-primary);
+    transform: translateY(-2px);
+  }
+
+  &.selected {
+    border-color: var(--sys-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--sys-primary) 25%, transparent);
+    background: color-mix(in srgb, var(--sys-primary) 8%, var(--sys-surface-container-low));
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.avatar-saving {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--sys-on-surface-variant);
+  font-size: 0.85rem;
 }
 
 /* ==================== SETTING GROUP ==================== */

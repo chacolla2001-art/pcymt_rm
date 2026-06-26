@@ -175,13 +175,21 @@ export class UserService {
     );
   }
 
-  /** Actualizar foto de perfil */
-  updateProfilePicture(userId: string, file: File): Observable<{ profile_picture_url: string }> {
+  /** Actualizar foto de perfil (subida custom) */
+  updateProfilePicture(userId: string, file: File): Observable<{ profile_picture_url: string; avatar_url?: string }> {
     const formData = new FormData();
     formData.append('profile_picture_url', file);
-    return this.http.patch<ApiResponse<{ profile_picture_url: string }>>(
-      this.apiRoutes.endpoints.users.profilePicture(userId), 
+    return this.http.patch<ApiResponse<{ profile_picture_url: string; avatar_url?: string }>>(
+      this.apiRoutes.endpoints.users.profilePicture(userId),
       formData
+    ).pipe(map(response => response.data));
+  }
+
+  /** Elegir avatar predefinido */
+  setPredefinedAvatar(userId: string, avatarId: string): Observable<{ avatar_url: string; profile_picture_url: string }> {
+    return this.http.patch<ApiResponse<{ avatar_url: string; profile_picture_url: string }>>(
+      this.apiRoutes.endpoints.users.avatar(userId),
+      { avatar_id: avatarId }
     ).pipe(map(response => response.data));
   }
 }

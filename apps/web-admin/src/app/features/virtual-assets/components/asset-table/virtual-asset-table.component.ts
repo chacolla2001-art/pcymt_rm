@@ -57,7 +57,7 @@ export class VirtualAssetTableComponent extends BaseTableComponent {
   public override loadData(type: TableDataType): void {
     if (!this.isBrowser) return;
 
-    this.isLoading = true;
+    this.startTableLoad();
     this.currentLoadType = type;
 
     if (type !== 'virtualAssets') {
@@ -65,9 +65,15 @@ export class VirtualAssetTableComponent extends BaseTableComponent {
       return;
     }
 
-    this.virtualAssetService.getAllVirtualAssets(this.getIsActiveFilter()).subscribe((assets: VirtualAsset[]) => {
-      const sortedAssets = assets.sort(this.sortByUpdated);
-      this.setupDataSource(sortedAssets);
+    this.virtualAssetService.getAllVirtualAssets(this.getIsActiveFilter()).subscribe({
+      next: (assets: VirtualAsset[]) => {
+        const sortedAssets = assets.sort(this.sortByUpdated);
+        this.setupDataSource(sortedAssets);
+      },
+      error: () => {
+        this.finishTableLoad();
+        this.alertService.showAlert('Error al cargar contenido 3D', 'error', 2000);
+      },
     });
   }
 

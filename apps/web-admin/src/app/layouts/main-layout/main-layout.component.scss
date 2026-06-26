@@ -4,8 +4,14 @@
   flex-direction: column;
   width: 100%;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-color: var(--sys-background);
+
+  &.shell-loading {
+    pointer-events: none;
+    user-select: none;
+  }
 }
 
 /* Ensure header and footer are visible */
@@ -49,6 +55,26 @@
   border-right: 1px solid var(--sys-outline-variant);
   display: flex;
   flex-direction: column;
+}
+
+.sidenav-ecosystems {
+  display: flex;
+  height: 4px;
+  flex-shrink: 0;
+
+  .eco {
+    flex: 1;
+  }
+
+  .eco-1 { background-color: var(--semantic-section-1); }
+  .eco-2 { background-color: var(--semantic-section-2); }
+  .eco-3 { background-color: var(--semantic-section-3); }
+  .eco-4 { background-color: var(--semantic-section-4); }
+}
+
+a.nav-item {
+  text-decoration: none;
+  color: inherit;
 }
 
 /* ── Contenido scrolleable de navegación ── */
@@ -161,27 +187,11 @@
 }
 
 .content-wrapper {
+  position: relative;
   flex: 1;
   width: 100%;
   overflow: auto;
   padding: 0;
-}
-
-.content-view {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-}
-
-/* ==================== ANIMACIONES ==================== */
-.fade-in {
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ==================== RESPONSIVE ==================== */

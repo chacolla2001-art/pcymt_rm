@@ -1,45 +1,3 @@
-.page-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-
-  .header-icon {
-    font-size: 32px;
-    width: 32px;
-    height: 32px;
-    color: var(--sys-primary);
-  }
-
-  h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin: 0;
-    color: var(--sys-on-surface);
-  }
-
-  .spacer { flex: 1; }
-
-  .time-toggle {
-    height: 36px;
-    .mat-button-toggle {
-      height: 36px;
-      .mat-button-toggle-label-content {
-        line-height: 36px;
-        padding: 0 12px;
-      }
-    }
-  }
-}
-
 .main-card {
   overflow: visible;
 }
@@ -187,13 +145,6 @@
 }
 
 @media (max-width: 768px) {
-  .page-container { padding: 1rem; }
-
-  .page-header {
-    flex-wrap: wrap;
-    h1 { font-size: 1.25rem; }
-  }
-
   .stats-layout {
     flex-direction: column;
   }
@@ -256,9 +207,9 @@
     font-size: 1rem;
     flex-shrink: 0;
 
-    &.rank-1 { background: #FFD700; color: #333; }
-    &.rank-2 { background: #C0C0C0; color: #333; }
-    &.rank-3 { background: #CD7F32; color: #fff; }
+    &.rank-1 { background: var(--semantic-rank-gold); color: var(--semantic-rank-gold-fg); }
+    &.rank-2 { background: var(--semantic-rank-silver); color: var(--semantic-rank-silver-fg); }
+    &.rank-3 { background: var(--semantic-rank-bronze); color: var(--semantic-rank-bronze-fg); }
   }
 
   .item-info {

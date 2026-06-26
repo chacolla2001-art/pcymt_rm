@@ -1,9 +1,12 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, Output, EventEmitter, OnDestroy, HostListener, OnInit, Inject, PLATFORM_ID, Input } from '@angular/core';
+import { Component, ElementRef, ViewChild, AfterViewInit, Output, EventEmitter, OnDestroy, HostListener, OnInit, Inject, PLATFORM_ID, Input, inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { AnchorPointService } from '../../anchor-points/services/anchor-point.service';
 import { AnchorPoint, AnchorCluster } from '../../anchor-points/models/anchor-point.model';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
+import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 import { Subject, takeUntil } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { StickerLayerService } from '../services/sticker-layer.service';
 import { StickerInstance, StickerLayer } from '../models/sticker.model';
 import { TilemapLayer, TilemapLayerData } from '../models/map-tile.model';
@@ -23,10 +26,60 @@ import { TilemapLayer, TilemapLayerData } from '../models/map-tile.model';
  * 9. Polígono detallado con 100+ puntos
  */
 
-interface GeoPoint {
-  lat: number;
-  lng: number;
-}
+import {
+  PARK_BOUNDARY,
+  PARK_CENTER,
+  cloneParkSectionRecords,
+  type GeoPoint as SharedGeoPoint,
+  type ParkSection as SharedParkSection,
+  type ParkSectionRecord,
+} from '../data/park-geometry';
+import {
+  isPointInPolygon,
+  findParkSectionAt,
+  sectionLabelCentroids,
+  toParkSectionsView,
+} from '../utils/park-map.util';
+import {
+  fillColorsFromHex,
+  resolveSectionFillOpacities,
+  syncSectionFillColors,
+} from '../utils/section-color.util';
+import {
+  cloneSpatialReferences,
+  exportSpatialReferencesJson,
+  isGeoInPark,
+  SPATIAL_REFERENCE_CATEGORY_COLORS,
+  spatialReferenceImageUrl,
+  spatialReferenceSummary,
+  type SpatialReference,
+  type SpatialReferenceCategory,
+  type SpatialReferenceMarkerStyle,
+} from '../data/spatial-reference';
+import { MapRainEffect } from '../utils/map-rain-effect';
+import type { MapPlaneBounds, RainTickOptions } from '../utils/map-rain-effect';
+import { MapFogEffect } from '../utils/map-fog-effect';
+import { MapMotesEffect } from '../utils/map-motes-effect';
+import { MapCloudShadowEffect } from '../utils/map-cloud-shadow-effect';
+import { MapLeavesEffect } from '../utils/map-leaves-effect';
+import { MapTreesEffect } from '../utils/map-trees-effect';
+import type { AmbientWind } from '../utils/map-ambient-zone';
+import { DEFAULT_AMBIENT_WIND, normalizeWindDegrees } from '../utils/map-ambient-wind';
+import { MapLightningEffect } from '../utils/map-lightning-effect';
+import { MapNightMistEffect } from '../utils/map-night-mist-effect';
+import { SpatialReferenceLayer } from '../utils/spatial-reference-layer';
+import type { AmbientScenario, AmbientScenarioTint } from '../data/ambient-scenarios';
+import { findAmbientScenario } from '../data/ambient-scenarios';
+import { clampGroundTilePx, PARK_MAP_VIS, parkGroundTintOpacity } from '../utils/map-park-visual-scale';
+import {
+  GroundPatternCache,
+  fillPolygonWithGroundTexture,
+  MapBackdropCache,
+  fillMapRectWithBackdrop,
+} from '../utils/draw-ground-texture';
+
+type GeoPoint = SharedGeoPoint;
+type ParkSection = SharedParkSection;
 
 interface CanvasPoint {
   x: number;
@@ -41,312 +94,9 @@ interface Marker {
   section?: string;
 }
 
-interface ParkSection {
-  name: string;
-  color: string;
-  colorLight: string;
-  polygon: GeoPoint[];
-}
-
-// Polígono del parque con alta precisión (100+ puntos para curvas suaves)
-const PARK_BOUNDARY: GeoPoint[] = [
-  // Entrada norte
-  { lat: -16.48659768, lng: -68.14596329 },
-  { lat: -16.48665000, lng: -68.14593000 },
-  { lat: -16.48680000, lng: -68.14585000 },
-  { lat: -16.48700000, lng: -68.14575000 },
-  { lat: -16.48720000, lng: -68.14567000 },
-  { lat: -16.48740000, lng: -68.14560000 },
-  { lat: -16.48760000, lng: -68.14554000 },
-  { lat: -16.48780000, lng: -68.14549000 },
-  { lat: -16.48800000, lng: -68.14545000 },
-  { lat: -16.48822963, lng: -68.14541751 },
-  { lat: -16.48832000, lng: -68.14535000 },
-  { lat: -16.48841898, lng: -68.14528839 },
-  { lat: -16.48855000, lng: -68.14523000 },
-  { lat: -16.48870000, lng: -68.14518000 },
-  { lat: -16.48886235, lng: -68.14515052 },
-  { lat: -16.48888001, lng: -68.14519958 },
-  { lat: -16.48900000, lng: -68.14510000 },
-  { lat: -16.48920000, lng: -68.14502000 },
-  { lat: -16.48940000, lng: -68.14495000 },
-  { lat: -16.48960000, lng: -68.14488000 },
-  { lat: -16.48980000, lng: -68.14481000 },
-  { lat: -16.49000000, lng: -68.14475000 },
-  { lat: -16.49020000, lng: -68.14469000 },
-  { lat: -16.49040000, lng: -68.14465000 },
-  { lat: -16.49055000, lng: -68.14463000 },
-  { lat: -16.49068582, lng: -68.14462362 },
-  { lat: -16.49070782, lng: -68.14472540 },
-  { lat: -16.49074000, lng: -68.14480000 },
-  { lat: -16.49078941, lng: -68.14487740 },
-  { lat: -16.49082000, lng: -68.14491000 },
-  { lat: -16.49086051, lng: -68.14496028 },
-  { lat: -16.49092000, lng: -68.14500000 },
-  { lat: -16.49099475, lng: -68.14505184 },
-  { lat: -16.49105000, lng: -68.14508000 },
-  { lat: -16.49110403, lng: -68.14510370 },
-  { lat: -16.49115000, lng: -68.14511500 },
-  { lat: -16.49120474, lng: -68.14512204 },
-  { lat: -16.49127000, lng: -68.14513000 },
-  { lat: -16.49133294, lng: -68.14513233 },
-  { lat: -16.49138000, lng: -68.14513000 },
-  { lat: -16.49142827, lng: -68.14512204 },
-  { lat: -16.49149000, lng: -68.14510500 },
-  { lat: -16.49156435, lng: -68.14508133 },
-  { lat: -16.49161000, lng: -68.14506000 },
-  { lat: -16.49166074, lng: -68.14502906 },
-  { lat: -16.49171000, lng: -68.14498000 },
-  { lat: -16.49176942, lng: -68.14491858 },
-  // Curva sureste
-  { lat: -16.49185000, lng: -68.14500000 },
-  { lat: -16.49195000, lng: -68.14510000 },
-  { lat: -16.49207074, lng: -68.14524457 },
-  { lat: -16.49202000, lng: -68.14524500 },
-  { lat: -16.49197133, lng: -68.14524635 },
-  { lat: -16.49185000, lng: -68.14528000 },
-  { lat: -16.49170000, lng: -68.14532000 },
-  { lat: -16.49155000, lng: -68.14535000 },
-  { lat: -16.49139718, lng: -68.14538138 },
-  { lat: -16.49125000, lng: -68.14540000 },
-  { lat: -16.49110000, lng: -68.14541500 },
-  { lat: -16.49095112, lng: -68.14542437 },
-  { lat: -16.49080000, lng: -68.14544000 },
-  { lat: -16.49065000, lng: -68.14546000 },
-  { lat: -16.49050000, lng: -68.14548000 },
-  { lat: -16.49033610, lng: -68.14550804 },
-  { lat: -16.49027000, lng: -68.14557000 },
-  { lat: -16.49022058, lng: -68.14564895 },
-  { lat: -16.49000000, lng: -68.14562000 },
-  { lat: -16.48975000, lng: -68.14559000 },
-  { lat: -16.48950180, lng: -68.14556667 },
-  { lat: -16.48938000, lng: -68.14557500 },
-  { lat: -16.48926133, lng: -68.14558171 },
-  { lat: -16.48918000, lng: -68.14557800 },
-  { lat: -16.48910599, lng: -68.14557360 },
-  { lat: -16.48912299, lng: -68.14561761 },
-  { lat: -16.48904000, lng: -68.14560500 },
-  { lat: -16.48896332, lng: -68.14559755 },
-  { lat: -16.48886000, lng: -68.14560500 },
-  { lat: -16.48876984, lng: -68.14561738 },
-  { lat: -16.48865000, lng: -68.14565000 },
-  { lat: -16.48855000, lng: -68.14569000 },
-  { lat: -16.48844095, lng: -68.14573936 },
-  // Lado oeste - más curvo
-  { lat: -16.48849000, lng: -68.14590000 },
-  { lat: -16.48854573, lng: -68.14608713 },
-  { lat: -16.48860000, lng: -68.14607000 },
-  { lat: -16.48866891, lng: -68.14604836 },
-  { lat: -16.48869000, lng: -68.14620000 },
-  { lat: -16.48871507, lng: -68.14636503 },
-  { lat: -16.48860000, lng: -68.14645000 },
-  { lat: -16.48845000, lng: -68.14658000 },
-  { lat: -16.48830000, lng: -68.14668000 },
-  { lat: -16.48820410, lng: -68.14673619 },
-  { lat: -16.48812000, lng: -68.14677000 },
-  { lat: -16.48803366, lng: -68.14679585 },
-  { lat: -16.48790000, lng: -68.14683000 },
-  { lat: -16.48776299, lng: -68.14685615 },
-  { lat: -16.48762000, lng: -68.14684000 },
-  { lat: -16.48748103, lng: -68.14680104 },
-  { lat: -16.48746000, lng: -68.14674000 },
-  { lat: -16.48744563, lng: -68.14667352 },
-  { lat: -16.48742500, lng: -68.14664000 },
-  { lat: -16.48740845, lng: -68.14661360 },
-  { lat: -16.48737000, lng: -68.14657000 },
-  { lat: -16.48734035, lng: -68.14654090 },
-  // Regreso al norte
-  { lat: -16.48728000, lng: -68.14635000 },
-  { lat: -16.48722000, lng: -68.14615000 },
-  { lat: -16.48714337, lng: -68.14591061 },
-  { lat: -16.48700000, lng: -68.14595000 },
-  { lat: -16.48685000, lng: -68.14600000 },
-  { lat: -16.48671717, lng: -68.14603711 },
-  { lat: -16.48668000, lng: -68.14602500 },
-  { lat: -16.48664566, lng: -68.14600784 },
-  { lat: -16.48662000, lng: -68.14598500 },
-  { lat: -16.48659707, lng: -68.14596340 },
-  { lat: -16.48659768, lng: -68.14596329 }
-];
-
-// Secciones del parque - tessellating polygons covering the full park area
-// Junction points on boundary: B15, B25, B62, B72, B104
-// Divider TA-ML: B15 → internal → B104
-// Divider TM-ML: B15 → B72
-// Divider TM-TB: B25 → B62
-const PARK_SECTIONS: ParkSection[] = [
-  {
-    name: 'Tierras Altas',
-    color: 'rgba(139, 90, 43, 0.12)',
-    colorLight: 'rgba(139, 90, 43, 0.08)',
-    polygon: [
-      // N boundary: entrance (B0) → NE (B15)
-      { lat: -16.48659768, lng: -68.14596329 },
-      { lat: -16.48665000, lng: -68.14593000 },
-      { lat: -16.48680000, lng: -68.14585000 },
-      { lat: -16.48700000, lng: -68.14575000 },
-      { lat: -16.48720000, lng: -68.14567000 },
-      { lat: -16.48740000, lng: -68.14560000 },
-      { lat: -16.48760000, lng: -68.14554000 },
-      { lat: -16.48780000, lng: -68.14549000 },
-      { lat: -16.48800000, lng: -68.14545000 },
-      { lat: -16.48822963, lng: -68.14541751 },
-      { lat: -16.48832000, lng: -68.14535000 },
-      { lat: -16.48841898, lng: -68.14528839 },
-      { lat: -16.48855000, lng: -68.14523000 },
-      { lat: -16.48870000, lng: -68.14518000 },
-      { lat: -16.48886235, lng: -68.14515052 },
-      { lat: -16.48888001, lng: -68.14519958 },
-      // Divider TA-ML: B15 → internal → B104
-      { lat: -16.48870000, lng: -68.14560000 },
-      { lat: -16.48820000, lng: -68.14570000 },
-      { lat: -16.48760000, lng: -68.14580000 },
-      { lat: -16.48714337, lng: -68.14591061 },
-      // NW boundary: B104 → entrance (B0)
-      { lat: -16.48700000, lng: -68.14595000 },
-      { lat: -16.48685000, lng: -68.14600000 },
-      { lat: -16.48671717, lng: -68.14603711 },
-      { lat: -16.48668000, lng: -68.14602500 },
-      { lat: -16.48664566, lng: -68.14600784 },
-      { lat: -16.48662000, lng: -68.14598500 },
-      { lat: -16.48659707, lng: -68.14596340 }
-    ]
-  },
-  {
-    name: 'Tierras Medias',
-    color: 'rgba(76, 175, 80, 0.12)',
-    colorLight: 'rgba(76, 175, 80, 0.08)',
-    polygon: [
-      // NE boundary: B15 → B25
-      { lat: -16.48888001, lng: -68.14519958 },
-      { lat: -16.48900000, lng: -68.14510000 },
-      { lat: -16.48920000, lng: -68.14502000 },
-      { lat: -16.48940000, lng: -68.14495000 },
-      { lat: -16.48960000, lng: -68.14488000 },
-      { lat: -16.48980000, lng: -68.14481000 },
-      { lat: -16.49000000, lng: -68.14475000 },
-      { lat: -16.49020000, lng: -68.14469000 },
-      { lat: -16.49040000, lng: -68.14465000 },
-      { lat: -16.49055000, lng: -68.14463000 },
-      { lat: -16.49068582, lng: -68.14462362 },
-      // Divider TM-TB: B25 → B62
-      { lat: -16.49033610, lng: -68.14550804 },
-      // S boundary: B62 → B72
-      { lat: -16.49027000, lng: -68.14557000 },
-      { lat: -16.49022058, lng: -68.14564895 },
-      { lat: -16.49000000, lng: -68.14562000 },
-      { lat: -16.48975000, lng: -68.14559000 },
-      { lat: -16.48950180, lng: -68.14556667 },
-      { lat: -16.48938000, lng: -68.14557500 },
-      { lat: -16.48926133, lng: -68.14558171 },
-      { lat: -16.48918000, lng: -68.14557800 },
-      { lat: -16.48910599, lng: -68.14557360 },
-      { lat: -16.48912299, lng: -68.14561761 },
-      // Divider TM-ML: B72 → B15
-      { lat: -16.48888001, lng: -68.14519958 }
-    ]
-  },
-  {
-    name: 'Tierras Bajas',
-    color: 'rgba(255, 193, 7, 0.12)',
-    colorLight: 'rgba(255, 193, 7, 0.08)',
-    polygon: [
-      // SE peninsula: B25 → around tip → B62
-      { lat: -16.49068582, lng: -68.14462362 },
-      { lat: -16.49070782, lng: -68.14472540 },
-      { lat: -16.49074000, lng: -68.14480000 },
-      { lat: -16.49078941, lng: -68.14487740 },
-      { lat: -16.49082000, lng: -68.14491000 },
-      { lat: -16.49086051, lng: -68.14496028 },
-      { lat: -16.49092000, lng: -68.14500000 },
-      { lat: -16.49099475, lng: -68.14505184 },
-      { lat: -16.49105000, lng: -68.14508000 },
-      { lat: -16.49110403, lng: -68.14510370 },
-      { lat: -16.49115000, lng: -68.14511500 },
-      { lat: -16.49120474, lng: -68.14512204 },
-      { lat: -16.49127000, lng: -68.14513000 },
-      { lat: -16.49133294, lng: -68.14513233 },
-      { lat: -16.49138000, lng: -68.14513000 },
-      { lat: -16.49142827, lng: -68.14512204 },
-      { lat: -16.49149000, lng: -68.14510500 },
-      { lat: -16.49156435, lng: -68.14508133 },
-      { lat: -16.49161000, lng: -68.14506000 },
-      { lat: -16.49166074, lng: -68.14502906 },
-      { lat: -16.49171000, lng: -68.14498000 },
-      { lat: -16.49176942, lng: -68.14491858 },
-      { lat: -16.49185000, lng: -68.14500000 },
-      { lat: -16.49195000, lng: -68.14510000 },
-      { lat: -16.49207074, lng: -68.14524457 },
-      { lat: -16.49202000, lng: -68.14524500 },
-      { lat: -16.49197133, lng: -68.14524635 },
-      { lat: -16.49185000, lng: -68.14528000 },
-      { lat: -16.49170000, lng: -68.14532000 },
-      { lat: -16.49155000, lng: -68.14535000 },
-      { lat: -16.49139718, lng: -68.14538138 },
-      { lat: -16.49125000, lng: -68.14540000 },
-      { lat: -16.49110000, lng: -68.14541500 },
-      { lat: -16.49095112, lng: -68.14542437 },
-      { lat: -16.49080000, lng: -68.14544000 },
-      { lat: -16.49065000, lng: -68.14546000 },
-      { lat: -16.49050000, lng: -68.14548000 },
-      { lat: -16.49033610, lng: -68.14550804 },
-      // Divider TM-TB: B62 → B25
-      { lat: -16.49068582, lng: -68.14462362 }
-    ]
-  },
-  {
-    name: 'Mitos y Leyendas',
-    color: 'rgba(103, 58, 183, 0.12)',
-    colorLight: 'rgba(103, 58, 183, 0.08)',
-    polygon: [
-      // Divider TM-ML: B72 → B15
-      { lat: -16.48912299, lng: -68.14561761 },
-      { lat: -16.48888001, lng: -68.14519958 },
-      // Divider TA-ML reversed: B15 → internal → B104
-      { lat: -16.48870000, lng: -68.14560000 },
-      { lat: -16.48820000, lng: -68.14570000 },
-      { lat: -16.48760000, lng: -68.14580000 },
-      { lat: -16.48714337, lng: -68.14591061 },
-      // W boundary: B104 → SW arm → B72
-      { lat: -16.48722000, lng: -68.14615000 },
-      { lat: -16.48728000, lng: -68.14635000 },
-      { lat: -16.48734035, lng: -68.14654090 },
-      { lat: -16.48737000, lng: -68.14657000 },
-      { lat: -16.48740845, lng: -68.14661360 },
-      { lat: -16.48742500, lng: -68.14664000 },
-      { lat: -16.48744563, lng: -68.14667352 },
-      { lat: -16.48746000, lng: -68.14674000 },
-      { lat: -16.48748103, lng: -68.14680104 },
-      { lat: -16.48762000, lng: -68.14684000 },
-      { lat: -16.48776299, lng: -68.14685615 },
-      { lat: -16.48790000, lng: -68.14683000 },
-      { lat: -16.48803366, lng: -68.14679585 },
-      { lat: -16.48812000, lng: -68.14677000 },
-      { lat: -16.48820410, lng: -68.14673619 },
-      { lat: -16.48830000, lng: -68.14668000 },
-      { lat: -16.48845000, lng: -68.14658000 },
-      { lat: -16.48860000, lng: -68.14645000 },
-      { lat: -16.48871507, lng: -68.14636503 },
-      { lat: -16.48869000, lng: -68.14620000 },
-      { lat: -16.48866891, lng: -68.14604836 },
-      { lat: -16.48860000, lng: -68.14607000 },
-      { lat: -16.48854573, lng: -68.14608713 },
-      { lat: -16.48849000, lng: -68.14590000 },
-      { lat: -16.48844095, lng: -68.14573936 },
-      { lat: -16.48855000, lng: -68.14569000 },
-      { lat: -16.48865000, lng: -68.14565000 },
-      { lat: -16.48876984, lng: -68.14561738 },
-      { lat: -16.48886000, lng: -68.14560500 },
-      { lat: -16.48896332, lng: -68.14559755 },
-      { lat: -16.48904000, lng: -68.14560500 },
-      { lat: -16.48912299, lng: -68.14561761 }
-    ]
-  }
-];
-
-// Constantes geodésicas
-const LAT_CENTER = -16.48933421;
-const LNG_CENTER = -68.14573989;
+// Constantes geodésicas (centroide OSM del parque — shared/data/park-boundary.json)
+const LAT_CENTER = PARK_CENTER.lat;
+const LNG_CENTER = PARK_CENTER.lng;
 const METERS_PER_DEG_LAT = 111320;
 const LAT_CORRECTION = Math.cos(LAT_CENTER * Math.PI / 180);
 const METERS_PER_DEG_LNG = METERS_PER_DEG_LAT * LAT_CORRECTION;
@@ -369,7 +119,7 @@ const THEME_COLORS = {
     scale: '#4caf50'
   },
   light: {
-    background: '#f5f5f5',
+    background: '#ddd8ce',
     grid: 'rgba(100, 100, 120, 0.3)',
     gridText: 'rgba(80, 80, 100, 0.8)',
     boundary: '#2e7d32',
@@ -385,27 +135,15 @@ const THEME_COLORS = {
   }
 };
 
-function isPointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lng, yi = polygon[i].lat;
-    const xj = polygon[j].lng, yj = polygon[j].lat;
-    if (((yi > point.lat) !== (yj > point.lat)) &&
-        (point.lng < (xj - xi) * (point.lat - yi) / (yj - yi) + xi)) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
 @Component({
   selector: 'app-map-control',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="precision-map" [class.light-theme]="!isDarkTheme">
       <canvas #mapCanvas
         [class.coord-picker]="coordPickerMode"
+        [class.section-hover]="hoveredSectionIndex >= 0 && !sectionEditorMode"
         (mousedown)="onMouseDown($event)"
         (mousemove)="onMouseMove($event)"
         (mouseup)="onMouseUp()"
@@ -423,6 +161,31 @@ function isPointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
         📋 {{ lastCopiedCoords }}
       </div>
 
+      <div class="map-orientation-hud">
+        <div class="section-chip" *ngIf="visitorSectionLabel">
+          Estás en: {{ visitorSectionLabel }}
+        </div>
+        <div class="section-chip muted" *ngIf="geoActive && !visitorSectionLabel">
+          Fuera de las zonas del parque
+        </div>
+        <div class="map-legend" *ngIf="mapOptions.showSections">
+          <div class="legend-title">Zonas del parque</div>
+          <button type="button" class="section-play-btn"
+            *ngFor="let s of editableSections; let i = index"
+            [class.active]="!sectionEditorMode && playerFichaSectionIndex === i"
+            [class.editor-active]="sectionEditorMode && sectionEditorIndex === i"
+            [style.--zone-color]="s.chartColor"
+            (click)="onZoneButtonClick(i); $event.stopPropagation()">
+            <span class="legend-swatch" [style.background]="s.chartColor"></span>
+            <span>{{ s.name }}</span>
+          </button>
+          <div class="legend-row you-row">
+            <span class="legend-swatch you"></span>
+            <span>Tú (GPS)</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Hint -->
       <div class="click-hint">
         {{ editorMode
@@ -430,11 +193,15 @@ function isPointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
              : editorActiveTool === 'eraser' ? 'Click sobre un item para borrarlo'
              : editorActiveTool === 'coordinate' ? 'Click para copiar coordenadas'
              : 'Click para seleccionar | Arrastra mover | Del = eliminar | Scroll = zoom'
+           : sectionEditorMode
+             ? (sectionEditorAddVertexMode
+               ? 'Click en el mapa para añadir vértice a la sección activa'
+               : 'Botones de zona · click dentro del polígono para seleccionar · arrastra vértices')
            : coordPickerMode
              ? 'Click en el mapa para copiar coordenadas GPS | Usa vista Z↓ para máxima precisión'
              : stickerEditMode
                ? 'Del = eliminar | Ctrl+Z/Y = deshacer/rehacer | Arrastra para mover | ↑↓←→ = nudge'
-               : 'Scroll = zoom | Arrastrar = mover mapa | Ctrl+Z = deshacer' }}
+               : 'Scroll = zoom | Zonas: botón encuadra y abre ficha · hover resalta contorno' }}
       </div>
 
       <!-- Sticker edit mode banner -->
@@ -445,6 +212,84 @@ function isPointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
       <!-- Editor mode banner -->
       <div class="edit-banner editor-banner" *ngIf="editorMode">
         🗺️ Editor de tiles
+      </div>
+
+      <div class="edit-banner section-editor-banner" *ngIf="sectionEditorMode">
+        ✏️ Editor de secciones — arrastra vértices · Del borrar · click añade si está activo
+      </div>
+
+      <!-- Ficha educativa (vista jugador + editor) -->
+      <div class="section-edu-card" *ngIf="showSectionFicha && fichaSection as sec"
+        (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+        <button type="button" class="section-edu-close" *ngIf="!sectionEditorMode"
+          (click)="closePlayerFicha()" title="Cerrar">✕</button>
+        <div class="section-edu-tabs">
+          <button type="button" class="section-edu-tab"
+            *ngFor="let s of editableSections; let i = index"
+            [class.active]="fichaSectionIndex === i"
+            [style.--tab-color]="s.chartColor"
+            (click)="onZoneButtonClick(i)">
+            <span class="tab-swatch" [style.background]="s.chartColor"></span>
+            {{ s.name }}
+          </button>
+        </div>
+
+        <!-- Vista jugador (solo lectura) -->
+        <div class="section-edu-body" *ngIf="!sectionEditorMode">
+          <div class="section-edu-media" *ngIf="sec.education?.referenceImageUrl">
+            <img [src]="sec.education!.referenceImageUrl!" [alt]="'Referencia ' + sec.name">
+          </div>
+          <p class="section-edu-readonly">{{ sec.education?.summary || 'Sin descripción educativa aún.' }}</p>
+        </div>
+
+        <!-- Editor -->
+        <div class="section-edu-body" *ngIf="sectionEditorMode">
+          <div class="section-edu-media" *ngIf="sec.education?.referenceImageUrl">
+            <img [src]="sec.education!.referenceImageUrl!" [alt]="'Referencia ' + sec.name">
+            <button type="button" class="section-edu-clear-img" (click)="clearSectionReferenceImage()"
+              title="Quitar imagen">✕</button>
+          </div>
+          <div class="section-edu-media placeholder" *ngIf="!sec.education?.referenceImageUrl">
+            <span>Sin imagen de referencia</span>
+          </div>
+
+          <button type="button" class="section-edu-img-btn" (click)="sectionImgInput.click()">
+            📷 Subir imagen de referencia
+          </button>
+          <input #sectionImgInput type="file" accept="image/*" hidden
+            (change)="onSectionReferenceImagePicked($event)">
+
+          <label class="section-edu-label">Definición educativa</label>
+          <textarea class="section-edu-textarea" rows="5" maxlength="1200"
+            [ngModel]="sec.education?.summary ?? ''"
+            (ngModelChange)="onEducationSummaryChange($event)"
+            placeholder="Describe el ecosistema, especies y mensaje educativo para visitantes…"></textarea>
+        </div>
+      </div>
+
+      <!-- Ficha referencia espacial -->
+      <div class="section-edu-card spatial-ref-ficha" *ngIf="playerSpatialRefIndex !== null && activeSpatialRef as sref"
+        (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
+        <button type="button" class="section-edu-close" (click)="closeSpatialRefFicha()" title="Cerrar">✕</button>
+        <div class="spatial-ref-ficha-bar" [style.background]="spatialRefCategoryColor(sref.category)"></div>
+        <div class="section-edu-tabs">
+          <button type="button" class="section-edu-tab"
+            *ngFor="let r of spatialReferences; let i = index"
+            [class.active]="playerSpatialRefIndex === i"
+            [style.--tab-color]="spatialRefCategoryColor(r.category)"
+            (click)="openSpatialRefFicha(i)">
+            <span class="tab-swatch" [style.background]="spatialRefCategoryColor(r.category)"></span>
+            {{ r.name }}
+          </button>
+        </div>
+        <div class="section-edu-body">
+          <h3 class="spatial-ref-ficha-title">{{ sref.name }}</h3>
+          <span class="spatial-ref-ficha-cat">{{ sref.category }}</span>
+          <div class="section-edu-media" *ngIf="spatialRefImage(sref) as imgUrl">
+            <img [src]="imgUrl" [alt]="sref.name">
+          </div>
+          <p class="section-edu-readonly">{{ spatialRefSummary(sref) || 'Sin información aún.' }}</p>
+        </div>
       </div>
     </div>
   `,
@@ -545,6 +390,333 @@ function isPointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
     .edit-banner.editor-banner {
       background: rgba(124, 131, 255, 0.9);
     }
+    .edit-banner.section-editor-banner {
+      background: rgba(255, 152, 0, 0.92);
+      top: 44px;
+    }
+
+    .map-orientation-hud {
+      position: absolute;
+      left: 12px;
+      bottom: 48px;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+      max-width: min(220px, 55vw);
+    }
+
+    .section-chip {
+      background: rgba(46, 125, 50, 0.92);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: sans-serif;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .section-chip.muted {
+      background: rgba(97, 97, 97, 0.9);
+    }
+
+    .map-legend {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--text);
+      font-family: sans-serif;
+      pointer-events: auto;
+    }
+
+    .legend-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .legend-row.you-row {
+      margin-top: 6px;
+      pointer-events: none;
+    }
+
+    .section-play-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin-bottom: 4px;
+      padding: 7px 8px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: transform 0.12s, border-color 0.12s, background 0.12s, box-shadow 0.12s;
+    }
+
+    .precision-map.light-theme .section-play-btn {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .section-play-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--zone-color, #ff9800);
+      background: color-mix(in srgb, var(--zone-color, #ff9800) 14%, transparent);
+      box-shadow: 0 2px 8px color-mix(in srgb, var(--zone-color, #ff9800) 35%, transparent);
+    }
+
+    .section-play-btn.active,
+    .section-play-btn.editor-active {
+      border-color: var(--zone-color, #ff9800);
+      background: color-mix(in srgb, var(--zone-color, #ff9800) 20%, transparent);
+    }
+
+    .legend-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+    }
+
+    .legend-swatch.you {
+      background: #1e88e5;
+      border-radius: 50%;
+    }
+
+    .section-edu-card {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 12;
+      width: min(320px, calc(100% - 24px));
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .section-edu-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.12);
+    }
+
+    .precision-map.light-theme .section-edu-tabs {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .section-edu-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      background: transparent;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+
+    .section-edu-tab:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .section-edu-tab.active {
+      border-color: var(--tab-color, #ff9800);
+      background: color-mix(in srgb, var(--tab-color, #ff9800) 16%, transparent);
+    }
+
+    .tab-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .section-edu-body {
+      padding: 10px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section-edu-media {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.2);
+      min-height: 88px;
+      max-height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .section-edu-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      max-height: 140px;
+    }
+
+    .section-edu-media.placeholder {
+      color: var(--text-secondary);
+      font-size: 11px;
+    }
+
+    .section-edu-clear-img {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .section-edu-img-btn {
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px dashed var(--panel-border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .section-edu-img-btn:hover {
+      border-color: #ff9800;
+      color: var(--text);
+    }
+
+    .section-edu-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+    }
+
+    .section-edu-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      resize: vertical;
+      min-height: 96px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.15);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.45;
+      font-family: inherit;
+    }
+
+    .precision-map.light-theme .section-edu-textarea {
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .section-edu-textarea:focus {
+      outline: none;
+      border-color: #ff9800;
+    }
+
+    .section-edu-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .section-edu-readonly {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .spatial-ref-ficha {
+      top: 12px;
+      left: 12px;
+      right: auto;
+      width: min(320px, calc(100% - 24px));
+    }
+
+    .spatial-ref-ficha-bar {
+      height: 4px;
+      width: 100%;
+    }
+
+    .spatial-ref-ficha-title {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .spatial-ref-ficha-cat {
+      display: inline-block;
+      margin-bottom: 10px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    canvas.section-hover {
+      cursor: pointer;
+    }
   `]
 })
 export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
@@ -556,7 +728,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   @Output() viewInfo = new EventEmitter<{
     lat: number; lng: number; zoom: number; rotDeg: number;
     showSections: boolean; showLabels: boolean;
-    showCanvasGrid: boolean; showBoundary: boolean; showMarkers: boolean;
+    showCanvasGrid: boolean; showTilemap: boolean; showGroundTextures: boolean;
+    groundTilePx: number;
+    showBoundary: boolean; showMarkers: boolean;
     canvasGridCellW: number; canvasGridCellH: number; canvasGridOpacity: number;
     canvasGridColor: string; canvasGridStyle: 'solid' | 'dashed' | 'dotted';
     canvasGridRotation: number;
@@ -577,6 +751,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   @Output() stickerDroppedOnMap = new EventEmitter<{ key: string; lat: number; lng: number }>();
   /** Sticker was moved on the map */
   @Output() stickerMoved = new EventEmitter<StickerInstance>();
+
+  /** Polígonos de sección editados (para panel lateral). */
+  @Output() sectionsChanged = new EventEmitter<ParkSectionRecord[]>();
+
+  /** Referencias espaciales (elementos de escena del mapa). */
+  @Output() spatialReferencesChanged = new EventEmitter<SpatialReference[]>();
 
   // ── Layer config I/O ──────────────────────────────────
   /** Request parent to save current map layer configuration */
@@ -604,6 +784,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private ctx!: CanvasRenderingContext2D;
   private destroy$ = new Subject<void>();
+  private readonly shellLoad = inject(AppShellLoadService);
   private isBrowser: boolean;
 
   // Estado del mapa
@@ -613,10 +794,18 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private targetRotation = 0;
   private offsetX = 0;
   private offsetY = 0;
+  private targetOffsetX = 0;
+  private targetOffsetY = 0;
 
   // Animación
   private animationId: number | null = null;
   private readonly ANIMATION_SPEED = 0.08;
+  private readonly ZOOM_ANIMATION_SPEED = 0.2;
+  /** Interpolación más rápida al encuadrar una zona. */
+  private readonly SECTION_FOCUS_ANIM_SPEED = 0.22;
+  private sectionFocusAnimating = false;
+  private readonly groundPatternCache = new GroundPatternCache();
+  private readonly mapBackdropCache = new MapBackdropCache();
   private readonly STORAGE_KEY = 'pcymt_map_state_v3';
 
   // Rotación continua
@@ -637,7 +826,24 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // Datos
   private markers: Marker[] = [];
   private clusters: AnchorCluster[] = [];
-  sections = PARK_SECTIONS;
+  editableSections: ParkSectionRecord[] = cloneParkSectionRecords();
+
+  // Editor de polígonos de sección
+  sectionEditorMode = false;
+  sectionEditorIndex = 0;
+  sectionEditorSelectedVertex: number | null = null;
+  sectionEditorAddVertexMode = false;
+  private draggingSectionVertex = false;
+  private pointerMovedSinceDown = false;
+  private pointerDownX = 0;
+  private pointerDownY = 0;
+  /** Tap en polígono de zona (mousedown) — evita que el pan robe el click. */
+  private pendingZoneTapIndex = -1;
+  /** Vista jugador: ficha abierta para esta sección (null = cerrada). */
+  playerFichaSectionIndex: number | null = null;
+  playerSpatialRefIndex: number | null = null;
+  /** Hover sobre polígono de sección (-1 = ninguna). */
+  hoveredSectionIndex = -1;
 
   // UI
   private _cursorLat = LAT_CENTER;
@@ -647,15 +853,98 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   isDarkTheme = true;
 
+  /** P0 orientación visitante — leyenda dinámica según colores de sección. */
+  get legendItems(): Array<{ name: string; swatch: string }> {
+    return this.editableSections.map((s) => ({ name: s.name, swatch: s.chartColor }));
+  }
+
+  get showSectionFicha(): boolean {
+    return this.sectionEditorMode || this.playerFichaSectionIndex !== null;
+  }
+
+  get fichaSectionIndex(): number {
+    if (this.sectionEditorMode) return this.sectionEditorIndex;
+    return this.playerFichaSectionIndex ?? 0;
+  }
+
+  get activeSpatialRef(): SpatialReference | null {
+    if (this.playerSpatialRefIndex === null) return null;
+    return this.spatialReferences[this.playerSpatialRefIndex] ?? null;
+  }
+
+  readonly spatialRefSummary = spatialReferenceSummary;
+  readonly spatialRefImage = spatialReferenceImageUrl;
+
+  spatialRefCategoryColor(cat: SpatialReferenceCategory): string {
+    return SPATIAL_REFERENCE_CATEGORY_COLORS[cat] ?? '#607D8B';
+  }
+
+  get fichaSection(): ParkSectionRecord | null {
+    return this.editableSections[this.fichaSectionIndex] ?? null;
+  }
+  visitorSectionLabel: string | null = null;
+  geoActive = false;
+  private geoWatchId: number | null = null;
+
   // Opciones del mapa
   mapOptions = {
     showSections: true,
+    showSectionLabels: true,
     showLabels: true,
     showCanvasGrid: false,
     showTilemap: true,
+    showGroundTextures: true,
+    groundTilePx: PARK_MAP_VIS.groundTilePx as number,
     showBoundary: true,
-    showMarkers: true
+    showMarkers: true,
+    showSpatialReferences: true,
+    showRainEffect: false,
+    rainIntensity: 0.45,
+    rainSize: 1,
+    rainSectionIndex: -1,
+    showFogEffect: false,
+    fogIntensity: 0.35,
+    fogSize: 1,
+    showMotesEffect: false,
+    motesIntensity: 0.4,
+    motesSize: 1,
+    showCloudShadows: false,
+    cloudShadowIntensity: 0.4,
+    cloudShadowSize: 1,
+    showLeavesEffect: false,
+    leavesIntensity: 0.45,
+    leavesSize: 1,
+    showTreesEffect: false,
+    treesIntensity: 0.55,
+    treesSize: 1,
+    showLightningEffect: false,
+    showNightMistEffect: false,
+    nightMistIntensity: 0.35,
+    ambientWindDeg: DEFAULT_AMBIENT_WIND.directionDeg,
+    ambientWindStrength: DEFAULT_AMBIENT_WIND.strength,
+    spatialAnimSpeed: 1,
   };
+
+  spatialReferences: SpatialReference[] = cloneSpatialReferences();
+  /** Índice activo para colocar referencia espacial con click en mapa (-1 = ninguno). */
+  spatialReferencePlaceIndex = -1;
+  selectedSpatialReferenceIndex = -1;
+
+  private readonly rainEffect = new MapRainEffect();
+  private readonly fogEffect = new MapFogEffect();
+  private readonly motesEffect = new MapMotesEffect();
+  private readonly cloudShadowEffect = new MapCloudShadowEffect();
+  private readonly leavesEffect = new MapLeavesEffect();
+  private readonly treesEffect = new MapTreesEffect();
+  private readonly lightningEffect = new MapLightningEffect();
+  private readonly nightMistEffect = new MapNightMistEffect();
+  private readonly spatialRefLayer = new SpatialReferenceLayer();
+  private spatialRefsPhase = 0;
+
+  /** Escenario demo activo (tinte + boost de contraste en secciones). */
+  ambientScenarioId: string | null = null;
+  private ambientScenarioTint: AmbientScenarioTint | null = null;
+  private ambientSectionOpacityBoost = 0;
 
   // Reference image (background layer)
   private refImage: HTMLImageElement | null = null;
@@ -754,9 +1043,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private readonly CURSOR_MOVE_THRESHOLD = 4; // px
 
   // ── Zoom-to-cursor anchor (updated per-frame in animation loop) ──
-  private _zoomAnchorX = 0;   // cursor X relative to viewport center
-  private _zoomAnchorY = 0;   // cursor Y relative to viewport center
+  private _zoomFocusScreen: { x: number; y: number } | null = null;
+  private _zoomFocusMap: { x: number; y: number } | null = null;
   private _hasZoomAnchor = false;
+  private lastPointerOnCanvas = { x: 0, y: 0, valid: false };
 
   /** When true, clicking on the map copies lat/lng coordinates. */
   coordPickerMode = false;
@@ -790,9 +1080,31 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         .pipe(takeUntil(this.destroy$))
         .subscribe(theme => {
           this.isDarkTheme = theme === 'dark';
+          this.groundPatternCache.clear();
+          this.mapBackdropCache.clear();
           this.render();
         });
+      this.startVisitorGeolocation();
     }
+  }
+
+  private startVisitorGeolocation(): void {
+    if (!navigator.geolocation) return;
+    this.geoWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        this.geoActive = true;
+        this.visitorSectionLabel = findParkSectionAt(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          toParkSectionsView(this.editableSections),
+        );
+      },
+      () => {
+        this.geoActive = false;
+        this.visitorSectionLabel = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+    );
   }
 
   ngAfterViewInit(): void {
@@ -802,9 +1114,27 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.ctx = canvas.getContext('2d')!;
     this.resize();
     this.loadMarkers();
+    this.rainEffect.setIntensity(this.mapOptions.rainIntensity);
+    this.rainEffect.setSizeMul(this.mapOptions.rainSize);
+    this.fogEffect.setIntensity(this.mapOptions.fogIntensity);
+    this.fogEffect.setSizeMul(this.mapOptions.fogSize);
+    this.motesEffect.setIntensity(this.mapOptions.motesIntensity);
+    this.motesEffect.setSizeMul(this.mapOptions.motesSize);
+    this.cloudShadowEffect.setIntensity(this.mapOptions.cloudShadowIntensity);
+    this.cloudShadowEffect.setSizeMul(this.mapOptions.cloudShadowSize);
+    this.leavesEffect.setIntensity(this.mapOptions.leavesIntensity);
+    this.leavesEffect.setSizeMul(this.mapOptions.leavesSize);
+    this.treesEffect.setIntensity(this.mapOptions.treesIntensity);
+    this.treesEffect.setSizeMul(this.mapOptions.treesSize);
+    this.lightningEffect.setEnabled(this.mapOptions.showLightningEffect);
+    this.lightningEffect.setRainIntensity(this.mapOptions.rainIntensity);
+    this.nightMistEffect.setIntensity(this.mapOptions.nightMistIntensity);
+    this.syncAmbientZoneCallbacks();
+    this.spatialRefLayer.preload(this.spatialReferences);
     this.startAnimationLoop();
     // Emit initial view info after a short delay so the canvas has sized up
     setTimeout(() => this.emitViewInfo(), 300);
+    setTimeout(() => this.emitSectionsChanged(), 350);
 
     // Observe parent element size changes (e.g. sidenav toggle) to auto-resize canvas
     const parent = canvas.parentElement;
@@ -826,6 +1156,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
     }
+    if (this.geoWatchId != null && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.geoWatchId);
+    }
   }
 
   // === PERSISTENCIA ===
@@ -841,10 +1174,18 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.targetRotation = this.rotation;
         this.offsetX = state.offsetX ?? 0;
         this.offsetY = state.offsetY ?? 0;
+        this.targetOffsetX = this.offsetX;
+        this.targetOffsetY = this.offsetY;
         this.mapOptions.showSections = state.showSections ?? true;
         this.mapOptions.showLabels = state.showLabels ?? true;
         this.mapOptions.showCanvasGrid = state.showCanvasGrid ?? false;
         this.mapOptions.showTilemap = state.showTilemap ?? true;
+        this.mapOptions.showGroundTextures = state.showGroundTextures ?? true;
+        if (state.groundTilePx != null) {
+          this.mapOptions.groundTilePx = clampGroundTilePx(state.groundTilePx);
+          this.groundPatternCache.setTilePx(this.mapOptions.groundTilePx);
+          this.mapBackdropCache.setTilePx(this.mapOptions.groundTilePx);
+        }
         if (state.canvasGridCellW) this.canvasGridCellW = state.canvasGridCellW;
         if (state.canvasGridCellH) this.canvasGridCellH = state.canvasGridCellH;
         if (state.canvasGridOpacity != null) this.canvasGridOpacity = state.canvasGridOpacity;
@@ -865,6 +1206,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         showLabels: this.mapOptions.showLabels,
         showCanvasGrid: this.mapOptions.showCanvasGrid,
         showTilemap: this.mapOptions.showTilemap,
+        showGroundTextures: this.mapOptions.showGroundTextures,
+        groundTilePx: this.mapOptions.groundTilePx,
         canvasGridCellW: this.canvasGridCellW,
         canvasGridCellH: this.canvasGridCellH,
         canvasGridOpacity: this.canvasGridOpacity
@@ -888,23 +1231,16 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
       // Interpolar escala (with zoom-to-cursor anchor adjustment)
       if (Math.abs(this.scale - this.targetScale) > 0.001) {
-        const prevScale = this.scale;
-        this.scale += (this.targetScale - this.scale) * this.ANIMATION_SPEED;
-        if (this._hasZoomAnchor) {
-          const r = this.scale / prevScale;
-          this.offsetX = this._zoomAnchorX - (this._zoomAnchorX - this.offsetX) * r;
-          this.offsetY = this._zoomAnchorY - (this._zoomAnchorY - this.offsetY) * r;
-        }
+        const zoomSpeed = this._hasZoomAnchor ? this.ZOOM_ANIMATION_SPEED : (this.sectionFocusAnimating ? this.SECTION_FOCUS_ANIM_SPEED : this.ANIMATION_SPEED);
+        this.scale += (this.targetScale - this.scale) * zoomSpeed;
+        if (this._hasZoomAnchor) this.applyZoomFocus(this.scale);
         needsRender = true;
       } else if (this.scale !== this.targetScale) {
-        const prevScale = this.scale;
         this.scale = this.targetScale;
-        if (this._hasZoomAnchor) {
-          const r = this.scale / prevScale;
-          this.offsetX = this._zoomAnchorX - (this._zoomAnchorX - this.offsetX) * r;
-          this.offsetY = this._zoomAnchorY - (this._zoomAnchorY - this.offsetY) * r;
-        }
+        if (this._hasZoomAnchor) this.applyZoomFocus(this.scale);
         this._hasZoomAnchor = false;
+        this._zoomFocusScreen = null;
+        this._zoomFocusMap = null;
         needsRender = true;
       }
 
@@ -921,8 +1257,53 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         needsRender = true;
       }
 
+      if (Math.abs(this.offsetX - this.targetOffsetX) > 0.5) {
+        const panSpeed = this.sectionFocusAnimating ? this.SECTION_FOCUS_ANIM_SPEED : this.ANIMATION_SPEED;
+        this.offsetX += (this.targetOffsetX - this.offsetX) * panSpeed;
+        needsRender = true;
+      } else if (this.offsetX !== this.targetOffsetX) {
+        this.offsetX = this.targetOffsetX;
+        needsRender = true;
+      }
+
+      if (Math.abs(this.offsetY - this.targetOffsetY) > 0.5) {
+        const panSpeed = this.sectionFocusAnimating ? this.SECTION_FOCUS_ANIM_SPEED : this.ANIMATION_SPEED;
+        this.offsetY += (this.targetOffsetY - this.offsetY) * panSpeed;
+        needsRender = true;
+      } else if (this.offsetY !== this.targetOffsetY) {
+        this.offsetY = this.targetOffsetY;
+        needsRender = true;
+      }
+
+      if (this.sectionFocusAnimating
+          && Math.abs(this.scale - this.targetScale) <= 0.001
+          && Math.abs(this.offsetX - this.targetOffsetX) <= 0.5
+          && Math.abs(this.offsetY - this.targetOffsetY) <= 0.5) {
+        this.sectionFocusAnimating = false;
+      }
+
       // Rotación continua
       if (this.isRotating) {
+        needsRender = true;
+      }
+
+      if (this.canvasRef?.nativeElement && this.hasActiveAmbientEffects()) {
+        const zone = this.getRainEffectOptions();
+        if (this.mapOptions.showCloudShadows) this.cloudShadowEffect.tick(zone);
+        if (this.mapOptions.showFogEffect) this.fogEffect.tick(zone);
+        if (this.mapOptions.showNightMistEffect && this.isDarkTheme) this.nightMistEffect.tick(zone);
+        if (this.mapOptions.showRainEffect) this.rainEffect.tick(zone);
+        if (this.mapOptions.showMotesEffect) this.motesEffect.tick(zone);
+        if (this.mapOptions.showLeavesEffect) this.leavesEffect.tick(zone);
+        if (this.mapOptions.showLightningEffect) {
+          this.lightningEffect.setRainIntensity(this.mapOptions.rainIntensity);
+          this.lightningEffect.tick(this.mapOptions.showRainEffect);
+        }
+        needsRender = true;
+      }
+
+      if (this.mapOptions.showSpatialReferences) {
+        this.spatialRefsPhase += 0.018 * this.mapOptions.spatialAnimSpeed;
         needsRender = true;
       }
 
@@ -963,7 +1344,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private loadMarkers(): void {
     this.anchorService.getActiveAnchorPoints()
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => this.shellLoad.endNavigation()),
+      )
       .subscribe((points: AnchorPoint[]) => {
         this.markers = points.map(p => {
           const geo = { lat: Number(p.latitude), lng: Number(p.longitude) };
@@ -1127,7 +1511,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     // Always reset to DPR-only transform to guarantee a clean slate each frame
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Fill with theme background
+    // Solid viewport background (theme — fixed while panning/zooming)
     this.ctx.fillStyle = this.theme.background;
     this.ctx.fillRect(0, 0, w, h);
 
@@ -1138,7 +1522,17 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.ctx.scale(this.scale, this.scale);
     this.ctx.translate(-w / 2, -h / 2);
 
-    // Each layer applies its own map-space offset
+    // Ground layers in map space: backdrop → park base → sections (zones)
+    if (this.mapOptions.showGroundTextures) {
+      const lo = this.layerOffsets.sections;
+      this.ctx.save();
+      this.ctx.translate(lo.x, lo.y);
+      this.drawMapGroundBackdrop(w, h);
+      if (PARK_BOUNDARY.length >= 3) {
+        this.drawParkGroundBase();
+      }
+      this.ctx.restore();
+    }
     if (this.mapOptions.showSections) {
       const lo = this.layerOffsets.sections;
       this.ctx.save(); this.ctx.translate(lo.x, lo.y);
@@ -1213,10 +1607,72 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.restore();
     }
 
+    if (this.mapOptions.showTreesEffect) {
+      this.treesEffect.drawWorld(this.ctx, {
+        geoToCanvas: (geo) => this.geoToCanvas(geo),
+        isInZone: (geo) => this.isInAmbientGeoZone(geo),
+        viewport: this.getWorldViewportBounds(w, h),
+        isDark: this.isDarkTheme,
+        baseHeight: PARK_MAP_VIS.treeBaseWorld,
+        sectionIndex: this.mapOptions.rainSectionIndex,
+        wind: this.getAmbientWind(),
+      });
+    }
+
+    this.drawCameraPivotWorld(w, h);
+
     this.ctx.restore();
+
+    // Capa ambiental (bajo referencias espaciales)
+    const ambientClip = this.buildRainClipPath();
+    const ambientToScreen = (bx: number, by: number) => this.baseCanvasToScreen(bx, by);
+    if (this.mapOptions.showCloudShadows) {
+      this.cloudShadowEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+    }
+    if (this.mapOptions.showFogEffect) {
+      this.fogEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+    }
+    if (this.mapOptions.showNightMistEffect) {
+      this.nightMistEffect.draw(
+        this.ctx, ambientClip, ambientToScreen, this.scale, this.isDarkTheme, w, h,
+      );
+    }
+    if (this.mapOptions.showRainEffect) {
+      this.rainEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+    }
+    if (this.mapOptions.showMotesEffect) {
+      this.motesEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+    }
+    if (this.mapOptions.showLeavesEffect) {
+      this.leavesEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+    }
+    if (this.mapOptions.showLightningEffect) {
+      this.lightningEffect.draw(this.ctx, ambientClip, w, h);
+    }
+    this.drawAmbientScenarioTint(ambientClip, w, h);
+    if (this.mapOptions.showSpatialReferences) {
+      this.spatialRefLayer.draw(this.ctx, this.spatialReferences, {
+        geoToScreen: (geo) => this.geoToScreen(geo),
+        phase: this.spatialRefsPhase,
+        viewportW: w,
+        viewportH: h,
+        placeIndex: this.spatialReferencePlaceIndex,
+        selectedIndex: this.selectedSpatialReferenceIndex,
+        fichaIndex: this.playerSpatialRefIndex ?? -1,
+      });
+    }
 
     // Sticker layers (drawn after main transform restore, using geoToScreen)
     this.drawStickers();
+
+    // Section names (screen-space, always readable)
+    if (this.mapOptions.showSections && this.mapOptions.showSectionLabels) {
+      this.drawSectionLabels();
+    }
+
+    if (this.sectionEditorMode) {
+      this.drawSectionEditorVertices();
+    }
 
     // Editor overlay layers (drawn on top of everything using geoToScreen)
     if (this.editorLayers?.length) this.drawEditorOverlay();
@@ -1238,6 +1694,88 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.drawMarkerLabels();
       }
     }
+
+    if (!this.editorMode && !this.sectionEditorMode) {
+      this.drawCameraReticle(w, h, dpr);
+    }
+  }
+
+  /** Anilla en el mapa: punto de mira de la cámara (se desplaza al panear). */
+  private drawCameraPivotWorld(w: number, h: number): void {
+    const pivot = this.getCameraMapPoint(w, h);
+    const r = 5 / this.scale;
+    const arm = 9 / this.scale;
+    const color = this.theme.accent;
+    this.ctx.save();
+    this.ctx.strokeStyle = color;
+    this.ctx.fillStyle = this.isDarkTheme ? 'rgba(124,77,255,0.22)' : 'rgba(46,125,50,0.22)';
+    this.ctx.lineWidth = 1.4 / this.scale;
+    this.ctx.globalAlpha = 0.85;
+    this.ctx.beginPath();
+    this.ctx.arc(pivot.x, pivot.y, r, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.moveTo(pivot.x - arm, pivot.y);
+    this.ctx.lineTo(pivot.x + arm, pivot.y);
+    this.ctx.moveTo(pivot.x, pivot.y - arm);
+    this.ctx.lineTo(pivot.x, pivot.y + arm);
+    this.ctx.stroke();
+    this.ctx.globalAlpha = 1;
+    this.ctx.restore();
+  }
+
+  /** Retícula fija en pantalla = centro óptico de la cámara. */
+  private drawCameraReticle(w: number, h: number, dpr: number): void {
+    const cx = w / 2;
+    const cy = h / 2;
+    const color = this.theme.accent;
+    this.ctx.save();
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.ctx.strokeStyle = color;
+    this.ctx.fillStyle = color;
+    this.ctx.globalAlpha = 0.65;
+    this.ctx.lineWidth = 1;
+    const r = 14;
+    const gap = 5;
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx - r - gap, cy);
+    this.ctx.lineTo(cx - 2, cy);
+    this.ctx.moveTo(cx + 2, cy);
+    this.ctx.lineTo(cx + r + gap, cy);
+    this.ctx.moveTo(cx, cy - r - gap);
+    this.ctx.lineTo(cx, cy - 2);
+    this.ctx.moveTo(cx, cy + 2);
+    this.ctx.lineTo(cx, cy + r + gap);
+    this.ctx.stroke();
+    this.ctx.globalAlpha = 0.95;
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
+  }
+
+  private getCameraMapPoint(w: number, h: number): { x: number; y: number } {
+    return this.screenToMap(w / 2, h / 2);
+  }
+
+  private getCameraScreenCenter(): { x: number; y: number } {
+    const dpr = window.devicePixelRatio || 1;
+    const w = this.canvasRef.nativeElement.width / dpr;
+    const h = this.canvasRef.nativeElement.height / dpr;
+    return { x: w / 2, y: h / 2 };
+  }
+
+  private clampZoom(scale: number): number {
+    return Math.max(PARK_MAP_VIS.zoomMin, Math.min(PARK_MAP_VIS.zoomMax, scale));
+  }
+
+  private beginCameraZoomFocus(): void {
+    const { x, y } = this.getCameraScreenCenter();
+    this.beginZoomFocus(x, y);
   }
 
   private drawGrid(w: number, h: number): void {
@@ -1269,21 +1807,95 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
   }
 
+  private drawMapGroundBackdrop(w: number, h: number): void {
+    const pad = Math.max(w, h) * 2;
+    fillMapRectWithBackdrop(
+      this.ctx,
+      -pad,
+      -pad,
+      w + pad * 2,
+      h + pad * 2,
+      this.isDarkTheme,
+      this.mapBackdropCache,
+      this.scale,
+    );
+  }
+
+  private drawParkGroundBase(): void {
+    const points = PARK_BOUNDARY.map(g => this.geoToCanvas(g));
+    fillPolygonWithGroundTexture(
+      this.ctx,
+      points,
+      -1,
+      this.isDarkTheme,
+      this.theme.boundaryFill,
+      this.isDarkTheme ? PARK_MAP_VIS.parkBaseTintDark : PARK_MAP_VIS.parkBaseTintLight,
+      this.groundPatternCache,
+      this.scale,
+    );
+  }
+
   private drawSections(w: number, h: number): void {
-    PARK_SECTIONS.forEach(section => {
+    const sections = toParkSectionsView(this.editableSections);
+    sections.forEach((section, idx) => {
       if (section.polygon.length < 3) return;
 
+      const record = this.editableSections[idx];
       const points = section.polygon.map(g => this.geoToCanvas(g));
-      const fillColor = this.isDarkTheme ? section.color : section.colorLight;
+      const isHovered = idx === this.hoveredSectionIndex;
+      const isActive = this.sectionEditorMode
+        ? idx === this.sectionEditorIndex
+        : idx === this.playerFichaSectionIndex;
+      const boosted = isHovered || isActive;
+      const { dark, light } = resolveSectionFillOpacities(record);
+      const zoneIdx = this.mapOptions.rainSectionIndex;
+      const inScenarioZone = !!this.ambientScenarioId
+        && (zoneIdx < 0 || idx === zoneIdx);
+      const scenarioBoost = inScenarioZone ? this.ambientSectionOpacityBoost : 0;
+      const drawOpDark = Math.min(dark + scenarioBoost + (boosted ? 0.12 : 0), 1);
+      const drawOpLight = Math.min(light + scenarioBoost * 0.7 + (boosted ? 0.08 : 0), 1);
+      const effectiveOp = this.isDarkTheme ? drawOpDark : drawOpLight;
+      const fill = fillColorsFromHex(record.chartColor, drawOpDark, drawOpLight);
+      const fillColor = this.isDarkTheme ? fill.webFill : fill.webFillLight;
 
-      this.ctx.fillStyle = fillColor;
       this.ctx.beginPath();
       this.ctx.moveTo(points[0].x, points[0].y);
       for (let i = 1; i < points.length; i++) {
         this.ctx.lineTo(points[i].x, points[i].y);
       }
       this.ctx.closePath();
-      this.ctx.fill();
+
+      if (effectiveOp > 0) {
+        if (this.mapOptions.showGroundTextures) {
+          fillPolygonWithGroundTexture(
+            this.ctx,
+            points,
+            idx,
+            this.isDarkTheme,
+            fillColor,
+            parkGroundTintOpacity(effectiveOp),
+            this.groundPatternCache,
+            this.scale,
+          );
+        } else {
+          this.ctx.fillStyle = fillColor;
+          this.ctx.fill();
+        }
+      }
+
+      // Contorno solo al hover (o zona activa en editor de secciones)
+      const showStroke = isHovered || (this.sectionEditorMode && isActive);
+      if (showStroke) {
+        const strokeW = (isHovered ? PARK_MAP_VIS.sectionStrokeHover : PARK_MAP_VIS.sectionStrokeActive) / this.scale;
+        this.ctx.strokeStyle = record.chartColor;
+        this.ctx.lineWidth = strokeW;
+        if (isHovered) {
+          this.ctx.shadowColor = record.chartColor;
+          this.ctx.shadowBlur = 10 / this.scale;
+        }
+        this.ctx.stroke();
+        this.ctx.shadowBlur = 0;
+      }
     });
   }
 
@@ -1292,22 +1904,27 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
     const points = PARK_BOUNDARY.map(g => this.geoToCanvas(g));
 
-    // Relleno
-    this.ctx.fillStyle = this.theme.boundaryFill;
+    if (!this.mapOptions.showGroundTextures) {
+      this.ctx.fillStyle = this.theme.boundaryFill;
+      this.ctx.beginPath();
+      this.ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        this.ctx.lineTo(points[i].x, points[i].y);
+      }
+      this.ctx.closePath();
+      this.ctx.fill();
+    }
+
     this.ctx.beginPath();
     this.ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
       this.ctx.lineTo(points[i].x, points[i].y);
     }
     this.ctx.closePath();
-    this.ctx.fill();
-
-    // Contorno
     this.ctx.strokeStyle = this.theme.boundary;
     this.ctx.lineWidth = 2 / this.scale;
     this.ctx.stroke();
 
-    // Vértices
     const vertexRadius = 2 / this.scale;
     this.ctx.fillStyle = this.theme.text;
     points.forEach((p) => {
@@ -1315,6 +1932,458 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.arc(p.x, p.y, vertexRadius, 0, Math.PI * 2);
       this.ctx.fill();
     });
+  }
+
+  /** Nombres de ecosistema — pantalla fija, siempre legibles (P0). */
+  private drawSectionLabels(): void {
+    const sections = toParkSectionsView(this.editableSections);
+    for (const { name, geo } of sectionLabelCentroids(sections)) {
+      const screenPos = this.geoToScreen(geo);
+      this.ctx.font = 'bold 12px sans-serif';
+      const textWidth = this.ctx.measureText(name).width + 14;
+      const textHeight = 18;
+
+      this.ctx.fillStyle = this.isDarkTheme ? 'rgba(0, 0, 0, 0.78)' : 'rgba(255, 255, 255, 0.92)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(screenPos.x - textWidth / 2, screenPos.y - textHeight / 2, textWidth, textHeight, 6);
+      this.ctx.fill();
+
+      this.ctx.fillStyle = this.isDarkTheme ? '#ffffff' : '#212121';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(name, screenPos.x, screenPos.y);
+    }
+  }
+
+  /** Vértices de la sección activa con etiquetas lat/lng (editor manual). */
+  private drawSectionEditorVertices(): void {
+    const section = this.editableSections[this.sectionEditorIndex];
+    if (!section) return;
+
+    const lo = this.layerOffsets.sections;
+    const sdx = lo.x * this.scale;
+    const sdy = lo.y * this.scale;
+
+    section.polygon.forEach((geo, vi) => {
+      const base = this.geoToScreen(geo);
+      const screenPos = { x: base.x + sdx, y: base.y + sdy };
+      const selected = vi === this.sectionEditorSelectedVertex;
+      const radius = selected ? 9 : 7;
+
+      this.ctx.fillStyle = selected ? '#ff9800' : '#ffffff';
+      this.ctx.strokeStyle = selected ? '#e65100' : '#ff9800';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(screenPos.x, screenPos.y, radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      const label = `${vi + 1}: ${geo.lat.toFixed(8)}, ${geo.lng.toFixed(8)}`;
+      this.ctx.font = '10px monospace';
+      const tw = this.ctx.measureText(label).width + 8;
+      const lx = screenPos.x + 12;
+      const ly = screenPos.y - 10;
+
+      this.ctx.fillStyle = this.isDarkTheme ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)';
+      this.ctx.strokeStyle = selected ? '#ff9800' : 'rgba(255,152,0,0.6)';
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.roundRect(lx, ly - 10, tw, 16, 4);
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = this.isDarkTheme ? '#fff' : '#212121';
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(label, lx + 4, ly - 2);
+    });
+  }
+
+  private hitTestSectionVertex(screenX: number, screenY: number): number | null {
+    const section = this.editableSections[this.sectionEditorIndex];
+    if (!section) return null;
+
+    const threshold = 14;
+    const lo = this.layerOffsets.sections;
+    const sdx = lo.x * this.scale;
+    const sdy = lo.y * this.scale;
+
+    for (let vi = section.polygon.length - 1; vi >= 0; vi--) {
+      const sp = this.geoToScreen(section.polygon[vi]);
+      const dx = screenX - (sp.x + sdx);
+      const dy = screenY - (sp.y + sdy);
+      if (dx * dx + dy * dy <= threshold * threshold) return vi;
+    }
+    return null;
+  }
+
+  // ── API editor de secciones (panel lateral) ─────────────────
+
+  setSectionEditorMode(enabled: boolean): void {
+    this.sectionEditorMode = enabled;
+    if (enabled) {
+      this.mapOptions.showSections = true;
+      this.mapOptions.showBoundary = true;
+    } else {
+      this.hoveredSectionIndex = -1;
+    }
+    if (!enabled) {
+      this.sectionEditorAddVertexMode = false;
+      this.sectionEditorSelectedVertex = null;
+      this.draggingSectionVertex = false;
+    }
+    this.render();
+  }
+
+  onZoneButtonClick(index: number): void {
+    this.focusZone(index);
+  }
+
+  /** Encuadra zona + abre ficha (vista jugador) o selecciona en editor. */
+  focusZone(index: number): void {
+    if (index < 0 || index >= this.editableSections.length) return;
+    if (this.sectionEditorMode) {
+      this.setSectionEditorIndex(index);
+    } else {
+      this.openPlayerFicha(index);
+      this.fitSectionToView(index);
+    }
+  }
+
+  /**
+   * Encuadra el polígono de la sección para que ocupe ~fill de la pantalla (animado).
+   */
+  fitSectionToView(index: number, fill = 0.88): void {
+    if (!this.isBrowser || !this.canvasRef?.nativeElement) return;
+    const section = this.editableSections[index];
+    if (!section?.polygon?.length) return;
+
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.width / (window.devicePixelRatio || 1);
+    const h = canvas.height / (window.devicePixelRatio || 1);
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const basePoints = section.polygon.map(g => this.geoToCanvas(g));
+    const bcx = basePoints.reduce((s, p) => s + p.x, 0) / basePoints.length;
+    const bcy = basePoints.reduce((s, p) => s + p.y, 0) / basePoints.length;
+
+    const rot = this.rotation;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const centroidRelX = (bcx - cx) * cos - (bcy - cy) * sin;
+    const centroidRelY = (bcx - cx) * sin + (bcy - cy) * cos;
+
+    let minDx = Infinity;
+    let maxDx = -Infinity;
+    let minDy = Infinity;
+    let maxDy = -Infinity;
+    for (const p of basePoints) {
+      const rdx = (p.x - cx) * cos - (p.y - cy) * sin - centroidRelX;
+      const rdy = (p.x - cx) * sin + (p.y - cy) * cos - centroidRelY;
+      minDx = Math.min(minDx, rdx);
+      maxDx = Math.max(maxDx, rdx);
+      minDy = Math.min(minDy, rdy);
+      maxDy = Math.max(maxDy, rdy);
+    }
+
+    const baseW = Math.max(maxDx - minDx, 1);
+    const baseH = Math.max(maxDy - minDy, 1);
+    const margin = (1 - fill) / 2;
+    const availW = w * (1 - 2 * margin);
+    const availH = h * (1 - 2 * margin);
+
+    let newScale = Math.min(availW / baseW, availH / baseH);
+    newScale = this.clampZoom(newScale);
+
+    const dx0 = (bcx - cx) * newScale;
+    const dy0 = (bcy - cy) * newScale;
+    const rx = cos * dx0 - sin * dy0;
+    const ry = sin * dx0 + cos * dy0;
+
+    this._hasZoomAnchor = false;
+    this.sectionFocusAnimating = true;
+    this.targetScale = newScale;
+    this.targetOffsetX = w / 2 - cx - rx;
+    this.targetOffsetY = h / 2 - cy - ry;
+    this.saveState();
+    this.emitViewInfo();
+  }
+
+  openPlayerFicha(index: number): void {
+    if (index < 0 || index >= this.editableSections.length) return;
+    this.playerFichaSectionIndex = index;
+    this.render();
+  }
+
+  closePlayerFicha(): void {
+    this.playerFichaSectionIndex = null;
+    this.render();
+  }
+
+  openSpatialRefFicha(index: number): void {
+    if (index < 0 || index >= this.spatialReferences.length) return;
+    this.playerSpatialRefIndex = index;
+    this.selectedSpatialReferenceIndex = index;
+    this.render();
+  }
+
+  closeSpatialRefFicha(): void {
+    this.playerSpatialRefIndex = null;
+    this.render();
+  }
+
+  updateSpatialReference(index: number, patch: Partial<SpatialReference>): void {
+    const ref = this.spatialReferences[index];
+    if (!ref) return;
+    Object.assign(ref, patch);
+    if (patch.summary !== undefined && !ref.education) {
+      ref.education = { summary: patch.summary };
+    }
+    this.emitSpatialReferencesChanged();
+    this.render();
+  }
+
+  setSelectedSpatialReferenceIndex(index: number): void {
+    this.selectedSpatialReferenceIndex = index;
+    this.render();
+  }
+
+  /** Plano del mapa (coords. base canvas) → pantalla, respeta zoom/rotación/pan. */
+  private baseCanvasToScreen(bx: number, by: number): { x: number; y: number } {
+    const canvas = this.canvasRef.nativeElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    const cx = w / 2;
+    const cy = h / 2;
+    let x = bx - cx;
+    let y = by - cy;
+    x *= this.scale;
+    y *= this.scale;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    return {
+      x: cos * x - sin * y + cx + this.offsetX,
+      y: sin * x + cos * y + cy + this.offsetY,
+    };
+  }
+
+  private getParkMapPlaneBounds(): MapPlaneBounds {
+    const pts = PARK_BOUNDARY.map((g) => this.geoToCanvas(g));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+
+  private hitTestSectionAtGeo(geo: GeoPoint): number {
+    for (let i = this.editableSections.length - 1; i >= 0; i--) {
+      if (isPointInPolygon(geo, this.editableSections[i].polygon)) return i;
+    }
+    return -1;
+  }
+
+  private updateSectionHover(x: number, y: number): void {
+    if (this.sectionEditorMode || !this.mapOptions.showSections) return;
+    if (this.isDragging || this.draggingSectionVertex || this.tilePaintMode || this.editorMode) return;
+
+    const geo = this.canvasToGeo({ x, y });
+    const hit = this.hitTestSectionAtGeo(geo);
+    if (hit !== this.hoveredSectionIndex) {
+      this.hoveredSectionIndex = hit;
+      this.render();
+    }
+  }
+
+  setSectionEditorIndex(index: number): void {
+    if (index < 0 || index >= this.editableSections.length) return;
+    this.sectionEditorIndex = index;
+    this.sectionEditorSelectedVertex = null;
+    this.fitSectionToView(index);
+    this.render();
+  }
+
+  setSectionEditorSelectedVertex(vertexIndex: number | null): void {
+    this.sectionEditorSelectedVertex = vertexIndex;
+    this.render();
+  }
+
+  setSectionEditorAddVertexMode(enabled: boolean): void {
+    this.sectionEditorAddVertexMode = enabled;
+    this.render();
+  }
+
+  get activeSectionRecord(): ParkSectionRecord | null {
+    return this.editableSections[this.sectionEditorIndex] ?? null;
+  }
+
+  updateSectionColor(sectionIndex: number, hex: string): void {
+    const section = this.editableSections[sectionIndex];
+    if (!section) return;
+    section.chartColor = hex;
+    syncSectionFillColors(section);
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  updateSectionFillOpacity(
+    sectionIndex: number,
+    which: 'dark' | 'light',
+    opacity: number,
+  ): void {
+    const section = this.editableSections[sectionIndex];
+    if (!section) return;
+    const v = Math.min(1, Math.max(0, opacity));
+    if (which === 'dark') section.fillOpacity = v;
+    else section.fillOpacityLight = v;
+    syncSectionFillColors(section);
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  onEducationSummaryChange(summary: string): void {
+    const section = this.editableSections[this.sectionEditorIndex];
+    if (!section) return;
+    if (!section.education) {
+      section.education = { summary: '', referenceImageUrl: '' };
+    }
+    section.education.summary = summary;
+    this.emitSectionsChanged();
+  }
+
+  onSectionReferenceImagePicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file?.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const section = this.editableSections[this.sectionEditorIndex];
+      if (!section) return;
+      if (!section.education) {
+        section.education = { summary: '', referenceImageUrl: '' };
+      }
+      section.education.referenceImageUrl = reader.result as string;
+      this.emitSectionsChanged();
+      this.render();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearSectionReferenceImage(): void {
+    const section = this.editableSections[this.sectionEditorIndex];
+    if (!section?.education) return;
+    section.education.referenceImageUrl = '';
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  getEditableSections(): ParkSectionRecord[] {
+    return this.editableSections.map((s) => ({
+      ...s,
+      colors: { ...s.colors },
+      polygon: s.polygon.map((p) => ({ ...p })),
+      education: s.education
+        ? { ...s.education }
+        : { summary: '', referenceImageUrl: '' },
+    }));
+  }
+
+  updateSectionVertex(sectionIndex: number, vertexIndex: number, lat: number, lng: number): void {
+    const section = this.editableSections[sectionIndex];
+    if (!section?.polygon[vertexIndex]) return;
+    section.polygon[vertexIndex] = {
+      lat: Number(lat.toFixed(8)),
+      lng: Number(lng.toFixed(8)),
+    };
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  addSectionVertex(sectionIndex: number, lat: number, lng: number): void {
+    const section = this.editableSections[sectionIndex];
+    if (!section) return;
+    section.polygon.push({
+      lat: Number(lat.toFixed(8)),
+      lng: Number(lng.toFixed(8)),
+    });
+    this.sectionEditorSelectedVertex = section.polygon.length - 1;
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  deleteSectionVertex(sectionIndex: number, vertexIndex: number): void {
+    const section = this.editableSections[sectionIndex];
+    if (!section || section.polygon.length <= 3) return;
+    section.polygon.splice(vertexIndex, 1);
+    this.sectionEditorSelectedVertex = null;
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  resetSectionsToDefault(): void {
+    this.editableSections = cloneParkSectionRecords();
+    this.sectionEditorSelectedVertex = null;
+    this.emitSectionsChanged();
+    this.render();
+  }
+
+  exportSectionsJson(): string {
+    return JSON.stringify(
+      {
+        version: 2,
+        source: 'web-admin-manual-edit',
+        partition: 'manual',
+        syncedAt: new Date().toISOString(),
+        sections: this.editableSections.map((s) => ({
+          id: s.id,
+          code: s.code,
+          semanticKey: s.semanticKey,
+          chartColor: s.chartColor,
+          name: s.name,
+          fillOpacity: s.fillOpacity,
+          fillOpacityLight: s.fillOpacityLight,
+          colors: s.colors,
+          education: s.education
+            ? {
+                summary: s.education.summary ?? '',
+                ...(s.education.referenceImageUrl
+                  ? { referenceImageUrl: s.education.referenceImageUrl }
+                  : {}),
+              }
+            : undefined,
+          polygon: s.polygon.map((p) => ({
+            lat: Number(p.lat.toFixed(8)),
+            lng: Number(p.lng.toFixed(8)),
+          })),
+        })),
+      },
+      null,
+      2,
+    );
+  }
+
+  downloadSectionsJson(): void {
+    const blob = new Blob([this.exportSectionsJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'park-sections.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private emitSectionsChanged(): void {
+    this.sectionsChanged.emit(this.getEditableSections());
   }
 
   private drawMarkerDots(w: number, h: number): void {
@@ -1362,7 +2431,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       'Tierras Altas':    { fill: 'rgba(139, 90, 43, 0.18)',  stroke: 'rgba(139, 90, 43, 0.6)' },
       'Tierras Medias':   { fill: 'rgba(76, 175, 80, 0.18)',  stroke: 'rgba(76, 175, 80, 0.6)' },
       'Tierras Bajas':    { fill: 'rgba(255, 193, 7, 0.18)',   stroke: 'rgba(255, 193, 7, 0.6)' },
-      'Mitos y Leyendas': { fill: 'rgba(103, 58, 183, 0.18)', stroke: 'rgba(103, 58, 183, 0.6)' },
     };
     const defaultColor = { fill: 'rgba(33, 150, 243, 0.18)', stroke: 'rgba(33, 150, 243, 0.6)' };
 
@@ -2295,6 +3363,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    this.pointerMovedSinceDown = false;
+    this.pointerDownX = e.clientX;
+    this.pointerDownY = e.clientY;
 
     // ── Tile paint mode: paint on grid cells ──────────────────
     if (this.tilePaintMode && e.button === 0) {
@@ -2336,6 +3407,28 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.paintAtScreenPos(x, y);
         return;
       }
+    }
+
+    // ── Section polygon editor ─────────────────────────────
+    if (this.sectionEditorMode && e.button === 0) {
+      const vertexHit = this.hitTestSectionVertex(x, y);
+      if (vertexHit !== null) {
+        this.sectionEditorSelectedVertex = vertexHit;
+        this.draggingSectionVertex = true;
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
+        this.emitSectionsChanged();
+        this.render();
+        return;
+      }
+      if (!this.sectionEditorAddVertexMode) {
+        this.isDragging = true;
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
+        const container = this.canvasRef.nativeElement.parentElement;
+        if (container) container.style.cursor = 'grabbing';
+      }
+      return;
     }
 
     // In editor mode, only allow map panning (pan tool or middle button)
@@ -2385,6 +3478,19 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       }
     }
 
+    // Vista jugador: tap en zona — no iniciar pan hasta confirmar que no es drag
+    if (e.button === 0 && !this.sectionEditorMode && !this.editorMode && !this.stickerEditMode
+        && !this.coordPickerMode && !this.tilePaintMode && this.mapOptions.showSections) {
+      const geo = this.canvasToGeo({ x, y });
+      const hit = this.hitTestSectionAtGeo(geo);
+      if (hit >= 0) {
+        this.pendingZoneTapIndex = hit;
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
+        return;
+      }
+    }
+
     this.isDragging = true;
     this.lastX = e.clientX;
     this.lastY = e.clientY;
@@ -2398,6 +3504,18 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    this.lastPointerOnCanvas = { x, y, valid: true };
+
+    if (!this.pointerMovedSinceDown) {
+      const dx = e.clientX - this.pointerDownX;
+      const dy = e.clientY - this.pointerDownY;
+      if (dx * dx + dy * dy > 16) this.pointerMovedSinceDown = true;
+    }
+
+    if (this.pendingZoneTapIndex >= 0 && this.pointerMovedSinceDown) {
+      this.isDragging = true;
+      this.pendingZoneTapIndex = -1;
+    }
 
     // ── Tile paint drag ──────────────────────────────────────
     if (this.isPainting && this.tilePaintMode) {
@@ -2431,6 +3549,18 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this._cursorLat = geo.lat;
     this._cursorLng = geo.lng;
 
+    if (this.draggingSectionVertex && this.sectionEditorSelectedVertex !== null) {
+      this.updateSectionVertex(
+        this.sectionEditorIndex,
+        this.sectionEditorSelectedVertex,
+        geo.lat,
+        geo.lng,
+      );
+      return;
+    }
+
+    this.updateSectionHover(x, y);
+
     // In editor mode, emit geo position for cursor display + item dragging
     if (this.editorMode) {
       this.editorGeoMove.emit({ lat: geo.lat, lng: geo.lng });
@@ -2440,6 +3570,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         const dy = e.clientY - this.lastY;
         this.offsetX += dx;
         this.offsetY += dy;
+        this.targetOffsetX = this.offsetX;
+        this.targetOffsetY = this.offsetY;
         this.lastX = e.clientX;
         this.lastY = e.clientY;
         this.render();
@@ -2587,6 +3719,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       if (this.activeMovableLayer === 'canvas') {
         this.offsetX += dx;
         this.offsetY += dy;
+        this.targetOffsetX = this.offsetX;
+        this.targetOffsetY = this.offsetY;
       } else if (this.activeMovableLayer === 'grid') {
         // Grid has its own rotation — use gridRad for correct delta conversion
         const gridRad = this.canvasGridRotation * Math.PI / 180;
@@ -2612,6 +3746,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   onMouseUp(): void {
+    if (this.draggingSectionVertex) {
+      this.draggingSectionVertex = false;
+    }
     // Tile painting end
     if (this.isPainting) {
       this.isPainting = false;
@@ -2693,6 +3830,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       }
       return;
     }
+    if (this.pendingZoneTapIndex >= 0) {
+      if (!this.pointerMovedSinceDown) {
+        this.focusZone(this.pendingZoneTapIndex);
+      }
+      this.pendingZoneTapIndex = -1;
+      return;
+    }
     if (this.isDragging) {
       this.isDragging = false;
       const container = this.canvasRef.nativeElement.parentElement;
@@ -2708,34 +3852,111 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.isDraggingSticker = false;
     this.isScalingSticker = false;
     this.isRotatingSticker = false;
+    this.pendingZoneTapIndex = -1;
     this.stopContinuousRotation();
+    if (this.hoveredSectionIndex >= 0) {
+      this.hoveredSectionIndex = -1;
+      this.render();
+    }
   }
 
   onWheel(e: WheelEvent): void {
     e.preventDefault();
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
     const dpr = window.devicePixelRatio || 1;
     const w = this.canvasRef.nativeElement.width / dpr;
     const h = this.canvasRef.nativeElement.height / dpr;
+    const factor = e.deltaY > 0 ? PARK_MAP_VIS.zoomWheelOut : PARK_MAP_VIS.zoomWheelIn;
+    const newScale = this.clampZoom(this.scale * factor);
+    if (Math.abs(newScale - this.scale) < 0.0001) return;
 
-    // Store zoom anchor: cursor position relative to viewport center.
-    // The animation loop will use this each frame to keep the world-point
-    // under the cursor fixed while scale interpolates.
-    this._zoomAnchorX = mouseX - w / 2;
-    this._zoomAnchorY = mouseY - h / 2;
+    this.beginZoomFocus(w / 2, h / 2);
+    this.scale = newScale;
+    this.targetScale = newScale;
+    this.applyZoomFocus(this.scale);
+    this._hasZoomAnchor = false;
+    this._zoomFocusScreen = null;
+    this._zoomFocusMap = null;
+    this.render();
+    this.saveState();
+    this.emitViewInfo();
+  }
+
+  /** Mantiene fijo el punto del mapa bajo el cursor al cambiar escala (respeta rotación). */
+  private beginZoomFocus(sx: number, sy: number): void {
+    this._zoomFocusScreen = { x: sx, y: sy };
+    this._zoomFocusMap = this.screenToMap(sx, sy);
     this._hasZoomAnchor = true;
+  }
 
-    // Symmetric zoom factor (1/0.9 ≈ 1.111, ensures zoom-in/out are reversible)
-    const factor = e.deltaY > 0 ? 0.9 : (1 / 0.9);
-    this.targetScale = Math.max(0.3, Math.min(15, this.targetScale * factor));
+  private applyZoomFocus(scale: number): void {
+    if (!this._zoomFocusMap || !this._zoomFocusScreen) return;
+    const canvasEl = this.canvasRef.nativeElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvasEl.width / dpr;
+    const h = canvasEl.height / dpr;
+    const cx = w / 2;
+    const cy = h / 2;
+    const mapPt = this._zoomFocusMap;
+    let mx = mapPt.x - cx;
+    let my = mapPt.y - cy;
+    mx *= scale;
+    my *= scale;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    const rx = cos * mx - sin * my;
+    const ry = sin * mx + cos * my;
+    this.offsetX = this._zoomFocusScreen.x - rx - cx;
+    this.offsetY = this._zoomFocusScreen.y - ry - cy;
+    this.targetOffsetX = this.offsetX;
+    this.targetOffsetY = this.offsetY;
   }
 
   onClick(e: MouseEvent): void {
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    // ── Section editor: add vertex on map click ─────────────
+    if (this.sectionEditorMode && this.sectionEditorAddVertexMode) {
+      const geo = this.canvasToGeo({ x, y });
+      this.addSectionVertex(this.sectionEditorIndex, geo.lat, geo.lng);
+      return;
+    }
+
+    // ── Colocar referencia espacial ─────────────────────────
+    if (this.spatialReferencePlaceIndex >= 0 && !this.pointerMovedSinceDown) {
+      const geo = this.canvasToGeo({ x, y });
+      const ref = this.spatialReferences[this.spatialReferencePlaceIndex];
+      if (ref && isGeoInPark(geo, PARK_BOUNDARY)) {
+        ref.lat = Number(geo.lat.toFixed(8));
+        ref.lng = Number(geo.lng.toFixed(8));
+        this.emitSpatialReferencesChanged();
+        this.render();
+      }
+      return;
+    }
+
+    // ── Section editor: tap inside polygon selects zone ─────
+    if (this.sectionEditorMode && !this.pointerMovedSinceDown) {
+      const geo = this.canvasToGeo({ x, y });
+      const hit = this.hitTestSectionAtGeo(geo);
+      if (hit >= 0) {
+        this.setSectionEditorIndex(hit);
+        return;
+      }
+    }
+
+    // ── Vista jugador: referencia espacial → ficha ──────────
+    if (!this.sectionEditorMode && !this.editorMode && !this.stickerEditMode && !this.coordPickerMode
+        && !this.pointerMovedSinceDown && this.mapOptions.showSpatialReferences) {
+      const refHit = this.spatialRefLayer.hitTest(
+        this.spatialReferences, x, y, (geo) => this.geoToScreen(geo),
+      );
+      if (refHit >= 0) {
+        this.openSpatialRefFicha(refHit);
+        return;
+      }
+    }
 
     // ── Editor mode: route click to tilemap editor ──────────
     if (this.editorMode) {
@@ -2814,15 +4035,474 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.stickerDroppedOnMap.emit({ key, lat: geo.lat, lng: geo.lng });
   }
 
-  /** Global keyboard handler for sticker editing shortcuts */
-  /** Set a single map option and re-render */
-  setMapOption(option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers', value: boolean): void {
+  setMapOption(option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers' | 'showGroundTextures', value: boolean): void {
     this.mapOptions[option] = value;
     this.onOptionChange();
     this.emitViewInfo();
   }
 
-  /** Emit current view state to external listeners */
+  setGroundTilePx(px: number): void {
+    const next = clampGroundTilePx(px);
+    if (next === this.mapOptions.groundTilePx) return;
+    this.mapOptions.groundTilePx = next;
+    this.groundPatternCache.setTilePx(next);
+    this.mapBackdropCache.setTilePx(next);
+    this.onOptionChange();
+    this.emitViewInfo();
+  }
+
+  setMapSceneOption(
+    option:
+      | 'showSpatialReferences'
+      | 'showRainEffect'
+      | 'showFogEffect'
+      | 'showMotesEffect'
+      | 'showCloudShadows'
+      | 'showLeavesEffect'
+      | 'showTreesEffect'
+      | 'showLightningEffect'
+      | 'showNightMistEffect',
+    value: boolean,
+  ): void {
+    this.mapOptions[option] = value;
+    if (option === 'showRainEffect' && !value) this.rainEffect.clear();
+    if (option === 'showFogEffect' && !value) this.fogEffect.clear();
+    if (option === 'showMotesEffect' && !value) this.motesEffect.clear();
+    if (option === 'showCloudShadows' && !value) this.cloudShadowEffect.clear();
+    if (option === 'showLeavesEffect' && !value) this.leavesEffect.clear();
+    if (option === 'showLightningEffect') {
+      this.lightningEffect.setEnabled(value);
+      if (!value) this.lightningEffect.clear();
+    }
+    if (option === 'showNightMistEffect' && !value) this.nightMistEffect.clear();
+    this.onOptionChange();
+    this.emitViewInfo();
+  }
+
+  private hasActiveAmbientEffects(): boolean {
+    return this.mapOptions.showRainEffect
+      || this.mapOptions.showFogEffect
+      || this.mapOptions.showMotesEffect
+      || this.mapOptions.showCloudShadows
+      || this.mapOptions.showLeavesEffect
+      || this.mapOptions.showLightningEffect
+      || (this.mapOptions.showNightMistEffect && this.isDarkTheme);
+  }
+
+  private isInAmbientGeoZone(geo: GeoPoint): boolean {
+    const idx = this.mapOptions.rainSectionIndex;
+    if (idx < 0) return isPointInPolygon(geo, PARK_BOUNDARY);
+    const polygon = this.editableSections[idx]?.polygon;
+    if (!polygon?.length) return isPointInPolygon(geo, PARK_BOUNDARY);
+    return isPointInPolygon(geo, polygon);
+  }
+
+  private getWorldViewportBounds(w: number, h: number): MapPlaneBounds {
+    const corners = [
+      this.screenToMap(0, 0),
+      this.screenToMap(w, 0),
+      this.screenToMap(w, h),
+      this.screenToMap(0, h),
+    ];
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of corners) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+
+  private syncAmbientZoneCallbacks(): void {
+    const contains = this.getRainContainsPoint() ?? null;
+    this.rainEffect.setContainsPoint(contains);
+    this.fogEffect.setContainsPoint(contains);
+    this.motesEffect.setContainsPoint(contains);
+    this.cloudShadowEffect.setContainsPoint(contains);
+    this.leavesEffect.setContainsPoint(contains);
+    this.nightMistEffect.setContainsPoint(contains);
+    this.leavesEffect.setSectionAt((bx, by) => this.hitTestSectionAtCanvas(bx, by));
+    this.treesEffect.setSectionIndex(this.mapOptions.rainSectionIndex);
+  }
+
+  private hitTestSectionAtCanvas(bx: number, by: number): number {
+    return this.hitTestSectionAtGeo(this.canvasToGeo({ x: bx, y: by }));
+  }
+
+  setRainIntensity(value: number): void {
+    this.mapOptions.rainIntensity = Math.min(1, Math.max(0, value));
+    this.rainEffect.setIntensity(this.mapOptions.rainIntensity);
+    this.lightningEffect.setRainIntensity(this.mapOptions.rainIntensity);
+    this.onOptionChange();
+  }
+
+  setRainSize(value: number): void {
+    this.mapOptions.rainSize = Math.min(2.5, Math.max(0.08, value));
+    this.rainEffect.setSizeMul(this.mapOptions.rainSize);
+    this.onOptionChange();
+  }
+
+  setFogIntensity(value: number): void {
+    this.mapOptions.fogIntensity = Math.min(1, Math.max(0, value));
+    this.fogEffect.setIntensity(this.mapOptions.fogIntensity);
+    this.onOptionChange();
+  }
+
+  setFogSize(value: number): void {
+    this.mapOptions.fogSize = Math.min(2.5, Math.max(0.08, value));
+    this.fogEffect.setSizeMul(this.mapOptions.fogSize);
+    this.onOptionChange();
+  }
+
+  setMotesIntensity(value: number): void {
+    this.mapOptions.motesIntensity = Math.min(1, Math.max(0, value));
+    this.motesEffect.setIntensity(this.mapOptions.motesIntensity);
+    this.onOptionChange();
+  }
+
+  setMotesSize(value: number): void {
+    this.mapOptions.motesSize = Math.min(2.5, Math.max(0.08, value));
+    this.motesEffect.setSizeMul(this.mapOptions.motesSize);
+    this.onOptionChange();
+  }
+
+  setCloudShadowIntensity(value: number): void {
+    this.mapOptions.cloudShadowIntensity = Math.min(1, Math.max(0, value));
+    this.cloudShadowEffect.setIntensity(this.mapOptions.cloudShadowIntensity);
+    this.onOptionChange();
+  }
+
+  setCloudShadowSize(value: number): void {
+    this.mapOptions.cloudShadowSize = Math.min(2.5, Math.max(0.08, value));
+    this.cloudShadowEffect.setSizeMul(this.mapOptions.cloudShadowSize);
+    this.onOptionChange();
+  }
+
+  setLeavesIntensity(value: number): void {
+    this.mapOptions.leavesIntensity = Math.min(1, Math.max(0, value));
+    this.leavesEffect.setIntensity(this.mapOptions.leavesIntensity);
+    this.onOptionChange();
+  }
+
+  setLeavesSize(value: number): void {
+    this.mapOptions.leavesSize = Math.min(2.5, Math.max(0.08, value));
+    this.leavesEffect.setSizeMul(this.mapOptions.leavesSize);
+    this.onOptionChange();
+  }
+
+  setTreesIntensity(value: number): void {
+    this.mapOptions.treesIntensity = Math.min(1, Math.max(0, value));
+    this.treesEffect.setIntensity(this.mapOptions.treesIntensity);
+    this.onOptionChange();
+  }
+
+  setTreesSize(value: number): void {
+    this.mapOptions.treesSize = Math.min(2.5, Math.max(0.08, value));
+    this.treesEffect.setSizeMul(this.mapOptions.treesSize);
+    this.onOptionChange();
+  }
+
+  setNightMistIntensity(value: number): void {
+    this.mapOptions.nightMistIntensity = Math.min(1, Math.max(0, value));
+    this.nightMistEffect.setIntensity(this.mapOptions.nightMistIntensity);
+    this.onOptionChange();
+  }
+
+  applyAmbientScenario(scenario: AmbientScenario, opts?: { skipCamera?: boolean }): void {
+    this.rainEffect.clear();
+    this.fogEffect.clear();
+    this.motesEffect.clear();
+    this.cloudShadowEffect.clear();
+    this.leavesEffect.clear();
+    this.nightMistEffect.clear();
+    this.lightningEffect.clear();
+
+    this.ambientScenarioId = scenario.id;
+    this.ambientScenarioTint = scenario.tint;
+    this.ambientSectionOpacityBoost = scenario.sectionOpacityBoost;
+
+    const s = scenario.scene;
+    this.mapOptions.showRainEffect = s.showRainEffect;
+    this.mapOptions.rainIntensity = s.rainIntensity;
+    this.mapOptions.rainSize = s.rainSize;
+    this.mapOptions.rainSectionIndex = s.rainSectionIndex;
+    this.mapOptions.showFogEffect = s.showFogEffect;
+    this.mapOptions.fogIntensity = s.fogIntensity;
+    this.mapOptions.fogSize = s.fogSize;
+    this.mapOptions.showMotesEffect = s.showMotesEffect;
+    this.mapOptions.motesIntensity = s.motesIntensity;
+    this.mapOptions.motesSize = s.motesSize;
+    this.mapOptions.showCloudShadows = s.showCloudShadows;
+    this.mapOptions.cloudShadowIntensity = s.cloudShadowIntensity;
+    this.mapOptions.cloudShadowSize = s.cloudShadowSize;
+    this.mapOptions.showLeavesEffect = s.showLeavesEffect;
+    this.mapOptions.leavesIntensity = s.leavesIntensity;
+    this.mapOptions.leavesSize = s.leavesSize;
+    this.mapOptions.showTreesEffect = s.showTreesEffect;
+    this.mapOptions.treesIntensity = s.treesIntensity;
+    this.mapOptions.treesSize = s.treesSize;
+    this.mapOptions.showLightningEffect = s.showLightningEffect;
+    this.mapOptions.showNightMistEffect = s.showNightMistEffect;
+    this.mapOptions.nightMistIntensity = s.nightMistIntensity;
+    this.mapOptions.ambientWindDeg = s.ambientWindDeg;
+    this.mapOptions.ambientWindStrength = s.ambientWindStrength;
+
+    this.rainEffect.setIntensity(s.rainIntensity);
+    this.rainEffect.setSizeMul(s.rainSize);
+    this.fogEffect.setIntensity(s.fogIntensity);
+    this.fogEffect.setSizeMul(s.fogSize);
+    this.motesEffect.setIntensity(s.motesIntensity);
+    this.motesEffect.setSizeMul(s.motesSize);
+    this.cloudShadowEffect.setIntensity(s.cloudShadowIntensity);
+    this.cloudShadowEffect.setSizeMul(s.cloudShadowSize);
+    this.leavesEffect.setIntensity(s.leavesIntensity);
+    this.leavesEffect.setSizeMul(s.leavesSize);
+    this.treesEffect.setIntensity(s.treesIntensity);
+    this.treesEffect.setSizeMul(s.treesSize);
+    this.nightMistEffect.setIntensity(s.nightMistIntensity);
+    this.lightningEffect.setEnabled(s.showLightningEffect);
+    this.lightningEffect.setRainIntensity(s.rainIntensity);
+    this.syncAmbientZoneCallbacks();
+
+    if (!opts?.skipCamera && scenario.focusSection !== null) {
+      if (scenario.focusSection >= 0) {
+        this.fitSectionToView(scenario.focusSection);
+      } else {
+        this.resetView();
+      }
+    }
+
+    this.onOptionChange();
+    this.render();
+  }
+
+  getActiveAmbientScenarioId(): string | null {
+    return this.ambientScenarioId;
+  }
+
+  /** Scenario color tint without changing camera or effect sliders. */
+  applyAmbientScenarioTint(scenarioId: string | null): void {
+    if (!scenarioId) {
+      this.ambientScenarioId = null;
+      this.ambientScenarioTint = null;
+      this.ambientSectionOpacityBoost = 0;
+      this.render();
+      return;
+    }
+    const scenario = findAmbientScenario(scenarioId);
+    if (!scenario) return;
+    this.ambientScenarioId = scenario.id;
+    this.ambientScenarioTint = scenario.tint;
+    this.ambientSectionOpacityBoost = scenario.sectionOpacityBoost;
+    this.render();
+  }
+
+  clearAmbientScenarioVisuals(): void {
+    if (!this.ambientScenarioId && !this.ambientScenarioTint) return;
+    this.ambientScenarioId = null;
+    this.ambientScenarioTint = null;
+    this.ambientSectionOpacityBoost = 0;
+    this.render();
+  }
+
+  private drawAmbientScenarioTint(clipPath: Path2D | null, w: number, h: number): void {
+    const tint = this.ambientScenarioTint;
+    if (!tint || tint.alpha <= 0) return;
+
+    this.ctx.save();
+    if (clipPath) this.ctx.clip(clipPath);
+
+    const grad = this.ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, tint.top);
+    grad.addColorStop(1, tint.bottom);
+    this.ctx.globalAlpha = tint.alpha;
+    this.ctx.fillStyle = grad;
+    this.ctx.fillRect(0, 0, w, h);
+    this.ctx.globalAlpha = 1;
+
+    this.ctx.restore();
+  }
+
+  setRainSectionIndex(index: number): void {
+    const next = Number.isFinite(index) ? Math.round(index) : -1;
+    if (this.mapOptions.rainSectionIndex === next) return;
+    this.mapOptions.rainSectionIndex = next;
+    this.rainEffect.clear();
+    this.fogEffect.clear();
+    this.motesEffect.clear();
+    this.cloudShadowEffect.clear();
+    this.leavesEffect.clear();
+    this.nightMistEffect.clear();
+    this.syncAmbientZoneCallbacks();
+    this.onOptionChange();
+  }
+
+  setSpatialAnimSpeed(value: number): void {
+    this.mapOptions.spatialAnimSpeed = Math.min(2, Math.max(0.2, value));
+  }
+
+  setSpatialReferencePlaceIndex(index: number): void {
+    this.spatialReferencePlaceIndex = index;
+    this.render();
+  }
+
+  getSceneOptions(): {
+    showSpatialReferences: boolean;
+    showRainEffect: boolean;
+    rainIntensity: number;
+    rainSize: number;
+    rainSectionIndex: number;
+    showFogEffect: boolean;
+    fogIntensity: number;
+    fogSize: number;
+    showMotesEffect: boolean;
+    motesIntensity: number;
+    motesSize: number;
+    showCloudShadows: boolean;
+    cloudShadowIntensity: number;
+    cloudShadowSize: number;
+    showLeavesEffect: boolean;
+    leavesIntensity: number;
+    leavesSize: number;
+    showTreesEffect: boolean;
+    treesIntensity: number;
+    treesSize: number;
+    showLightningEffect: boolean;
+    showNightMistEffect: boolean;
+    nightMistIntensity: number;
+    ambientWindDeg: number;
+    ambientWindStrength: number;
+    spatialAnimSpeed: number;
+  } {
+    return {
+      showSpatialReferences: this.mapOptions.showSpatialReferences,
+      showRainEffect: this.mapOptions.showRainEffect,
+      rainIntensity: this.mapOptions.rainIntensity,
+      rainSize: this.mapOptions.rainSize,
+      rainSectionIndex: this.mapOptions.rainSectionIndex,
+      showFogEffect: this.mapOptions.showFogEffect,
+      fogIntensity: this.mapOptions.fogIntensity,
+      fogSize: this.mapOptions.fogSize,
+      showMotesEffect: this.mapOptions.showMotesEffect,
+      motesIntensity: this.mapOptions.motesIntensity,
+      motesSize: this.mapOptions.motesSize,
+      showCloudShadows: this.mapOptions.showCloudShadows,
+      cloudShadowIntensity: this.mapOptions.cloudShadowIntensity,
+      cloudShadowSize: this.mapOptions.cloudShadowSize,
+      showLeavesEffect: this.mapOptions.showLeavesEffect,
+      leavesIntensity: this.mapOptions.leavesIntensity,
+      leavesSize: this.mapOptions.leavesSize,
+      showTreesEffect: this.mapOptions.showTreesEffect,
+      treesIntensity: this.mapOptions.treesIntensity,
+      treesSize: this.mapOptions.treesSize,
+      showLightningEffect: this.mapOptions.showLightningEffect,
+      showNightMistEffect: this.mapOptions.showNightMistEffect,
+      nightMistIntensity: this.mapOptions.nightMistIntensity,
+      ambientWindDeg: this.mapOptions.ambientWindDeg,
+      ambientWindStrength: this.mapOptions.ambientWindStrength,
+      spatialAnimSpeed: this.mapOptions.spatialAnimSpeed,
+    };
+  }
+
+  getSpatialReferences(): SpatialReference[] {
+    return this.spatialReferences.map((r) => ({ ...r }));
+  }
+
+  downloadSpatialReferencesJson(): void {
+    const blob = new Blob([exportSpatialReferencesJson(this.spatialReferences)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'spatial-references.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private emitSpatialReferencesChanged(): void {
+    this.spatialReferencesChanged.emit(this.getSpatialReferences());
+    this.spatialRefLayer.preload(this.spatialReferences);
+  }
+
+  /** Clip del polígono del parque en espacio de pantalla (para lluvia). */
+  private buildParkClipPath(): Path2D | null {
+    return this.buildGeoClipPath(PARK_BOUNDARY);
+  }
+
+  private buildRainClipPath(): Path2D | null {
+    const idx = this.mapOptions.rainSectionIndex;
+    if (idx < 0) return this.buildParkClipPath();
+    const polygon = this.editableSections[idx]?.polygon;
+    if (!polygon?.length) return this.buildParkClipPath();
+    return this.buildGeoClipPath(polygon);
+  }
+
+  private buildGeoClipPath(polygon: GeoPoint[]): Path2D | null {
+    const pts = polygon.map((g) => this.geoToScreen(g));
+    if (pts.length < 3) return null;
+    const path = new Path2D();
+    path.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) path.lineTo(pts[i].x, pts[i].y);
+    path.closePath();
+    return path;
+  }
+
+  private getAmbientWind(): AmbientWind {
+    return {
+      directionDeg: this.mapOptions.ambientWindDeg,
+      strength: this.mapOptions.ambientWindStrength,
+    };
+  }
+
+  setAmbientWindDirection(deg: number): void {
+    this.mapOptions.ambientWindDeg = normalizeWindDegrees(deg);
+    this.onOptionChange();
+  }
+
+  setAmbientWindStrength(value: number): void {
+    this.mapOptions.ambientWindStrength = Math.min(1, Math.max(0, value));
+    this.onOptionChange();
+  }
+
+  private getRainEffectOptions(): RainTickOptions {
+    return {
+      bounds: this.getRainPlaneBounds(),
+      containsPoint: this.getRainContainsPoint(),
+      wind: this.getAmbientWind(),
+    };
+  }
+
+  private getRainContainsPoint(): ((bx: number, by: number) => boolean) | undefined {
+    const idx = this.mapOptions.rainSectionIndex;
+    if (idx < 0) return undefined;
+    const polygon = this.editableSections[idx]?.polygon;
+    if (!polygon?.length) return undefined;
+    return (bx, by) => isPointInPolygon(this.canvasToGeo({ x: bx, y: by }), polygon);
+  }
+
+  private getRainPlaneBounds(): MapPlaneBounds {
+    const idx = this.mapOptions.rainSectionIndex;
+    if (idx < 0) return this.getParkMapPlaneBounds();
+    const polygon = this.editableSections[idx]?.polygon;
+    if (!polygon?.length) return this.getParkMapPlaneBounds();
+    const pts = polygon.map((g) => this.geoToCanvas(g));
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const p of pts) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+
+  /** Global keyboard handler for sticker editing shortcuts */
   private emitViewInfo(): void {
     if (!this.isBrowser || !this.canvasRef?.nativeElement) return;
     const canvasEl = this.canvasRef.nativeElement;
@@ -2838,6 +4518,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       showSections: this.mapOptions.showSections,
       showLabels: this.mapOptions.showLabels,
       showCanvasGrid: this.mapOptions.showCanvasGrid,
+      showTilemap: this.mapOptions.showTilemap,
+      showGroundTextures: this.mapOptions.showGroundTextures,
+      groundTilePx: this.mapOptions.groundTilePx,
       showBoundary: this.mapOptions.showBoundary,
       showMarkers: this.mapOptions.showMarkers,
       canvasGridCellW: this.canvasGridCellW,
@@ -2899,6 +4582,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.tilePaintToolChange.emit(this.tilePaintTool);
         return;
       }
+    }
+
+    // ── Section editor: delete selected vertex ───────────────
+    if (this.sectionEditorMode && (e.key === 'Delete' || e.key === 'Backspace')) {
+      if (this.sectionEditorSelectedVertex !== null) {
+        e.preventDefault();
+        this.deleteSectionVertex(this.sectionEditorIndex, this.sectionEditorSelectedVertex);
+      }
+      return;
     }
 
     // ── Sticker edit-mode only shortcuts ────────────────────────
@@ -2981,11 +4673,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // === CONTROLES ===
 
   zoomIn(): void {
-    this.targetScale = Math.min(15, this.targetScale * 1.4);
+    this.beginCameraZoomFocus();
+    this.targetScale = this.clampZoom(this.targetScale * PARK_MAP_VIS.zoomButtonFactor);
   }
 
   zoomOut(): void {
-    this.targetScale = Math.max(0.3, this.targetScale / 1.4);
+    this.beginCameraZoomFocus();
+    this.targetScale = this.clampZoom(this.targetScale / PARK_MAP_VIS.zoomButtonFactor);
   }
 
   rotateOnce(direction: 'left' | 'right'): void {
@@ -3036,7 +4730,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.targetRotation = 0;
     this.offsetX = 0;
     this.offsetY = 0;
+    this.targetOffsetX = 0;
+    this.targetOffsetY = 0;
     this._hasZoomAnchor = false;
+    this._zoomFocusScreen = null;
+    this._zoomFocusMap = null;
     this.saveState();
   }
 
@@ -3071,6 +4769,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     // offsetX/Y moves screen — to center the centroid we negate the displacement
     this.offsetX = -rx;
     this.offsetY = -ry;
+    this.targetOffsetX = this.offsetX;
+    this.targetOffsetY = this.offsetY;
     this._hasZoomAnchor = false;
     this.saveState();
     this.render();
@@ -3085,7 +4785,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // === MAP STATE CAPTURE / RESTORE (for layer config system) ===
 
   /** Capture current map view state as a serializable object */
-  getMapViewState(): { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid: boolean; canvasGridCellW: number; canvasGridCellH: number; canvasGridOpacity: number } {
+  getMapViewState(): { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid: boolean; showGroundTextures: boolean; groundTilePx: number; canvasGridCellW: number; canvasGridCellH: number; canvasGridOpacity: number } {
     return {
       scale: this.scale,
       rotation: this.rotation,
@@ -3094,6 +4794,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       showSections: this.mapOptions.showSections,
       showLabels: this.mapOptions.showLabels,
       showCanvasGrid: this.mapOptions.showCanvasGrid,
+      showGroundTextures: this.mapOptions.showGroundTextures,
+      groundTilePx: this.mapOptions.groundTilePx,
       canvasGridCellW: this.canvasGridCellW,
       canvasGridCellH: this.canvasGridCellH,
       canvasGridOpacity: this.canvasGridOpacity
@@ -3101,21 +4803,193 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   /** Restore map view state from a saved configuration */
-  setMapViewState(state: { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid?: boolean; canvasGridCellW?: number; canvasGridCellH?: number; canvasGridOpacity?: number }): void {
+  setMapViewState(state: { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid?: boolean; showTilemap?: boolean; showGroundTextures?: boolean; groundTilePx?: number; showBoundary?: boolean; showMarkers?: boolean; markerSize?: number; canvasGridCellW?: number; canvasGridCellH?: number; canvasGridOpacity?: number; canvasGridColor?: string; canvasGridStyle?: 'solid' | 'dashed' | 'dotted'; canvasGridRotation?: number }): void {
     this.scale = state.scale;
     this.targetScale = state.scale;
     this.rotation = state.rotation;
     this.targetRotation = state.rotation;
     this.offsetX = state.offsetX;
     this.offsetY = state.offsetY;
+    this.targetOffsetX = state.offsetX;
+    this.targetOffsetY = state.offsetY;
     this.mapOptions.showSections = state.showSections;
     this.mapOptions.showLabels = state.showLabels;
     this.mapOptions.showCanvasGrid = state.showCanvasGrid ?? false;
+    this.mapOptions.showTilemap = state.showTilemap ?? true;
+    this.mapOptions.showGroundTextures = state.showGroundTextures ?? true;
+    if (state.groundTilePx != null) this.setGroundTilePx(state.groundTilePx);
+    this.mapOptions.showBoundary = state.showBoundary ?? true;
+    this.mapOptions.showMarkers = state.showMarkers ?? true;
+    if (state.markerSize != null) this.markerRadius = state.markerSize;
     if (state.canvasGridCellW) this.canvasGridCellW = state.canvasGridCellW;
     if (state.canvasGridCellH) this.canvasGridCellH = state.canvasGridCellH;
     if (state.canvasGridOpacity != null) this.canvasGridOpacity = state.canvasGridOpacity;
+    if (state.canvasGridColor != null) this.canvasGridColor = state.canvasGridColor;
+    if (state.canvasGridStyle) this.canvasGridStyle = state.canvasGridStyle;
+    if (state.canvasGridRotation != null) this.canvasGridRotation = state.canvasGridRotation;
     this.saveState();
     this.render();
     this.emitViewInfo();
+  }
+
+  /** Serializable painted tiles for session / checkpoints */
+  exportPaintedTiles(): { col: number; row: number; url: string }[] {
+    const out: { col: number; row: number; url: string }[] = [];
+    this.paintedTiles.forEach((tile, key) => {
+      const [col, row] = key.split(',').map(Number);
+      if (!Number.isFinite(col) || !Number.isFinite(row)) return;
+      out.push({ col, row, url: tile.url });
+    });
+    return out;
+  }
+
+  /** Restore painted tiles from serialized data */
+  applyPaintedTiles(tiles: { col: number; row: number; url: string }[]): void {
+    this.paintedTiles.clear();
+    for (const t of tiles) {
+      const key = `${t.col},${t.row}`;
+      let img = this.paintImageCache.get(t.url) ?? null;
+      if (!img) {
+        img = new Image();
+        img.src = t.url;
+        this.paintImageCache.set(t.url, img);
+        img.onload = () => this.render();
+      }
+      this.paintedTiles.set(key, { url: t.url, img: img.complete ? img : null });
+    }
+    this.render();
+  }
+
+  /** Full map-side snapshot (stickers handled by container). */
+  exportMapPersistedState() {
+    const base = this.getMapViewState();
+    return {
+      mapState: {
+        ...base,
+        showTilemap: this.mapOptions.showTilemap,
+        showGroundTextures: this.mapOptions.showGroundTextures,
+        groundTilePx: this.mapOptions.groundTilePx,
+        showBoundary: this.mapOptions.showBoundary,
+        showMarkers: this.mapOptions.showMarkers,
+        markerSize: this.markerRadius,
+        canvasGridColor: this.canvasGridColor,
+        canvasGridStyle: this.canvasGridStyle,
+        canvasGridRotation: this.canvasGridRotation,
+      },
+      layerOffsets: JSON.parse(JSON.stringify(this.layerOffsets)),
+      activeMovableLayer: this.activeMovableLayer,
+      sections: this.getEditableSections(),
+      spatialReferences: this.getSpatialReferences(),
+      ambientScene: {
+        ...this.getSceneOptions(),
+        activeScenarioId: this.getActiveAmbientScenarioId(),
+      },
+      paintedTiles: this.exportPaintedTiles(),
+      refImageDataUrl: this.refImage?.src?.startsWith('data:') ? this.refImage.src : null,
+      refImageOpacity: this.refImageOpacity,
+    };
+  }
+
+  /** Restore map-side state from snapshot (stickers handled by container). */
+  applyMapPersistedState(
+    data: {
+      mapState?: Parameters<MapControlComponent['setMapViewState']>[0];
+      layerOffsets?: { grid: { x: number; y: number }; boundary: { x: number; y: number }; sections: { x: number; y: number }; markers: { x: number; y: number } };
+      activeMovableLayer?: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers';
+      sections?: ParkSectionRecord[];
+      spatialReferences?: SpatialReference[];
+      ambientScene?: ReturnType<MapControlComponent['getSceneOptions']> & { activeScenarioId?: string | null };
+      paintedTiles?: { col: number; row: number; url: string }[];
+      refImageDataUrl?: string | null;
+      refImageOpacity?: number;
+    },
+    opts?: { skipLegacySave?: boolean },
+  ): void {
+    if (data.mapState) this.setMapViewState(data.mapState);
+    if (data.layerOffsets) {
+      this.layerOffsets = JSON.parse(JSON.stringify(data.layerOffsets));
+    }
+    if (data.activeMovableLayer) {
+      this.activeMovableLayer = data.activeMovableLayer;
+    }
+    if (data.sections?.length) {
+      this.editableSections = data.sections.map((s) => ({
+        ...s,
+        colors: { ...s.colors },
+        polygon: s.polygon.map((p) => ({ ...p })),
+        education: s.education ? { ...s.education } : { summary: '', referenceImageUrl: '' },
+      }));
+      this.emitSectionsChanged();
+    }
+    if (data.spatialReferences?.length) {
+      this.spatialReferences = data.spatialReferences.map((r) => ({ ...r }));
+      this.emitSpatialReferencesChanged();
+    }
+    if (data.ambientScene) {
+      this.applySceneSnapshot(data.ambientScene);
+    }
+    if (data.paintedTiles) {
+      this.applyPaintedTiles(data.paintedTiles);
+    }
+    if (data.refImageDataUrl) {
+      this.setRefImage(data.refImageDataUrl);
+      if (data.refImageOpacity != null) this.setRefImageOpacity(data.refImageOpacity);
+    } else if (data.refImageOpacity != null) {
+      this.setRefImageOpacity(data.refImageOpacity);
+    }
+    if (!opts?.skipLegacySave) this.saveState();
+    this.render();
+    this.emitViewInfo();
+  }
+
+  private applySceneSnapshot(scene: ReturnType<MapControlComponent['getSceneOptions']> & { activeScenarioId?: string | null }): void {
+    this.ambientScenarioId = scene.activeScenarioId ?? null;
+    if (!scene.activeScenarioId) {
+      this.ambientScenarioTint = null;
+      this.ambientSectionOpacityBoost = 0;
+    }
+    this.mapOptions.showSpatialReferences = scene.showSpatialReferences;
+    this.mapOptions.showRainEffect = scene.showRainEffect;
+    this.mapOptions.rainIntensity = scene.rainIntensity;
+    this.mapOptions.rainSize = scene.rainSize;
+    this.mapOptions.rainSectionIndex = scene.rainSectionIndex;
+    this.mapOptions.showFogEffect = scene.showFogEffect;
+    this.mapOptions.fogIntensity = scene.fogIntensity;
+    this.mapOptions.fogSize = scene.fogSize;
+    this.mapOptions.showMotesEffect = scene.showMotesEffect;
+    this.mapOptions.motesIntensity = scene.motesIntensity;
+    this.mapOptions.motesSize = scene.motesSize;
+    this.mapOptions.showCloudShadows = scene.showCloudShadows;
+    this.mapOptions.cloudShadowIntensity = scene.cloudShadowIntensity;
+    this.mapOptions.cloudShadowSize = scene.cloudShadowSize;
+    this.mapOptions.showLeavesEffect = scene.showLeavesEffect;
+    this.mapOptions.leavesIntensity = scene.leavesIntensity;
+    this.mapOptions.leavesSize = scene.leavesSize;
+    this.mapOptions.showTreesEffect = scene.showTreesEffect;
+    this.mapOptions.treesIntensity = scene.treesIntensity;
+    this.mapOptions.treesSize = scene.treesSize;
+    this.mapOptions.showLightningEffect = scene.showLightningEffect;
+    this.mapOptions.showNightMistEffect = scene.showNightMistEffect;
+    this.mapOptions.nightMistIntensity = scene.nightMistIntensity;
+    this.mapOptions.ambientWindDeg = scene.ambientWindDeg;
+    this.mapOptions.ambientWindStrength = scene.ambientWindStrength;
+    this.mapOptions.spatialAnimSpeed = scene.spatialAnimSpeed;
+
+    this.rainEffect.setIntensity(scene.rainIntensity);
+    this.rainEffect.setSizeMul(scene.rainSize);
+    this.fogEffect.setIntensity(scene.fogIntensity);
+    this.fogEffect.setSizeMul(scene.fogSize);
+    this.motesEffect.setIntensity(scene.motesIntensity);
+    this.motesEffect.setSizeMul(scene.motesSize);
+    this.cloudShadowEffect.setIntensity(scene.cloudShadowIntensity);
+    this.cloudShadowEffect.setSizeMul(scene.cloudShadowSize);
+    this.leavesEffect.setIntensity(scene.leavesIntensity);
+    this.leavesEffect.setSizeMul(scene.leavesSize);
+    this.treesEffect.setIntensity(scene.treesIntensity);
+    this.treesEffect.setSizeMul(scene.treesSize);
+    this.nightMistEffect.setIntensity(scene.nightMistIntensity);
+    this.lightningEffect.setEnabled(scene.showLightningEffect);
+    this.lightningEffect.setRainIntensity(scene.rainIntensity);
+    this.syncAmbientZoneCallbacks();
   }
 }

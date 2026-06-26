@@ -2,6 +2,19 @@
     <!-- app_name is provided by each product flavor (admin/visitor) via resValue -->
     <string name="title_home">Realidad Mixta</string>
     <string name="title_dashboard">Mapa</string>
+    <string name="map_you_are_in_section">Estás en: %1$s</string>
+    <string name="section_edu_empty">Sin descripción educativa aún.</string>
+    <string name="map_section_unknown">Dentro del parque</string>
+    <string name="map_scene_panel_title">Escena ambiental</string>
+    <string name="map_scene_panel_hint">Referencias espaciales georreferenciadas y efecto de lluvia sobre el mapa.</string>
+    <string name="map_scene_spatial_refs">Referencias espaciales</string>
+    <string name="map_scene_rain">Lluvia en el mapa</string>
+    <string name="map_scene_rain_intensity">Intensidad de lluvia</string>
+    <string name="map_scene_rain_size">Tamaño de gotas</string>
+    <string name="map_scene_rain_zone">Zona con lluvia</string>
+    <string name="map_scene_rain_zone_all">Todo el parque</string>
+    <string name="map_scene_anim_speed">Velocidad de animación</string>
+    <string name="map_scene_fab_desc">Escena ambiental del mapa</string>
     <string name="title_notifications">Mi perfil</string>
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">First Fragment</string>
@@ -46,6 +59,31 @@
         vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
     </string>
     <string name="continuar_con_google">Continuar con Google</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_image_desc">Mascota Jukumario</string>
+    <string name="onboarding_welcome_title">Bienvenido a Juku Go</string>
+    <string name="onboarding_welcome_desc">Explora el Parque de las Culturas y la Madre Tierra y descubre animales en realidad aumentada.</string>
+    <string name="onboarding_explore_title">Explora el parque</string>
+    <string name="onboarding_explore_desc">Usa el mapa y Juku Go para acercarte a los puntos de encuentro con los animales.</string>
+    <string name="onboarding_collect_title">Completa tu colección</string>
+    <string name="onboarding_collect_desc">Encuentra los 12 animales del parque y sigue tu progreso en la pantalla de inicio.</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_start">Empezar a explorar</string>
+    <string name="onboarding_step_format">%1$d de %2$d</string>
+    <string name="out_of_park_banner">Estás fuera de los límites del parque</string>
+
+    <!-- Encuentro — copy educativo post-guardado -->
+    <string name="encounter_saved">¡Encuentro guardado!</string>
+    <string name="encounter_already_saved">Ya guardado</string>
+    <string name="encounter_save_btn">Guardar encuentro</string>
+    <string name="encounter_save_admin">Guardar (Admin)</string>
+    <string name="encounter_approach">Acércate más</string>
+    <string name="encounter_tip_highlands">Tip: En Tierras Altas habitan especies del altiplano y bosques nublados andinos.</string>
+    <string name="encounter_tip_midlands">Tip: En Tierras Medias conviven animales de valles interandinos y la vida rural.</string>
+    <string name="encounter_tip_lowlands">Tip: En Tierras Bajas encontrarás fauna de selva amazónica y llanos orientales.</string>
+    <string name="encounter_tip_myths">Tip: En Mitos y Leyendas descubrirás criaturas de la tradición oral andina.</string>
+    <string name="encounter_tip_default">Tip: Sigue explorando el parque para completar tu colección de 12 animales.</string>
 
 
     <string name="host_cloud_anchor">Host Cloud Anchor</string>

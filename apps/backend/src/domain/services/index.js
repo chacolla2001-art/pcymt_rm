@@ -7,6 +7,8 @@ const UserSessionService = require('./userSession.service');
 const AnalyticsService = require('./analytics.service');
 const MapConfigurationService = require('./mapConfiguration.service');
 const MapTileService = require('./mapTile.service');
+const AppSettingsService = require('./appSettings.service');
+const ProfilePictureService = require('./profilePicture.service');
 
 module.exports = {
   UserService,
@@ -18,4 +20,6 @@ module.exports = {
   AnalyticsService,
   MapConfigurationService,
   MapTileService,
+  AppSettingsService,
+  ProfilePictureService,
 };
