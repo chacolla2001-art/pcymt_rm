@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Bases de gráficos del mapa</title>
+  <style>
+    body { margin: 0; background: #e9e9ee; font-family: Inter, "Segoe UI", sans-serif; }
+    canvas { display: block; margin: 16px auto; box-shadow: 0 2px 12px rgba(0,0,0,0.15); background: #fff; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1180" height="1180"></canvas>
+  <script>
+    const s = document.createElement('script');
+    s.src = 'preview.bundle.js?t=' + Date.now();
+    s.onload = () => window.renderPreview(document.getElementById('c'));
+    document.body.appendChild(s);
+  </script>
+</body>
+</html>

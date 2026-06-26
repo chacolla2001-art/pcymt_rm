@@ -203,6 +203,7 @@ export class MapRainEffect {
     const fallLen = Math.hypot(this.fallDx, this.fallDy);
     const fallAngle = Math.atan2(this.fallDy, this.fallDx);
 
+    // Ondas de impacto — anillo limpio con contorno (cartoon)
     for (const r of this.ripples) {
       if (!this.inZone(r.bx, r.by)) continue;
       const t = r.age / r.duration;
@@ -210,55 +211,46 @@ export class MapRainEffect {
       const { x, y } = toScreen(r.bx, r.by);
       const radius = r.maxR * sr * (0.1 + t * 1.15);
 
-      ctx.strokeStyle = `rgba(120, 210, 255, ${fade * 0.85})`;
-      ctx.lineWidth = Math.max(0.5, 2.4 * sr * (1 - t * 0.55));
+      ctx.strokeStyle = `rgba(20, 60, 110, ${fade * 0.7})`;
+      ctx.lineWidth = Math.max(0.6, 2.8 * sr * (1 - t * 0.5));
       ctx.beginPath();
-      ctx.ellipse(x, y, radius, radius * 0.36, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y, radius, radius * 0.34, 0, 0, Math.PI * 2);
       ctx.stroke();
-
-      if (t < 0.45) {
-        ctx.strokeStyle = `rgba(235, 250, 255, ${fade * 0.95})`;
-        ctx.lineWidth = Math.max(0.4, 1.2 * sr);
-        ctx.beginPath();
-        ctx.ellipse(x, y, radius * 0.38, radius * 0.14, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.fillStyle = `rgba(80, 175, 245, ${fade * 0.22})`;
+      ctx.strokeStyle = `rgba(150, 220, 255, ${fade})`;
+      ctx.lineWidth = Math.max(0.4, 1.4 * sr * (1 - t * 0.5));
       ctx.beginPath();
-      ctx.ellipse(x, y, radius * 0.55, radius * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.ellipse(x, y, radius, radius * 0.34, 0, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
+    // Gotas en forma de lágrima con contorno negro y brillo
+    const dropAngle = fallAngle + Math.PI / 2;
     for (const f of this.fallers) {
       if (!this.inZone(f.bx, f.by)) continue;
       const head = toScreen(f.bx, f.by);
-      const tail = toScreen(
-        f.bx - (this.fallDx / fallLen) * f.streak * this.sizeMul,
-        f.by - (this.fallDy / fallLen) * f.streak * this.sizeMul,
-      );
       const alpha = LAYER_ALPHA[f.layer] * intensity;
-      const headR = Math.max(0.25, f.r * sr * 0.75);
-
-      const grad = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-      grad.addColorStop(0, `rgba(100, 190, 255, 0)`);
-      grad.addColorStop(0.55, `rgba(130, 215, 255, ${alpha * 0.25})`);
-      grad.addColorStop(1, `rgba(235, 250, 255, ${alpha})`);
-
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = Math.max(0.2, (0.7 + f.layer * 0.35) * sr);
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(tail.x, tail.y);
-      ctx.lineTo(head.x, head.y);
-      ctx.stroke();
+      const rw = Math.max(0.5, f.r * sr * 0.85);
+      const len = rw * (2.4 + f.streak * 0.5);
+      const lw = Math.max(0.4, rw * 0.4);
 
       ctx.save();
       ctx.translate(head.x, head.y);
-      ctx.rotate(fallAngle + Math.PI / 2);
-      ctx.fillStyle = `rgba(220, 245, 255, ${alpha * 0.95})`;
+      ctx.rotate(dropAngle);
+      // silueta de lágrima (punta arriba, bulbo abajo)
       ctx.beginPath();
-      ctx.ellipse(0, 0, headR * 0.55, headR, 0, 0, Math.PI * 2);
+      ctx.moveTo(0, -len);
+      ctx.bezierCurveTo(rw, -len * 0.45, rw, rw * 0.6, 0, rw);
+      ctx.bezierCurveTo(-rw, rw * 0.6, -rw, -len * 0.45, 0, -len);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(70, 160, 235, ${alpha})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(15, 45, 90, ${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.stroke();
+      // brillo blanco
+      ctx.fillStyle = `rgba(235, 250, 255, ${alpha * 0.85})`;
+      ctx.beginPath();
+      ctx.ellipse(-rw * 0.28, -len * 0.1, rw * 0.22, rw * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }

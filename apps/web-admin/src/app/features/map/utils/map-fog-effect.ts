@@ -103,14 +103,30 @@ export class MapFogEffect {
       const { x, y } = toScreen(p.bx, p.by);
       const pulse = 0.82 + Math.sin(p.phase) * 0.18;
       const radius = p.r * sr * pulse;
-      const g = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      g.addColorStop(0, `rgba(235, 245, 255, ${inten * 0.22})`);
-      g.addColorStop(0.45, `rgba(200, 220, 240, ${inten * 0.12})`);
-      g.addColorStop(1, 'rgba(200, 220, 240, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(x, y, radius, radius * 0.72, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // Nube puff plana (cartoon): varios discos cel con borde suave
+      const puffs: Array<[number, number, number]> = [
+        [-0.5, 0.12, 0.52],
+        [0.5, 0.12, 0.52],
+        [-0.9, 0.22, 0.36],
+        [0.9, 0.22, 0.36],
+        [0, -0.22, 0.62],
+      ];
+      const cel = (px: number, py: number, pr: number, a: number, col: string) => {
+        const cx = x + px * radius;
+        const cy = y + py * radius * 0.7;
+        const cr = pr * radius;
+        const g = ctx.createRadialGradient(cx, cy, cr * 0.7, cx, cy, cr);
+        g.addColorStop(0, `rgba(${col}, ${a})`);
+        g.addColorStop(0.8, `rgba(${col}, ${a})`);
+        g.addColorStop(1, `rgba(${col}, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      for (const [px, py, pr] of puffs) cel(px, py, pr, inten * 0.16, '236, 244, 255');
+      // realce superior
+      cel(-0.2, -0.2, 0.42, inten * 0.12, '255, 255, 255');
     }
 
     ctx.restore();

@@ -107,18 +107,35 @@ export class MapMotesEffect {
       const { x, y } = toScreen(m.bx, m.by);
       const r = Math.max(0.25, m.r * sr * 0.9);
 
+      // Halo de brillo — las motas cálidas resplandecen como luciérnagas
+      const haloR = r * (m.warm ? 4.5 : 3);
+      const haloA = alpha * (m.warm ? 0.5 : 0.3);
+      const halo = ctx.createRadialGradient(x, y, 0, x, y, haloR);
       if (m.warm) {
-        ctx.fillStyle = `rgba(255, 230, 160, ${alpha * 0.9})`;
+        halo.addColorStop(0, `rgba(255, 224, 150, ${haloA})`);
+        halo.addColorStop(1, 'rgba(255, 210, 120, 0)');
       } else {
-        ctx.fillStyle = `rgba(210, 245, 255, ${alpha * 0.75})`;
+        halo.addColorStop(0, `rgba(200, 240, 255, ${haloA})`);
+        halo.addColorStop(1, 'rgba(190, 230, 255, 0)');
       }
+      ctx.fillStyle = halo;
       ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.arc(x, y, haloR, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.35})`;
+      const bodyR = r * 1.15;
+      ctx.fillStyle = m.warm ? `rgba(255, 206, 70, ${alpha})` : `rgba(150, 220, 255, ${alpha})`;
       ctx.beginPath();
-      ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.35, 0, Math.PI * 2);
+      ctx.arc(x, y, bodyR, 0, Math.PI * 2);
+      ctx.fill();
+      // contorno fino cartoon
+      ctx.strokeStyle = m.warm ? `rgba(120, 70, 0, ${alpha})` : `rgba(20, 60, 110, ${alpha})`;
+      ctx.lineWidth = Math.max(0.3, bodyR * 0.28);
+      ctx.stroke();
+      // punto blanco central
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x - bodyR * 0.15, y - bodyR * 0.15, bodyR * 0.45, 0, Math.PI * 2);
       ctx.fill();
     }
 

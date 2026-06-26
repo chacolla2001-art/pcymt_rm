@@ -11,8 +11,8 @@ export const PARK_MAP_VIS = {
   treeMinWorld: 3.2,
   /** Baldosa por defecto (px espacio mapa). Más bajo = grano más fino. */
   groundTilePx: 5,
-  groundTileMin: 3,
-  groundTileMax: 16,
+  groundTileMin: 2,
+  groundTileMax: 48,
   zoomMin: 0.08,
   zoomMax: 120,
   zoomWheelOut: 0.8,

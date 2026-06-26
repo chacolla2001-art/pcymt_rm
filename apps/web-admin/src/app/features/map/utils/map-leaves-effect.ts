@@ -127,24 +127,46 @@ export class MapLeavesEffect {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rot);
+    // Volteo 3D: el ancho se comprime según la fase de giro
+    const flip = 0.4 + 0.6 * Math.abs(Math.cos(rot * 1.6));
+    ctx.scale(flip, 1);
+    const lw = Math.max(0.3, r * 0.18);
     if (kind === 'petal') {
-      ctx.fillStyle = `hsla(${hue}, 72%, 68%, ${alpha})`;
       ctx.beginPath();
-      ctx.ellipse(0, 0, r * 0.55, r, 0.3, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, r * 0.6, r, 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hue}, 78%, 70%, ${alpha})`;
+      ctx.fill();
+      ctx.strokeStyle = `hsla(${hue}, 50%, 32%, ${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.stroke();
+      ctx.fillStyle = `hsla(0, 0%, 100%, ${alpha * 0.6})`;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.18, -r * 0.3, r * 0.16, r * 0.3, 0, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      ctx.fillStyle = `hsla(${hue}, 55%, 38%, ${alpha})`;
+      // Hoja tipo corazón aplanado (muesca arriba, punta abajo)
       ctx.beginPath();
-      ctx.moveTo(0, -r);
-      ctx.bezierCurveTo(r * 0.9, -r * 0.3, r * 0.7, r * 0.8, 0, r);
-      ctx.bezierCurveTo(-r * 0.7, r * 0.8, -r * 0.9, -r * 0.3, 0, -r);
+      ctx.moveTo(0, r);
+      ctx.bezierCurveTo(r * 1.2, -r * 0.1, r * 0.5, -r, 0, -r * 0.4);
+      ctx.bezierCurveTo(-r * 0.5, -r, -r * 1.2, -r * 0.1, 0, r);
+      ctx.closePath();
+      ctx.fillStyle = `hsla(${hue}, 60%, 48%, ${alpha})`;
       ctx.fill();
-      ctx.strokeStyle = `hsla(${hue}, 45%, 28%, ${alpha * 0.6})`;
-      ctx.lineWidth = Math.max(0.3, r * 0.12);
-      ctx.beginPath();
-      ctx.moveTo(0, -r * 0.85);
-      ctx.lineTo(0, r * 0.85);
+      ctx.strokeStyle = `hsla(${hue}, 55%, 22%, ${alpha})`;
+      ctx.lineWidth = lw;
+      ctx.lineJoin = 'round';
       ctx.stroke();
+      // nervadura central
+      ctx.lineWidth = lw * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.85);
+      ctx.lineTo(0, -r * 0.35);
+      ctx.stroke();
+      // brillo en lóbulo superior-izquierdo
+      ctx.fillStyle = `hsla(${hue}, 70%, 70%, ${alpha * 0.5})`;
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.32, -r * 0.32, r * 0.26, r * 0.34, -0.4, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }
