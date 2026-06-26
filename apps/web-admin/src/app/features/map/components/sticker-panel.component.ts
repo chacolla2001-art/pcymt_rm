@@ -13,6 +13,13 @@ import type { SpatialReference, SpatialReferenceCategory, SpatialReferenceMarker
 import { SPATIAL_REFERENCE_MARKER_STYLES, spatialReferenceSummary } from '../data/spatial-reference';
 import { resolveSectionFillOpacities } from '../utils/section-color.util';
 import { PARK_MAP_VIS } from '../utils/map-park-visual-scale';
+import {
+  GROUND_ELEMENT_LABELS,
+  GROUND_ZONE_KEYS,
+  GROUND_ZONE_LABELS,
+  type GroundElementType,
+  type ZoneGroundStyle,
+} from '../utils/draw-ground-texture';
 
 /** Event fired by the panel to control the map from outside */
 export type MapControlEvent =
@@ -23,6 +30,9 @@ export type MapControlEvent =
   | { type: 'reset' }
   | { type: 'optionChange'; option: 'showSections' | 'showLabels' | 'showBoundary' | 'showMarkers' | 'showGroundTextures'; value: boolean }
   | { type: 'groundTilePxChange'; value: number }
+  | { type: 'groundStyleZoneChange'; sectionIndex: number; style: ZoneGroundStyle }
+  | { type: 'groundStyleResetZone'; sectionIndex: number }
+  | { type: 'groundStyleResetAll' }
   | { type: 'setTreePlaceVariant'; variant: 0 | 1 | 2 }
   | { type: 'setTreePlaceStyleSection'; section: number }
   | { type: 'selectAmbientTree'; index: number | null }
@@ -190,6 +200,46 @@ export interface MapViewInfo {
               (ngModelChange)="onGroundTilePxChange($event)">
             <span class="param-val">{{ localGroundTilePx }}px</span>
           </div>
+          <ng-container *ngIf="localOpts.showGroundTextures && isAdmin">
+            <div class="sub-divider"></div>
+            <p class="ambient-subtitle">Estilo suelo por zona</p>
+            <p class="section-hint compact">Menos densidad = más plano. Se guarda en sesión y configuraciones.</p>
+            <div class="section-pick-grid ground-zone-pick">
+              <button type="button" class="section-pick-btn"
+                *ngFor="let z of groundZoneKeys"
+                [class.active]="groundStyleEditSection === z"
+                (click)="groundStyleEditSection = z">
+                <span class="section-pick-label">{{ groundZoneLabels[z] }}</span>
+              </button>
+            </div>
+            <ng-container *ngIf="groundStyleEditZone as zone">
+              <div class="param-row" *ngFor="let el of zone.elements; let i = index">
+                <label>{{ groundElementLabel(el.type) }}</label>
+                <input type="range" min="0" max="120" step="1"
+                  [ngModel]="groundDensityPercent(el.density)"
+                  (ngModelChange)="onGroundElementDensityChange(i, $event)">
+                <span class="param-val">{{ groundDensityPercent(el.density) }}%</span>
+              </div>
+              <div class="param-row">
+                <label>Variac. macro</label>
+                <input type="range" min="0" max="200" step="1"
+                  [ngModel]="groundMacroDensityPercent(zone)"
+                  (ngModelChange)="onGroundMacroDensityChange($event)">
+                <span class="param-val">{{ groundMacroDensityPercent(zone) }}%</span>
+              </div>
+              <div class="param-row">
+                <label>Opac. macro</label>
+                <input type="range" min="0" max="100" step="1"
+                  [ngModel]="groundMacroAlphaPercent(zone)"
+                  (ngModelChange)="onGroundMacroAlphaChange($event)">
+                <span class="param-val">{{ groundMacroAlphaPercent(zone) }}%</span>
+              </div>
+              <div class="tool-grid cols-2">
+                <button type="button" class="tool-btn" (click)="resetGroundStyleZone()">Restaurar zona</button>
+                <button type="button" class="tool-btn danger" (click)="resetGroundStyleAll()">Restaurar todo</button>
+              </div>
+            </ng-container>
+          </ng-container>
           <div class="layer-row">
             <button class="vis-btn" [class.hidden-layer]="!localOpts.showMarkers"
               (click)="toggleOpt('showMarkers')" title="Mostrar/ocultar marcadores">
@@ -1756,6 +1806,7 @@ export interface MapViewInfo {
     }
 
     .config-server-actions { margin-top: 4px; }
+    .ground-zone-pick .section-pick-btn { padding: 6px 8px; font-size: 10px; }
   `]
 })
 export class StickerPanelComponent implements OnChanges {
@@ -1785,6 +1836,7 @@ export class StickerPanelComponent implements OnChanges {
   @Input() spatialPlaceIndex = -1;
   @Input() activeSpatialRefIndex = 0;
   @Input() sessionSavedAt: string | null = null;
+  @Input() groundStyle: Record<number, ZoneGroundStyle> = {};
   @Input() sceneOpts = {
     activeScenarioId: null as string | null,
     showRainEffect: false,
@@ -1849,6 +1901,9 @@ export class StickerPanelComponent implements OnChanges {
   localGroundTilePx: number = PARK_MAP_VIS.groundTilePx;
   readonly groundTileMin = PARK_MAP_VIS.groundTileMin;
   readonly groundTileMax = PARK_MAP_VIS.groundTileMax;
+  readonly groundZoneKeys = GROUND_ZONE_KEYS;
+  readonly groundZoneLabels = GROUND_ZONE_LABELS;
+  groundStyleEditSection = 0;
 
   /** Collapsible sections state */
   openSections = {
@@ -2364,6 +2419,70 @@ export class StickerPanelComponent implements OnChanges {
   onGroundTilePxChange(px: number): void {
     this.localGroundTilePx = px;
     this.mapControlEvent.emit({ type: 'groundTilePxChange', value: px });
+  }
+
+  get groundStyleEditZone(): ZoneGroundStyle | null {
+    return this.groundStyle[this.groundStyleEditSection] ?? this.groundStyle[1] ?? null;
+  }
+
+  groundElementLabel(type: GroundElementType): string {
+    return GROUND_ELEMENT_LABELS[type];
+  }
+
+  groundDensityPercent(density: number): number {
+    return Math.round(density * 100);
+  }
+
+  groundMacroDensityPercent(zone: ZoneGroundStyle): number {
+    return Math.round(zone.macroDensity * 100);
+  }
+
+  groundMacroAlphaPercent(zone: ZoneGroundStyle): number {
+    return Math.round(zone.macroAlpha * 100);
+  }
+
+  onGroundElementDensityChange(elIndex: number, percent: number): void {
+    const zone = this.patchedGroundZone();
+    zone.elements[elIndex].density = Math.min(1.2, Math.max(0, Number(percent) || 0) / 100);
+    this.emitGroundStyleZone(zone);
+  }
+
+  onGroundMacroDensityChange(percent: number): void {
+    const zone = this.patchedGroundZone();
+    zone.macroDensity = Math.min(2, Math.max(0, Number(percent) || 0) / 100);
+    this.emitGroundStyleZone(zone);
+  }
+
+  onGroundMacroAlphaChange(percent: number): void {
+    const zone = this.patchedGroundZone();
+    zone.macroAlpha = Math.min(1, Math.max(0, Number(percent) || 0) / 100);
+    this.emitGroundStyleZone(zone);
+  }
+
+  resetGroundStyleZone(): void {
+    this.mapControlEvent.emit({ type: 'groundStyleResetZone', sectionIndex: this.groundStyleEditSection });
+  }
+
+  resetGroundStyleAll(): void {
+    this.mapControlEvent.emit({ type: 'groundStyleResetAll' });
+  }
+
+  private patchedGroundZone(): ZoneGroundStyle {
+    const z = this.groundStyleEditZone;
+    if (!z) return { elements: [], macroDensity: 1, macroAlpha: 1 };
+    return {
+      macroDensity: z.macroDensity,
+      macroAlpha: z.macroAlpha,
+      elements: z.elements.map((e) => ({ ...e })),
+    };
+  }
+
+  private emitGroundStyleZone(zone: ZoneGroundStyle): void {
+    this.mapControlEvent.emit({
+      type: 'groundStyleZoneChange',
+      sectionIndex: this.groundStyleEditSection,
+      style: zone,
+    });
   }
 
   onEffectWindDirection(effect: AmbientEffectWindKey, deg: number): void {

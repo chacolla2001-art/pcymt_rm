@@ -122,6 +122,12 @@ Para **cambiar el aspecto de una zona** solo editas su entrada. Reglas práctica
 - **Menos/más variación a distancia** → `macroDensity` / `macroAlpha` (0 = sin macro).
 - **Añadir un icono** → agrega un `GroundElementSpec` al array de la zona.
 
+**UI del mapa (admin):** Panel lateral → **Capas** → con *Texturas suelo* activas,
+sección **Estilo suelo por zona** (sliders de densidad + macro). Persiste en sesión
+local y en configuraciones guardadas (`groundStyle` en `MapConfigData`). Los defaults
+de código siguen en `GROUND_STYLE`; la UI escribe overrides vía
+`setGroundStyleOverride()` / `exportGroundStyleSnapshot()`.
+
 **Estado actual por zona** (resumen; la verdad está en el código):
 | Zona | Iconos (density) | Carácter |
 |---|---|---|

@@ -13,6 +13,7 @@ import {
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
 import { MapSessionService } from '../services/map-session.service';
 import { MapConfigData, MAP_CONFIG_VERSION } from '../models/map-layer-config.model';
+import type { ZoneGroundStyle } from '../utils/draw-ground-texture';
 import type { ParkSectionRecord } from '../data/park-geometry';
 import type { SpatialReference } from '../data/spatial-reference';
 import type { AmbientTreeSlot } from '../data/ambient-tree-slots';
@@ -59,6 +60,7 @@ import { AuthService } from '../../../core/services/auth.service';
         [activeSpatialRefIndex]="activeSpatialRefIndex"
         [sceneOpts]="sceneOpts"
         [spatialRefsOpts]="spatialRefsOpts"
+        [groundStyle]="groundStyleOpts"
         [sessionSavedAt]="sessionSavedAt"
         (mapControlEvent)="onMapControlEvent($event)"
         (panelToggled)="onPanelToggled()">
@@ -211,6 +213,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   sessionSavedAt: string | null = null;
+  groundStyleOpts: Record<number, ZoneGroundStyle> = {};
 
   private readonly isBrowser: boolean;
   private sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -286,6 +289,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       spatialReferences: map.spatialReferences,
       ambientScene: map.ambientScene,
       ambientTrees: map.ambientTrees,
+      groundStyle: map.groundStyle,
       themeMode: this.themeService.isDarkMode() ? 'dark' : 'light',
     };
   }
@@ -312,6 +316,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       spatialReferences: configData.spatialReferences,
       ambientScene: configData.ambientScene,
       ambientTrees: configData.ambientTrees,
+      groundStyle: configData.groundStyle,
     }, { skipLegacySave: true });
 
     if (scenarioId) {
@@ -349,6 +354,21 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'reset':        this.mapControl.resetView(); break;
       case 'optionChange': this.mapControl.setMapOption(event.option, event.value); break;
       case 'groundTilePxChange': this.mapControl.setGroundTilePx(event.value); break;
+      case 'groundStyleZoneChange':
+        this.mapControl.setGroundStyleZone(event.sectionIndex, event.style);
+        this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
+        this.scheduleSessionSave();
+        break;
+      case 'groundStyleResetZone':
+        this.mapControl.resetGroundStyleZone(event.sectionIndex);
+        this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
+        this.scheduleSessionSave();
+        break;
+      case 'groundStyleResetAll':
+        this.mapControl.resetGroundStyleAll();
+        this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
+        this.scheduleSessionSave();
+        break;
       case 'centerMap':    this.mapControl.centerMap(); break;
       case 'toggleCoordPicker': this.mapControl.toggleCoordPicker(); this.coordPickerActive = this.mapControl.coordPickerMode; break;
       case 'saveConfig':   this.onSaveRequest(); break;
@@ -642,6 +662,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.treePlaceVariant = this.mapControl.treePlaceVariant;
     this.treePlaceStyleSection = this.mapControl.treePlaceStyleSection;
     this.treePlacementHint = this.mapControl.treePlacementHint;
+    this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
   }
 
   onAmbientTreesChanged(trees: AmbientTreeSlot[]): void {

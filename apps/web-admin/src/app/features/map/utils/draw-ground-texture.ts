@@ -221,6 +221,26 @@ export interface ZoneGroundStyle {
  * Cambia densidades, tamaños y variación macro por zona aquí. Todo escala con
  * el tamaño de baldosa (`unit`), así que acepta cualquier zoom.
  */
+/** Etiquetas UI para tipos de icono de suelo. */
+export const GROUND_ELEMENT_LABELS: Record<GroundElementType, string> = {
+  patch: 'Parches planos',
+  stone: 'Piedras',
+  grass: 'Hierba / paja',
+  leaf: 'Hojas',
+  flower: 'Flores',
+  shadow: 'Sombras',
+};
+
+export const GROUND_ZONE_KEYS = [0, 1, 2, -1, -2] as const;
+
+export const GROUND_ZONE_LABELS: Record<number, string> = {
+  0: 'Tierras Altas',
+  1: 'Tierras Medias',
+  2: 'Tierras Bajas',
+  [-1]: 'Base parque',
+  [-2]: 'Fondo mapa',
+};
+
 export const GROUND_STYLE: Record<number, ZoneGroundStyle> = {
   // Tierras Altas: altiplano árido → pocas piedras, poca paja, MUCHO plano
   0: {
@@ -274,8 +294,75 @@ export const GROUND_STYLE: Record<number, ZoneGroundStyle> = {
   },
 };
 
+/** Alias explícito de los valores de fábrica (código / reset UI). */
+export const DEFAULT_GROUND_STYLE = GROUND_STYLE;
+
+let activeGroundStyleOverride: Record<number, ZoneGroundStyle> | null = null;
+
+function cloneZoneStyle(z: ZoneGroundStyle): ZoneGroundStyle {
+  return {
+    macroDensity: z.macroDensity,
+    macroAlpha: z.macroAlpha,
+    elements: z.elements.map((e) => ({ ...e })),
+  };
+}
+
+export function cloneGroundStyleMap(src: Record<number, ZoneGroundStyle>): Record<number, ZoneGroundStyle> {
+  const out: Record<number, ZoneGroundStyle> = {};
+  for (const [k, v] of Object.entries(src)) out[Number(k)] = cloneZoneStyle(v);
+  return out;
+}
+
+/** Estilo resuelto (defaults + overrides de UI). */
+export function getActiveGroundStyleMap(): Record<number, ZoneGroundStyle> {
+  if (!activeGroundStyleOverride) return GROUND_STYLE;
+  const merged = cloneGroundStyleMap(GROUND_STYLE);
+  for (const [k, v] of Object.entries(activeGroundStyleOverride)) {
+    merged[Number(k)] = cloneZoneStyle(v);
+  }
+  return merged;
+}
+
+export function getGroundStyleOverride(): Record<number, ZoneGroundStyle> | null {
+  return activeGroundStyleOverride ? cloneGroundStyleMap(activeGroundStyleOverride) : null;
+}
+
+export function setGroundStyleOverride(style: Record<number, ZoneGroundStyle> | null): void {
+  activeGroundStyleOverride = style ? cloneGroundStyleMap(style) : null;
+}
+
+export function resetGroundStyleToDefaults(): void {
+  activeGroundStyleOverride = null;
+}
+
+export function resetGroundStyleZone(sectionIndex: number): void {
+  if (!activeGroundStyleOverride) return;
+  delete activeGroundStyleOverride[sectionIndex];
+  if (Object.keys(activeGroundStyleOverride).length === 0) activeGroundStyleOverride = null;
+}
+
+export function updateGroundStyleZone(sectionIndex: number, style: ZoneGroundStyle): void {
+  if (!activeGroundStyleOverride) activeGroundStyleOverride = {};
+  activeGroundStyleOverride[sectionIndex] = cloneZoneStyle(style);
+}
+
+/** Snapshot completo para persistencia / panel UI. */
+export function exportGroundStyleSnapshot(): Record<number, ZoneGroundStyle> {
+  return cloneGroundStyleMap(getActiveGroundStyleMap());
+}
+
+/** Restaura desde snapshot guardado (null = defaults de código). */
+export function importGroundStyleSnapshot(snapshot: Record<number, ZoneGroundStyle> | null | undefined): void {
+  if (!snapshot || Object.keys(snapshot).length === 0) {
+    resetGroundStyleToDefaults();
+    return;
+  }
+  setGroundStyleOverride(cloneGroundStyleMap(snapshot));
+}
+
 function styleForSection(sectionIndex: number): ZoneGroundStyle {
-  return GROUND_STYLE[sectionIndex] ?? GROUND_STYLE[1];
+  const styles = getActiveGroundStyleMap();
+  return styles[sectionIndex] ?? styles[1];
 }
 
 function drawGroundElement(

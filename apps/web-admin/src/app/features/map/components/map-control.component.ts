@@ -75,6 +75,12 @@ import {
   fillPolygonWithGroundTexture,
   MapBackdropCache,
   fillMapRectWithBackdrop,
+  exportGroundStyleSnapshot,
+  importGroundStyleSnapshot,
+  resetGroundStyleToDefaults,
+  resetGroundStyleZone,
+  updateGroundStyleZone,
+  type ZoneGroundStyle,
 } from '../utils/draw-ground-texture';
 
 type GeoPoint = SharedGeoPoint;
@@ -3008,6 +3014,38 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.emitViewInfo();
   }
 
+  getGroundStyleSnapshot(): Record<number, ZoneGroundStyle> {
+    return exportGroundStyleSnapshot();
+  }
+
+  applyGroundStyle(snapshot: Record<number, ZoneGroundStyle> | null | undefined): void {
+    importGroundStyleSnapshot(snapshot);
+    this.invalidateGroundPatterns();
+  }
+
+  setGroundStyleZone(sectionIndex: number, style: ZoneGroundStyle): void {
+    updateGroundStyleZone(sectionIndex, style);
+    this.invalidateGroundPatterns();
+  }
+
+  resetGroundStyleZone(sectionIndex: number): void {
+    resetGroundStyleZone(sectionIndex);
+    this.invalidateGroundPatterns();
+  }
+
+  resetGroundStyleAll(): void {
+    resetGroundStyleToDefaults();
+    this.invalidateGroundPatterns();
+  }
+
+  private invalidateGroundPatterns(): void {
+    this.groundPatternCache.clear();
+    this.mapBackdropCache.clear();
+    this.onOptionChange();
+    this.render();
+    this.emitViewInfo();
+  }
+
   setMapSceneOption(
     option:
       | 'showSpatialReferences'
@@ -3719,6 +3757,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         activeScenarioId: this.getActiveAmbientScenarioId(),
       },
       ambientTrees: this.getAmbientTrees(),
+      groundStyle: exportGroundStyleSnapshot(),
     };
   }
 
@@ -3732,6 +3771,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       spatialReferences?: SpatialReference[];
       ambientScene?: AmbientSceneData & { activeScenarioId?: string | null };
       ambientTrees?: AmbientTreeSlot[];
+      groundStyle?: Record<number, ZoneGroundStyle>;
     },
     opts?: { skipLegacySave?: boolean },
   ): void {
@@ -3760,6 +3800,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
     if (data.ambientTrees != null) {
       this.setAmbientTrees(data.ambientTrees);
+    }
+    if (data.groundStyle != null) {
+      importGroundStyleSnapshot(data.groundStyle);
+      this.groundPatternCache.clear();
+      this.mapBackdropCache.clear();
     }
     if (!opts?.skipLegacySave) this.saveState();
     this.render();
