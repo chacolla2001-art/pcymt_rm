@@ -1,13 +1,25 @@
-/** Posiciones fijas de árboles decorativos (lat/lng dentro de cada sección del parque). */
+import type { GeoPoint } from './park-geometry';
+import { isPointInPolygon } from '../utils/park-map.util';
+
+/** Árboles colocados fuera del parque, sobre el marco/fondo del mapa. */
+export const BACKDROP_TREE_SECTION = -1;
+
+/** Posiciones fijas de árboles decorativos (lat/lng). */
 export interface AmbientTreeSlot {
   lat: number;
   lng: number;
-  /** Índice de sección (0=Altas, 1=Medias, 2=Bajas). */
+  /** 0=Altas, 1=Medias, 2=Bajas, -1=fondo del mapa. */
   section: number;
   variant: 0 | 1 | 2;
   seed: number;
   scale: number;
+  /** Paleta ecosistema cuando section=-1 (0/1/2). */
+  styleSection?: number;
 }
+
+export const TREE_VARIANT_LABELS: ReadonlyArray<string> = ['Silueta A', 'Silueta B', 'Silueta C'];
+
+export const TREE_ECO_LABELS: ReadonlyArray<string> = ['Tierras Altas', 'Tierras Medias', 'Tierras Bajas'];
 
 /** Generados dentro del polígono de cada sección (no solo el bbox del parque). */
 export const AMBIENT_TREE_SLOTS: AmbientTreeSlot[] = [
@@ -42,3 +54,63 @@ export const AMBIENT_TREE_SLOTS: AmbientTreeSlot[] = [
   { lat: -16.49034909, lng: -68.14470357, section: 2, variant: 1, seed: 171.84, scale: 1.21 },
   { lat: -16.49040532, lng: -68.14535393, section: 2, variant: 2, seed: 174.01, scale: 0.89 },
 ];
+
+export function isBackdropTreeSlot(slot: AmbientTreeSlot): boolean {
+  return slot.section === BACKDROP_TREE_SECTION;
+}
+
+export function paletteSectionForTree(slot: AmbientTreeSlot): number {
+  if (isBackdropTreeSlot(slot)) {
+    const s = slot.styleSection ?? 1;
+    return Math.min(2, Math.max(0, Math.floor(s)));
+  }
+  return Math.min(2, Math.max(0, slot.section));
+}
+
+export function isGeoInBackdropFrame(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+  paddingDeg = 0.004,
+): boolean {
+  if (!boundary.length) return false;
+  if (isPointInPolygon(geo, boundary)) return false;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  for (const p of boundary) {
+    minLat = Math.min(minLat, p.lat);
+    maxLat = Math.max(maxLat, p.lat);
+    minLng = Math.min(minLng, p.lng);
+    maxLng = Math.max(maxLng, p.lng);
+  }
+  return geo.lat >= minLat - paddingDeg
+    && geo.lat <= maxLat + paddingDeg
+    && geo.lng >= minLng - paddingDeg
+    && geo.lng <= maxLng + paddingDeg;
+}
+
+export function cloneAmbientTreeSlots(slots: AmbientTreeSlot[]): AmbientTreeSlot[] {
+  return slots.map((s) => ({ ...s }));
+}
+
+export function exportAmbientTreesJson(slots: AmbientTreeSlot[]): string {
+  return JSON.stringify(
+    {
+      version: 2,
+      source: 'web-admin-manual-edit',
+      syncedAt: new Date().toISOString(),
+      trees: slots.map((t) => ({
+        lat: Number(t.lat.toFixed(8)),
+        lng: Number(t.lng.toFixed(8)),
+        section: t.section,
+        variant: t.variant,
+        seed: t.seed,
+        scale: t.scale,
+        ...(t.styleSection != null ? { styleSection: t.styleSection } : {}),
+      })),
+    },
+    null,
+    2,
+  );
+}

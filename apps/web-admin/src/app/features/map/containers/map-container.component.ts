@@ -11,13 +11,11 @@ import {
   MapViewInfo
 } from '../components/sticker-panel.component';
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
-import { TilesetPanelComponent, TilesetConfig, TilesetSelection, TilePaintTool } from '../components/tileset-panel.component';
-import { StickerLayerService } from '../services/sticker-layer.service';
 import { MapSessionService } from '../services/map-session.service';
-import { StickerInstance, StickerLayer } from '../models/sticker.model';
-import { MapConfigData, MAP_CONFIG_VERSION, MapCheckpointSummary } from '../models/map-layer-config.model';
+import { MapConfigData, MAP_CONFIG_VERSION } from '../models/map-layer-config.model';
 import type { ParkSectionRecord } from '../data/park-geometry';
 import type { SpatialReference } from '../data/spatial-reference';
+import type { AmbientTreeSlot } from '../data/ambient-tree-slots';
 import { findAmbientScenario } from '../data/ambient-scenarios';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -26,82 +24,67 @@ import { AuthService } from '../../../core/services/auth.service';
  * MAP FEATURE — Smart Container
  *
  * Coordinates:
- * - StickerPanelComponent   (left sidebar — map info, controls, options, stickers)
+ * - StickerPanelComponent   (left sidebar — map info, controls, options)
  * - MapControlComponent     (canvas map)
  * - MapLayerConfigPanelComponent (top-right save/load button)
  */
 @Component({
   selector: 'app-map-container',
   standalone: true,
-  imports: [CommonModule, MapControlComponent, StickerPanelComponent, MapLayerConfigPanelComponent,
-            TilesetPanelComponent],
+  imports: [CommonModule, MapControlComponent, StickerPanelComponent, MapLayerConfigPanelComponent],
   template: `
     <div class="container-wrapper">
 
       <!-- Left sidebar: unified map panel -->
       <app-sticker-panel
-        #stickerPanel
         [isDarkTheme]="isDarkTheme"
         [isAdmin]="isAdmin"
-        [selectedSticker]="selectedSticker"
         [mapViewInfo]="currentViewInfo"
-        [tileEditorActive]="tileEditorMode"
         [coordPickerActive]="coordPickerActive"
         [editableSections]="editableSections"
         [sectionEditorActive]="sectionEditorMode"
         [activeSectionIndex]="sectionEditorIndex"
         [selectedVertexIndex]="sectionEditorSelectedVertex"
         [addVertexMode]="sectionEditorAddVertexMode"
+        [treeEditorActive]="treeEditorMode"
+        [treePlaceActive]="treePlaceActive"
+        [treeEditorSectionIndex]="treeEditorSectionIndex"
+        [selectedTreeIndex]="selectedTreeIndex"
+        [treePlaceVariant]="treePlaceVariant"
+        [treePlaceStyleSection]="treePlaceStyleSection"
+        [treePlacementHint]="treePlacementHint"
+        [ambientTrees]="ambientTrees"
         [spatialReferences]="spatialReferences"
         [spatialPlaceIndex]="spatialPlaceIndex"
         [activeSpatialRefIndex]="activeSpatialRefIndex"
         [sceneOpts]="sceneOpts"
         [spatialRefsOpts]="spatialRefsOpts"
-        [checkpoints]="checkpoints"
         [sessionSavedAt]="sessionSavedAt"
-        (stickerSelected)="onPaletteStickerSelected($event)"
-        (stickerChanged)="onStickerPropertyChanged($event)"
-        (stickerRemoved)="onStickerRemoved($event)"
-        (editModeChanged)="onEditModeChanged($event)"
-        (layersChanged)="onLayersChanged()"
         (mapControlEvent)="onMapControlEvent($event)"
         (panelToggled)="onPanelToggled()">
       </app-sticker-panel>
 
-      <!-- Central canvas area: map + bottom tileset panel -->
+      <!-- Central canvas area -->
       <div class="map-area">
+        <div class="map-float-toolbar">
+          <button type="button" class="float-btn" title="Acercar" (click)="onMapControlEvent({ type: 'zoomIn' })">+</button>
+          <button type="button" class="float-btn" title="Alejar" (click)="onMapControlEvent({ type: 'zoomOut' })">−</button>
+          <button type="button" class="float-btn" title="Centrar mapa" (click)="onMapControlEvent({ type: 'centerMap' })">⌖</button>
+          <button type="button" class="float-btn" [class.active]="coordPickerActive" title="Copiar coordenadas GPS"
+            (click)="onMapControlEvent({ type: 'toggleCoordPicker' })">📍</button>
+          <button type="button" class="float-btn" title="Restablecer vista" (click)="onMapControlEvent({ type: 'reset' })">⟲</button>
+        </div>
         <app-map-control
           #mapControl
-          [stickerEditMode]="stickerEditMode"
-          [placingStickerKey]="placingStickerKey"
-          [stickerLayers]="stickerLayers"
-          [editorMode]="tileEditorMode"
-          [tilePaintMode]="tileEditorMode && (!!selectedTileDataUrl || activePaintTool === 'grab' || activePaintTool === 'picker' || activePaintTool === 'eraser' || activePaintTool === 'bucket')"
-          [tilePaintDataUrl]="selectedTileDataUrl"
-          [tilePaintTool]="activePaintTool"
-          [tilePaintMultiTiles]="selectedMultiTiles"
           (anchorClick)="onAnchorMarkerClick($event)"
-          (stickerSelectedOnMap)="onStickerSelectedOnMap($event)"
-          (stickerPlaced)="onStickerPlaced($event)"
-          (stickerDroppedOnMap)="onStickerDroppedOnMap($event)"
-          (stickerMoved)="onStickerMoved($event)"
           (viewInfo)="onViewInfo($event)"
           (saveRequest)="onSaveRequest()"
           (loadRequest)="onLoadRequest()"
-          (clearRequest)="onClearRequest()"
-          (tilePickerPicked)="onTilePickerPicked($event)"
-          (tilePaintToolChange)="onTilePaintToolChange($event)"
           (sectionsChanged)="onSectionsChanged($event)"
+          (ambientTreesChanged)="onAmbientTreesChanged($event)"
+          (treeEditorStateChanged)="onTreeEditorStateChanged($event)"
           (spatialReferencesChanged)="onSpatialReferencesChanged($event)">
         </app-map-control>
-
-        <app-tileset-panel *ngIf="tileEditorMode"
-          #tilesetPanel
-          [isDarkTheme]="isDarkTheme"
-          (tileSelected)="onTileSelected($event)"
-          (configChanged)="onTilesetConfigChanged($event)"
-          (paintToolChanged)="onPaintToolChanged($event)">
-        </app-tileset-panel>
       </div>
 
       <!-- Map config panel: always present (hidden behind canvas overlay) -->
@@ -126,33 +109,64 @@ import { AuthService } from '../../../core/services/auth.service';
     .map-area { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--sys-surface); }
     .map-area app-map-control { flex: 1; min-width: 0; }
     app-sticker-panel { flex-shrink: 0; }
-    :host-context(.map-fullscreen) .container-wrapper {
-      position: fixed; inset: 0; z-index: 9999; background: var(--sys-surface);
+    .map-float-toolbar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 15;
+      display: flex;
+      flex-direction: row;
+      gap: 4px;
+    }
+    .float-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--sys-outline-variant, rgba(255,255,255,0.15));
+      background: color-mix(in srgb, var(--sys-surface) 88%, transparent);
+      color: var(--sys-on-surface);
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .float-btn:hover {
+      border-color: var(--sys-primary);
+      background: color-mix(in srgb, var(--sys-primary) 12%, var(--sys-surface));
+    }
+    .float-btn.active {
+      border-color: var(--sys-primary);
+      background: var(--sys-primary);
+      color: var(--sys-on-primary);
     }
   `]
 })
 export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('mapControl') mapControl!: MapControlComponent;
-  @ViewChild('stickerPanel') stickerPanel!: StickerPanelComponent;
   @ViewChild('configPanel') configPanel!: MapLayerConfigPanelComponent;
-  @ViewChild('tilesetPanel') tilesetPanel?: TilesetPanelComponent;
 
   private destroy$ = new Subject<void>();
 
-  stickerEditMode = false;
-  placingStickerKey: string | null = null;
-  selectedSticker: StickerInstance | null = null;
-  stickerLayers: StickerLayer[] = [];
   isDarkTheme = true;
   isAdmin = false;
-  tileEditorMode = false;
   coordPickerActive = false;
-  isFullscreen = false;
 
   sectionEditorMode = false;
   sectionEditorIndex = 0;
   sectionEditorSelectedVertex: number | null = null;
   sectionEditorAddVertexMode = false;
+  treeEditorMode = false;
+  treePlaceActive = false;
+  treeEditorSectionIndex = 0;
+  selectedTreeIndex: number | null = null;
+  treePlaceVariant: 0 | 1 | 2 = 0;
+  treePlaceStyleSection = 1;
+  treePlacementHint = '';
+  ambientTrees: AmbientTreeSlot[] = [];
   editableSections: ParkSectionRecord[] = [];
 
   spatialReferences: SpatialReference[] = [];
@@ -184,18 +198,19 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     nightMistIntensityPercent: 35,
     ambientWindDeg: 245,
     ambientWindStrengthPercent: 45,
+    rainWindDeg: -1,
+    fogWindDeg: -1,
+    motesWindDeg: -1,
+    cloudShadowWindDeg: -1,
+    leavesWindDeg: -1,
+    treesWindDeg: -1,
   };
   spatialRefsOpts = {
     showSpatialReferences: true,
     spatialAnimPercent: 100,
   };
 
-  checkpoints: MapCheckpointSummary[] = [];
   sessionSavedAt: string | null = null;
-
-  // ── Tile painting state ────────────────────────────────────
-  selectedTileDataUrl: string | null = null;
-  selectedMultiTiles: { col: number; row: number; dataUrl: string }[] | undefined = undefined;
 
   private readonly isBrowser: boolean;
   private sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -207,7 +222,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   constructor(
     private router: Router,
-    private stickerService: StickerLayerService,
     private mapSession: MapSessionService,
     private themeService: ThemeManagerService,
     private authService: AuthService,
@@ -223,19 +237,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.themeService.themeChanged$
       .pipe(takeUntil(this.destroy$))
       .subscribe(theme => { this.isDarkTheme = theme === 'dark'; });
-
-    this.stickerService.layers$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe(layers => {
-        this.stickerLayers = layers;
-        setTimeout(() => this.mapControl?.refreshStickers(), 0);
-        if (!this.restoringSession) this.scheduleSessionSave();
-      });
-
-    this.mapSession.checkpoints$
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((list) => { this.checkpoints = list; });
-
   }
 
   ngAfterViewInit(): void {
@@ -275,40 +276,16 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private captureFullState(): MapConfigData {
     const map = this.mapControl.exportMapPersistedState();
-    const stickerLayers = this.stickerService.layers.map((l) => ({
-      id: l.id,
-      name: l.name,
-      visible: l.visible,
-      stickers: l.stickers.map((s) => ({
-        stickerKey: s.stickerKey,
-        lat: s.lat,
-        lng: s.lng,
-        scale: s.scale,
-        rotation: s.rotation,
-        opacity: s.opacity,
-      })),
-    }));
 
     return {
       version: MAP_CONFIG_VERSION,
       mapState: map.mapState,
-      stickerLayers,
-      activeStickerLayerId: this.stickerService.activeLayerId,
-      canvasGrid: {
-        cellW: map.mapState.canvasGridCellW ?? 32,
-        cellH: map.mapState.canvasGridCellH ?? 32,
-        opacity: map.mapState.canvasGridOpacity ?? 0.35,
-        color: map.mapState.canvasGridColor || '#ffffff',
-        style: map.mapState.canvasGridStyle ?? 'solid',
-      },
-      paintedTiles: map.paintedTiles,
       layerOffsets: map.layerOffsets,
       activeMovableLayer: map.activeMovableLayer,
       sections: map.sections,
       spatialReferences: map.spatialReferences,
       ambientScene: map.ambientScene,
-      refImageDataUrl: map.refImageDataUrl ?? undefined,
-      refImageOpacity: map.refImageOpacity,
+      ambientTrees: map.ambientTrees,
       themeMode: this.themeService.isDarkMode() ? 'dark' : 'light',
     };
   }
@@ -333,10 +310,8 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       activeMovableLayer: configData.activeMovableLayer,
       sections: configData.sections,
       spatialReferences: configData.spatialReferences,
-      paintedTiles: configData.paintedTiles,
-      refImageDataUrl: configData.refImageDataUrl,
-      refImageOpacity: configData.refImageOpacity,
       ambientScene: configData.ambientScene,
+      ambientTrees: configData.ambientTrees,
     }, { skipLegacySave: true });
 
     if (scenarioId) {
@@ -345,28 +320,9 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       this.mapControl.applyAmbientScenarioTint(scenarioId);
     }
 
-    if (configData.stickerLayers?.length) {
-      const layers: StickerLayer[] = configData.stickerLayers.map((l) => ({
-        id: l.id,
-        name: l.name,
-        visible: l.visible,
-        opacity: 1,
-        stickers: l.stickers.map((s) => ({
-          id: `${l.id}_${s.stickerKey}_${s.lat}_${s.lng}`,
-          stickerKey: s.stickerKey,
-          lat: s.lat,
-          lng: s.lng,
-          scale: s.scale,
-          rotation: s.rotation,
-          opacity: s.opacity,
-        })),
-      }));
-      this.stickerService.importLayers(layers);
-    }
-
     this.editableSections = this.mapControl.getEditableSections();
+    this.ambientTrees = this.mapControl.getAmbientTrees();
     this.syncSceneStateFromMap();
-    setTimeout(() => this.mapControl?.refreshStickers(), 0);
 
     this.restoringSession = false;
     if (!opts?.fromAutoRestore) {
@@ -397,28 +353,67 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'toggleCoordPicker': this.mapControl.toggleCoordPicker(); this.coordPickerActive = this.mapControl.coordPickerMode; break;
       case 'saveConfig':   this.onSaveRequest(); break;
       case 'loadConfig':   this.onLoadRequest(); break;
-      case 'clearStickers': this.onClearRequest(); break;
-      case 'toggleEditorMode': this.toggleEditorMode(); break;
-      case 'canvasGridCellSize': this.mapControl.setCanvasGridCellSize(event.cellW, event.cellH); break;
-      case 'canvasGridOpacity':  this.mapControl.setCanvasGridOpacity(event.value); break;
-      case 'canvasGridColor':    this.mapControl.setCanvasGridColor(event.value); break;
-      case 'canvasGridStyle':    this.mapControl.setCanvasGridStyle(event.value); break;
-      case 'canvasGridRotation': this.mapControl.setCanvasGridRotation(event.value); break;
-      case 'clearPaintedTiles':  this.mapControl.clearPaintedTiles(); break;
-      case 'toggleFullscreen':   this.toggleFullscreen(); break;
       case 'markerSize':         this.mapControl.markerRadius = event.value; this.mapControl.resize(); break;
-      case 'selectMovableLayer':  this.mapControl.setActiveMovableLayer(event.layer); break;
-      case 'loadTileset':        this.onLoadTilesetFromPanel(event.tileset); break;
-      case 'refImage':           this.mapControl.setRefImage(event.dataUrl); break;
-      case 'refImageOpacity':    this.mapControl.setRefImageOpacity(event.value); break;
       case 'toggleSectionEditor':
         this.sectionEditorMode = !this.sectionEditorMode;
         if (this.sectionEditorMode) {
-          this.tileEditorMode = false;
-          this.stickerEditMode = false;
-          this.stickerService.setEditMode(false);
+          this.treeEditorMode = false;
+          this.mapControl.setTreeEditorMode(false);
         }
         this.mapControl.setSectionEditorMode(this.sectionEditorMode);
+        break;
+      case 'toggleTreeEditor':
+        this.treeEditorMode = !this.treeEditorMode;
+        if (this.treeEditorMode) {
+          this.sectionEditorMode = false;
+          this.mapControl.setSectionEditorMode(false);
+          this.treePlaceActive = true;
+          this.mapControl.setTreeEditorMode(true);
+          this.mapControl.setTreePlaceActive(true);
+          if (!this.sceneOpts.showTreesEffect) {
+            this.mapControl.setMapSceneOption('showTreesEffect', true);
+            this.sceneOpts.showTreesEffect = true;
+          }
+        } else {
+          this.treePlaceActive = false;
+          this.selectedTreeIndex = null;
+          this.mapControl.setTreeEditorMode(false);
+        }
+        break;
+      case 'setTreeEditorSection':
+        this.treeEditorSectionIndex = event.index;
+        this.mapControl.setTreeEditorSectionIndex(event.index);
+        break;
+      case 'setTreePlaceVariant':
+        this.treePlaceVariant = event.variant;
+        this.mapControl.setTreePlaceVariant(event.variant);
+        break;
+      case 'setTreePlaceStyleSection':
+        this.treePlaceStyleSection = event.section;
+        this.mapControl.setTreePlaceStyleSection(event.section);
+        break;
+      case 'selectAmbientTree':
+        this.selectedTreeIndex = event.index;
+        this.mapControl.selectAmbientTree(event.index);
+        this.treePlaceActive = this.mapControl.treePlaceActive;
+        break;
+      case 'updateAmbientTree':
+        this.mapControl.updateAmbientTree(event.index, event.patch);
+        this.ambientTrees = this.mapControl.getAmbientTrees();
+        if (event.patch.variant != null) this.treePlaceVariant = event.patch.variant;
+        if (event.patch.styleSection != null) this.treePlaceStyleSection = event.patch.styleSection;
+        break;
+      case 'setTreePlaceActive':
+        this.treePlaceActive = event.active;
+        this.mapControl.setTreePlaceActive(event.active);
+        break;
+      case 'removeAmbientTree':
+        this.mapControl.removeAmbientTree(event.index);
+        this.ambientTrees = this.mapControl.getAmbientTrees();
+        this.selectedTreeIndex = this.mapControl.selectedTreeIndex;
+        break;
+      case 'exportAmbientTrees':
+        this.mapControl.downloadAmbientTreesJson();
         break;
       case 'setSectionEditorIndex':
         this.sectionEditorIndex = event.index;
@@ -545,6 +540,19 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
         this.mapControl.setAmbientWindStrength(event.value);
         this.sceneOpts.ambientWindStrengthPercent = Math.round(event.value * 100);
         break;
+      case 'effectWindDirectionChange': {
+        this.onManualSceneEdit();
+        this.mapControl.setEffectWindDirection(event.effect, event.deg);
+        switch (event.effect) {
+          case 'rain': this.sceneOpts.rainWindDeg = event.deg; break;
+          case 'fog': this.sceneOpts.fogWindDeg = event.deg; break;
+          case 'motes': this.sceneOpts.motesWindDeg = event.deg; break;
+          case 'cloudShadows': this.sceneOpts.cloudShadowWindDeg = event.deg; break;
+          case 'leaves': this.sceneOpts.leavesWindDeg = event.deg; break;
+          case 'trees': this.sceneOpts.treesWindDeg = event.deg; break;
+        }
+        break;
+      }
       case 'rainSectionChange':
         this.onManualSceneEdit();
         this.mapControl.setRainSectionIndex(event.sectionIndex);
@@ -568,18 +576,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
         break;
       case 'exportSpatialReferencesJson':
         this.mapControl.downloadSpatialReferencesJson();
-        break;
-      case 'saveCheckpoint':
-        this.onSaveCheckpoint(event.label);
-        break;
-      case 'restoreCheckpoint':
-        this.onRestoreCheckpoint(event.id);
-        break;
-      case 'deleteCheckpoint':
-        this.onDeleteCheckpoint(event.id);
-        break;
-      case 'renameCheckpoint':
-        this.onRenameCheckpoint(event.id, event.label);
         break;
     }
     this.scheduleSessionSave();
@@ -624,6 +620,12 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       nightMistIntensityPercent: Math.round(scene.nightMistIntensity * 100),
       ambientWindDeg: scene.ambientWindDeg,
       ambientWindStrengthPercent: Math.round(scene.ambientWindStrength * 100),
+      rainWindDeg: scene.rainWindDeg ?? -1,
+      fogWindDeg: scene.fogWindDeg ?? -1,
+      motesWindDeg: scene.motesWindDeg ?? -1,
+      cloudShadowWindDeg: scene.cloudShadowWindDeg ?? -1,
+      leavesWindDeg: scene.leavesWindDeg ?? -1,
+      treesWindDeg: scene.treesWindDeg ?? -1,
     };
     this.spatialRefsOpts = {
       showSpatialReferences: scene.showSpatialReferences,
@@ -632,42 +634,36 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.spatialReferences = this.mapControl.getSpatialReferences();
     this.spatialPlaceIndex = this.mapControl.spatialReferencePlaceIndex;
     this.activeSpatialRefIndex = this.mapControl.selectedSpatialReferenceIndex;
+    this.ambientTrees = this.mapControl.getAmbientTrees();
+    this.treeEditorMode = this.mapControl.treeEditorMode;
+    this.treePlaceActive = this.mapControl.treePlaceActive;
+    this.treeEditorSectionIndex = this.mapControl.treeEditorSectionIndex;
+    this.selectedTreeIndex = this.mapControl.selectedTreeIndex;
+    this.treePlaceVariant = this.mapControl.treePlaceVariant;
+    this.treePlaceStyleSection = this.mapControl.treePlaceStyleSection;
+    this.treePlacementHint = this.mapControl.treePlacementHint;
+  }
+
+  onAmbientTreesChanged(trees: AmbientTreeSlot[]): void {
+    this.ambientTrees = trees;
+    this.scheduleSessionSave();
+  }
+
+  onTreeEditorStateChanged(state: {
+    selectedTreeIndex: number | null;
+    treePlaceVariant: 0 | 1 | 2;
+    treePlaceStyleSection: number;
+    treePlacementHint: string;
+  }): void {
+    this.selectedTreeIndex = state.selectedTreeIndex;
+    this.treePlaceVariant = state.treePlaceVariant;
+    this.treePlaceStyleSection = state.treePlaceStyleSection;
+    this.treePlacementHint = state.treePlacementHint;
   }
 
   onSectionsChanged(sections: ParkSectionRecord[]): void {
     this.editableSections = sections;
     this.sectionEditorSelectedVertex = this.mapControl?.sectionEditorSelectedVertex ?? null;
-    this.scheduleSessionSave();
-  }
-
-  // ── Sticker panel events ───────────────────────────────────
-
-  onEditModeChanged(enabled: boolean): void {
-    this.stickerEditMode = enabled;
-    if (!enabled) {
-      this.placingStickerKey = null;
-      this.selectedSticker = null;
-    }
-  }
-
-  onPaletteStickerSelected(key: string): void {
-    this.placingStickerKey = key || null;
-    this.selectedSticker = null;
-    if (key) this.stickerService.loadImage(key).catch(() => {});
-  }
-
-  onStickerPropertyChanged(updated: StickerInstance): void {
-    this.selectedSticker = updated;
-    this.mapControl?.updateSelectedSticker(updated);
-  }
-
-  onStickerRemoved(_id: string): void {
-    this.mapControl?.removeSelectedSticker();
-    this.selectedSticker = null;
-  }
-
-  onLayersChanged(): void {
-    this.mapControl?.refreshStickers();
     this.scheduleSessionSave();
   }
 
@@ -683,102 +679,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  onStickerSelectedOnMap(sticker: StickerInstance | null): void {
-    this.selectedSticker = sticker;
-    if (sticker) {
-      this.placingStickerKey = null;
-      this.stickerPanel?.clearPaletteSelection();
-    }
-  }
-
-  onStickerPlaced(geo: { lat: number; lng: number }): void {
-    if (!this.placingStickerKey) return;
-    const activeLayer = this.stickerService.getActiveLayer();
-    if (!activeLayer) return;
-    this.stickerService.addSticker(activeLayer.id, this.placingStickerKey, geo.lat, geo.lng);
-    setTimeout(() => this.mapControl?.refreshStickers(), 0);
-  }
-
-  onStickerDroppedOnMap(event: { key: string; lat: number; lng: number }): void {
-    const activeLayer = this.stickerService.getActiveLayer();
-    if (!activeLayer) return;
-
-    if (!this.stickerEditMode) {
-      this.stickerEditMode = true;
-      this.stickerService.setEditMode(true);
-    }
-
-    this.stickerPanel?.clearPaletteSelection();
-
-    this.stickerService.loadImage(event.key)
-      .catch(() => {})
-      .finally(() => {
-        this.stickerService.addSticker(activeLayer.id, event.key, event.lat, event.lng);
-        setTimeout(() => this.mapControl?.refreshStickers(), 0);
-      });
-  }
-
-  onStickerMoved(sticker: StickerInstance): void {
-    this.selectedSticker = sticker;
-  }
-
-  // ── Tile editor mode toggle & events ─────────────────────
-
-  toggleEditorMode(): void {
-    this.tileEditorMode = !this.tileEditorMode;
-    if (!this.tileEditorMode) {
-      this.selectedTileDataUrl = null;
-    }
-    // Resize canvas after tileset panel appears/disappears (#9)
-    setTimeout(() => this.mapControl?.resize?.(), 60);
-  }
-
-  onTileSelected(selection: TilesetSelection): void {
-    this.selectedTileDataUrl = selection.tileDataUrl;
-    this.selectedMultiTiles = selection.tiles && selection.tiles.length > 1 ? selection.tiles : undefined;
-  }
-
-  onTilePickerPicked(url: string): void {
-    // Eyedropper: find the tile in the tileset and highlight it
-    this.selectedTileDataUrl = url;
-    this.selectedMultiTiles = undefined;
-    this.tilesetPanel?.highlightPickerOrigin(0, 0);
-  }
-
-  onTilePaintToolChange(tool: string): void {
-    this.activePaintTool = tool as TilePaintTool;
-    this.tilesetPanel?.setActiveTool(tool as TilePaintTool);
-  }
-
-  onTilesetConfigChanged(_config: TilesetConfig): void {
-    // Reserved for future tileset config updates
-  }
-
-  activePaintTool: TilePaintTool = 'paint';
-
-  onPaintToolChanged(tool: TilePaintTool): void {
-    this.activePaintTool = tool;
-  }
-
-  /** Load a tileset from sticker-panel into the tileset-panel */
-  onLoadTilesetFromPanel(tileset: { name: string; imageUrl: string; config: TilesetConfig }): void {
-    if (!this.tileEditorMode) {
-      this.tileEditorMode = true;
-    }
-    // Wait for tileset panel to be created via *ngIf, then load tileset
-    setTimeout(() => {
-      this.tilesetPanel?.loadTilesetFromUrl(tileset.imageUrl, tileset.name, tileset.config);
-      this.mapControl?.resize?.();
-    }, 100);
-  }
-
-  toggleFullscreen(): void {
-    this.isFullscreen = !this.isFullscreen;
-    document.body.classList.toggle('map-fullscreen', this.isFullscreen);
-    // Let the canvas recalculate after layout shift
-    setTimeout(() => this.mapControl?.resize?.(), 60);
-  }
-
   // ── Map config panel events ────────────────────────────────
 
   onSaveRequest(): void {
@@ -789,38 +689,11 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.configPanel?.loadConfig();
   }
 
-  onClearRequest(): void {
-    const activeLayer = this.stickerService.getActiveLayer();
-    if (activeLayer) {
-      this.stickerService.clearAllStickers(activeLayer.id);
-    }
-    this.selectedSticker = null;
-    this.placingStickerKey = null;
-    setTimeout(() => this.mapControl?.refreshStickers(), 0);
-  }
-
   onCaptureStateRequest(): void {
     this.configPanel?.receiveState(this.captureFullState());
   }
 
   onConfigLoaded(configData: MapConfigData): void {
     this.applyFullState(configData);
-  }
-
-  onSaveCheckpoint(label?: string): void {
-    this.mapSession.saveCheckpoint(this.captureFullState(), label);
-  }
-
-  onRestoreCheckpoint(id: string): void {
-    const data = this.mapSession.restoreCheckpoint(id);
-    if (data) this.applyFullState(data);
-  }
-
-  onDeleteCheckpoint(id: string): void {
-    this.mapSession.deleteCheckpoint(id);
-  }
-
-  onRenameCheckpoint(id: string, label: string): void {
-    this.mapSession.renameCheckpoint(id, label);
   }
 }

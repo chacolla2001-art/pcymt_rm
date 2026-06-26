@@ -8,9 +8,12 @@ require('dotenv').config();
 const targetPath = path.join(__dirname, '..', 'src', 'app', 'environments', 'environment.ts');
 const envScriptPath = path.join(__dirname, '..', 'src', 'assets', 'env.js');
 
+// Backend remoto en Vercel (default para desarrollo local y producción)
+const DEFAULT_API_URL = 'https://pcymt-rm-api.vercel.app';
+
 // Obtener variables de entorno con defaults seguros
 const envConfig = {
-  API_URL: process.env.API_URL || 'http://localhost:5000',
+  API_URL: process.env.API_URL || DEFAULT_API_URL,
   ENV_NAME: process.env.ENV_NAME || 'development',
   PRODUCTION: process.env.PRODUCTION === 'true'
 };

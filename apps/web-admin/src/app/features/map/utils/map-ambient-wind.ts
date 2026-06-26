@@ -23,6 +23,26 @@ export function ambientWindVector(wind: AmbientWind): { vx: number; vy: number }
   return { vx: Math.cos(rad) * mag, vy: Math.sin(rad) * mag };
 }
 
+/** Usar viento global del mapa en lugar de orientación propia del efecto. */
+export const EFFECT_WIND_INHERIT = -1;
+
+export type AmbientEffectWindKey =
+  | 'rain'
+  | 'fog'
+  | 'motes'
+  | 'cloudShadows'
+  | 'leaves'
+  | 'trees';
+
+export const EFFECT_WIND_OPTION_KEYS: Record<AmbientEffectWindKey, string> = {
+  rain: 'rainWindDeg',
+  fog: 'fogWindDeg',
+  motes: 'motesWindDeg',
+  cloudShadows: 'cloudShadowWindDeg',
+  leaves: 'leavesWindDeg',
+  trees: 'treesWindDeg',
+};
+
 /** Etiquetas de los 8 puntos cardinales. */
 export const WIND_DIRECTION_PRESETS: ReadonlyArray<{ label: string; deg: number }> = [
   { label: 'E', deg: 0 },

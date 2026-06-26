@@ -261,7 +261,7 @@ export const EN_TRANSLATIONS: Record<string, string> = {
   'map.saveError': 'Error saving',
   'map.loadError': 'Error loading',
   'map.toggleConfig': 'Save / load map configuration',
-  'map.saveHint': 'Saves position, zoom, rotation and current stickers',
+  'map.saveHint': 'Saves position, zoom, rotation and map configuration',
   'map.loadHint': 'Restores the last saved configuration',
   'map.saveShort': 'Save',
   'map.loadShort': 'Load',

@@ -10,7 +10,6 @@ const createAnalyticsRoutes = require('./analytics.routes');
 const createConfigRoutes = require('./config.routes');
 const createFileRoutes = require('./file.routes');
 const createMapConfigurationRoutes = require('./mapConfiguration.routes');
-const createMapTileRoutes = require('./mapTile.routes');
 
 /**
  * Create all v1 API routes
@@ -31,7 +30,6 @@ const createV1Routes = (container) => {
     configController,
     fileController,
     mapConfigurationController,
-    mapTileController,
     authMiddleware,
     uploadMiddleware,
   } = container;
@@ -49,7 +47,6 @@ const createV1Routes = (container) => {
   router.use('/analytics', createAnalyticsRoutes(analyticsController, authMiddleware));
   router.use('/files', createFileRoutes(fileController, authMiddleware));
   router.use('/map-configurations', createMapConfigurationRoutes(mapConfigurationController, authMiddleware));
-  router.use('/map', createMapTileRoutes(mapTileController, authMiddleware, uploadMiddleware));
 
   return router;
 };

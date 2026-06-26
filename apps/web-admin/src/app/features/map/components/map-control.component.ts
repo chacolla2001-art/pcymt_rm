@@ -7,9 +7,6 @@ import { ThemeManagerService } from '../../../core/services/theme-manager.servic
 import { AppShellLoadService } from '../../../core/services/app-shell-load.service';
 import { Subject, takeUntil } from 'rxjs';
 import { finalize } from 'rxjs/operators';
-import { StickerLayerService } from '../services/sticker-layer.service';
-import { StickerInstance, StickerLayer } from '../models/sticker.model';
-import { TilemapLayer, TilemapLayerData } from '../models/map-tile.model';
 
 /**
  * MAPA DE ULTRA ALTA PRECISIÓN v3.0 - Parque de las Culturas y de la Madre Tierra
@@ -63,8 +60,10 @@ import { MapMotesEffect } from '../utils/map-motes-effect';
 import { MapCloudShadowEffect } from '../utils/map-cloud-shadow-effect';
 import { MapLeavesEffect } from '../utils/map-leaves-effect';
 import { MapTreesEffect } from '../utils/map-trees-effect';
+import { BACKDROP_TREE_SECTION, cloneAmbientTreeSlots, exportAmbientTreesJson, isGeoInBackdropFrame, isBackdropTreeSlot, type AmbientTreeSlot } from '../data/ambient-tree-slots';
+import type { AmbientSceneData } from '../models/map-layer-config.model';
 import type { AmbientWind } from '../utils/map-ambient-zone';
-import { DEFAULT_AMBIENT_WIND, normalizeWindDegrees } from '../utils/map-ambient-wind';
+import { DEFAULT_AMBIENT_WIND, EFFECT_WIND_INHERIT, normalizeWindDegrees, type AmbientEffectWindKey } from '../utils/map-ambient-wind';
 import { MapLightningEffect } from '../utils/map-lightning-effect';
 import { MapNightMistEffect } from '../utils/map-night-mist-effect';
 import { SpatialReferenceLayer } from '../utils/spatial-reference-layer';
@@ -150,8 +149,6 @@ const THEME_COLORS = {
         (mouseleave)="onMouseLeave()"
         (wheel)="onWheel($event)"
         (click)="onClick($event)"
-        (dragover)="onDragOver($event)"
-        (drop)="onMapDrop($event)"
         (contextmenu)="$event.preventDefault()">
       </canvas>
 
@@ -188,34 +185,25 @@ const THEME_COLORS = {
 
       <!-- Hint -->
       <div class="click-hint">
-        {{ editorMode
-           ? editorActiveTool === 'sticker' ? 'Click para colocar sticker | Esc = cancelar'
-             : editorActiveTool === 'eraser' ? 'Click sobre un item para borrarlo'
-             : editorActiveTool === 'coordinate' ? 'Click para copiar coordenadas'
-             : 'Click para seleccionar | Arrastra mover | Del = eliminar | Scroll = zoom'
-           : sectionEditorMode
+        {{ sectionEditorMode
              ? (sectionEditorAddVertexMode
                ? 'Click en el mapa para añadir vértice a la sección activa'
                : 'Botones de zona · click dentro del polígono para seleccionar · arrastra vértices')
+           : treeEditorMode && treePlaceActive
+             ? (treeEditorSectionIndex === -1
+               ? 'Click fuera del parque para colocar · sigue colocando sin pulsar de nuevo'
+               : 'Click en la zona activa para colocar · puedes poner varios seguidos')
            : coordPickerMode
              ? 'Click en el mapa para copiar coordenadas GPS | Usa vista Z↓ para máxima precisión'
-             : stickerEditMode
-               ? 'Del = eliminar | Ctrl+Z/Y = deshacer/rehacer | Arrastra para mover | ↑↓←→ = nudge'
-               : 'Scroll = zoom | Zonas: botón encuadra y abre ficha · hover resalta contorno' }}
-      </div>
-
-      <!-- Sticker edit mode banner -->
-      <div class="edit-banner" *ngIf="stickerEditMode && !editorMode">
-        ✏️ Modo edición de stickers
-      </div>
-
-      <!-- Editor mode banner -->
-      <div class="edit-banner editor-banner" *ngIf="editorMode">
-        🗺️ Editor de tiles
+             : 'Scroll = zoom | Zonas: botón encuadra y abre ficha · hover resalta contorno' }}
       </div>
 
       <div class="edit-banner section-editor-banner" *ngIf="sectionEditorMode">
         ✏️ Editor de secciones — arrastra vértices · Del borrar · click añade si está activo
+      </div>
+
+      <div class="edit-banner section-editor-banner" *ngIf="treeEditorMode">
+        🌳 {{ treeEditorBannerText }}
       </div>
 
       <!-- Ficha educativa (vista jugador + editor) -->
@@ -728,32 +716,22 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   @Output() viewInfo = new EventEmitter<{
     lat: number; lng: number; zoom: number; rotDeg: number;
     showSections: boolean; showLabels: boolean;
-    showCanvasGrid: boolean; showTilemap: boolean; showGroundTextures: boolean;
+    showGroundTextures: boolean;
     groundTilePx: number;
     showBoundary: boolean; showMarkers: boolean;
-    canvasGridCellW: number; canvasGridCellH: number; canvasGridOpacity: number;
-    canvasGridColor: string; canvasGridStyle: 'solid' | 'dashed' | 'dotted';
-    canvasGridRotation: number;
   }>();
-
-  // ── Sticker system I/O ────────────────────────────────────
-  /** Whether sticker edit mode is active */
-  @Input() stickerEditMode = false;
-  /** The sticker key from the palette the user wants to place */
-  @Input() placingStickerKey: string | null = null;
-  /** The sticker layers to render */
-  @Input() stickerLayers: StickerLayer[] = [];
-  /** Currently selected sticker for property editing */
-  @Output() stickerSelectedOnMap = new EventEmitter<StickerInstance | null>();
-  /** Sticker was placed on the map (click-to-place with placingStickerKey) */
-  @Output() stickerPlaced = new EventEmitter<{ lat: number; lng: number }>();
-  /** Sticker was dropped from the panel palette (drag-and-drop) */
-  @Output() stickerDroppedOnMap = new EventEmitter<{ key: string; lat: number; lng: number }>();
-  /** Sticker was moved on the map */
-  @Output() stickerMoved = new EventEmitter<StickerInstance>();
 
   /** Polígonos de sección editados (para panel lateral). */
   @Output() sectionsChanged = new EventEmitter<ParkSectionRecord[]>();
+
+  /** Árboles ambientales colocados por zona. */
+  @Output() ambientTreesChanged = new EventEmitter<AmbientTreeSlot[]>();
+  @Output() treeEditorStateChanged = new EventEmitter<{
+    selectedTreeIndex: number | null;
+    treePlaceVariant: 0 | 1 | 2;
+    treePlaceStyleSection: number;
+    treePlacementHint: string;
+  }>();
 
   /** Referencias espaciales (elementos de escena del mapa). */
   @Output() spatialReferencesChanged = new EventEmitter<SpatialReference[]>();
@@ -763,24 +741,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   @Output() saveRequest = new EventEmitter<void>();
   /** Request parent to load saved map layer configuration */
   @Output() loadRequest = new EventEmitter<void>();
-  /** Request parent to clear all stickers */
-  @Output() clearRequest = new EventEmitter<void>();
-
-  // ── Tilemap editor overlay I/O ────────────────────────────
-  /** Editor layers to draw on top of the park map */
-  @Input() editorLayers: TilemapLayer[] = [];
-  /** Whether editor mode is active (routes clicks to editor) */
-  @Input() editorMode = false;
-  /** Currently selected editor item (draws selection handles) */
-  @Input() editorSelectedItem: TilemapLayerData | null = null;
-  /** Active tool in the editor (affects cursor on canvas) */
-  @Input() editorActiveTool = 'select';
-  /** Emitted when the map canvas is clicked while editor mode is active */
-  @Output() editorGeoClick = new EventEmitter<{ lat: number; lng: number }>();
-  /** Emitted on every mouse move (throttled) for editor cursor display */
-  @Output() editorGeoMove = new EventEmitter<{ lat: number; lng: number }>();
-  /** Emitted on mouse up for editor drag-end notification */
-  @Output() editorGeoMouseUp = new EventEmitter<void>();
 
   private ctx!: CanvasRenderingContext2D;
   private destroy$ = new Subject<void>();
@@ -834,6 +794,18 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   sectionEditorSelectedVertex: number | null = null;
   sectionEditorAddVertexMode = false;
   private draggingSectionVertex = false;
+
+  // Editor de árboles por zona
+  treeEditorMode = false;
+  treePlaceActive = false;
+  treeEditorSectionIndex = 0;
+  selectedTreeIndex: number | null = null;
+  treePlaceVariant: 0 | 1 | 2 = 0;
+  treePlaceStyleSection = 1;
+  treePlacementHint = '';
+  ambientTrees: AmbientTreeSlot[] = [];
+  private draggingTreeIndex: number | null = null;
+
   private pointerMovedSinceDown = false;
   private pointerDownX = 0;
   private pointerDownY = 0;
@@ -891,8 +863,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     showSections: true,
     showSectionLabels: true,
     showLabels: true,
-    showCanvasGrid: false,
-    showTilemap: true,
     showGroundTextures: true,
     groundTilePx: PARK_MAP_VIS.groundTilePx as number,
     showBoundary: true,
@@ -922,6 +892,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     nightMistIntensity: 0.35,
     ambientWindDeg: DEFAULT_AMBIENT_WIND.directionDeg,
     ambientWindStrength: DEFAULT_AMBIENT_WIND.strength,
+    rainWindDeg: EFFECT_WIND_INHERIT,
+    fogWindDeg: EFFECT_WIND_INHERIT,
+    motesWindDeg: EFFECT_WIND_INHERIT,
+    cloudShadowWindDeg: EFFECT_WIND_INHERIT,
+    leavesWindDeg: EFFECT_WIND_INHERIT,
+    treesWindDeg: EFFECT_WIND_INHERIT,
     spatialAnimSpeed: 1,
   };
 
@@ -946,41 +922,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private ambientScenarioTint: AmbientScenarioTint | null = null;
   private ambientSectionOpacityBoost = 0;
 
-  // Reference image (background layer)
-  private refImage: HTMLImageElement | null = null;
-  private refImageOpacity = 0.5;
-  private refImageLoaded = false;
-
-  // Canvas grid configuration
-  canvasGridCellW = 32;
-  canvasGridCellH = 32;
-  canvasGridOpacity = 0.15;
-  canvasGridColor = '';
-  canvasGridStyle: 'solid' | 'dashed' | 'dotted' = 'solid';
-  /** Grid rotation in degrees relative to screen horizontal (0 = straight, independent of map rotation) */
-  canvasGridRotation = 0;
-
-  // ── Tile painting ─────────────────────────────────────────
-  @Input() tilePaintMode = false;
-  @Input() tilePaintDataUrl: string | null = null;
-  @Input() tilePaintTool: string = 'paint';
   @Input() markerRadius = 10;
-  /** Multi-tile selection from tileset panel */
-  @Input() set tilePaintMultiTiles(val: { col: number; row: number; dataUrl: string }[] | undefined) {
-    this.multiTiles = val ?? [];
-    this.multiTileCols = val?.length ? Math.max(...val.map(t => t.col)) + 1 : 1;
-    this.multiTileRows = val?.length ? Math.max(...val.map(t => t.row)) + 1 : 1;
-  }
-  /** Emitted when eyedropper picks a tile — contains the dataUrl of the tile */
-  @Output() tilePickerPicked = new EventEmitter<string>();
-  @Output() tilePaintToolChange = new EventEmitter<string>();
 
   /** Which layer is currently movable ('canvas' = move all) */
-  activeMovableLayer: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers' = 'canvas';
+  activeMovableLayer: 'canvas' | 'boundary' | 'sections' | 'markers' = 'canvas';
 
   /** Per-layer offsets in map-space (used when moving individual layers) */
   layerOffsets = {
-    grid:     { x: 0, y: 0 },
     boundary: { x: 0, y: 0 },
     sections: { x: 0, y: 0 },
     markers:  { x: 0, y: 0 },
@@ -989,53 +937,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   /** Saved transform snapshot for locked boundary */
   // lockedBoundaryTransform removed — lock now only prevents layer editing, not panning
   private resizeObserver: ResizeObserver | null = null;
-  /** Painted tiles: key = "col,row" → value = tileDataUrl */
-  paintedTiles = new Map<string, { url: string; img: HTMLImageElement | null }>();
-  private isPainting = false;
-  private paintImageCache = new Map<string, HTMLImageElement>();
-
-  // ── Undo / redo ─────────────────────────────────────────
-  private undoStack: Map<string, { url: string; img: HTMLImageElement | null }>[] = [];
-  private redoStack: Map<string, { url: string; img: HTMLImageElement | null }>[] = [];
-  private readonly MAX_UNDO = 50;
-
-  // ── Multi-tile selection (from tileset panel) ──────────
-  private multiTiles: { col: number; row: number; dataUrl: string }[] = [];
-  private multiTileCols = 1;
-  private multiTileRows = 1;
-
-  // ── Line tool state ────────────────────────────────────
-  private lineStartCol = -1;
-  private lineStartRow = -1;
-  private lineDragging = false;
-  private lineEndCol = -1;
-  private lineEndRow = -1;
-
-  // ── Rectangle paint tool state ─────────────────────────
-  private rectStartCol = -1;
-  private rectStartRow = -1;
-  private rectDragging = false;
-  private rectEndCol = -1;
-  private rectEndRow = -1;
 
   // Interacción
   private isDragging = false;
   private lastX = 0;
   private lastY = 0;
-
-  // ── Sticker interaction state ─────────────────────────────
-  private selectedStickerRef: { layerId: string; sticker: StickerInstance } | null = null;
-  private isDraggingSticker = false;
-  private isScalingSticker = false;
-  private scaleDragStartDist = 0;
-  private scaleDragStartScale = 1;
-  private isRotatingSticker = false;
-  private rotateDragStartAngle = 0; // atan2 angle from center to mouse at drag start
-  private rotateDragStartStkRot = 0; // sticker rotation (deg) at drag start
-  private readonly ROTATE_HANDLE_STEM   = 22; // stem length in screen px
-  private readonly ROTATE_HANDLE_RADIUS = 7;  // circle radius in screen px
-  private readonly STICKER_BASE_SIZE = 40; // px base size at scale=1 (in screen pixels)
-  private readonly HANDLE_RADIUS = 6; // corner handle hit area
 
   // ── Cursor throttle (hit-test at most every 30ms) ────────
   private lastCursorX = -9999;
@@ -1054,11 +960,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // ── ViewInfo throttle ─────────────────────────────────────────
   private lastViewInfoTime = 0;
 
-  // Expose selected sticker for template
-  get selectedStickerPublic(): StickerInstance | null {
-    return this.selectedStickerRef?.sticker ?? null;
-  }
-
   get zoom(): number { return this.scale; }
   get rotationDeg(): number { return this.rotation * 180 / Math.PI; }
   get theme() { return this.isDarkTheme ? THEME_COLORS.dark : THEME_COLORS.light; }
@@ -1066,7 +967,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   constructor(
     private anchorService: AnchorPointService,
     private themeService: ThemeManagerService,
-    private stickerService: StickerLayerService,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
@@ -1126,6 +1026,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.leavesEffect.setSizeMul(this.mapOptions.leavesSize);
     this.treesEffect.setIntensity(this.mapOptions.treesIntensity);
     this.treesEffect.setSizeMul(this.mapOptions.treesSize);
+    this.treesEffect.setSlots(this.ambientTrees);
     this.lightningEffect.setEnabled(this.mapOptions.showLightningEffect);
     this.lightningEffect.setRainIntensity(this.mapOptions.rainIntensity);
     this.nightMistEffect.setIntensity(this.mapOptions.nightMistIntensity);
@@ -1135,6 +1036,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     // Emit initial view info after a short delay so the canvas has sized up
     setTimeout(() => this.emitViewInfo(), 300);
     setTimeout(() => this.emitSectionsChanged(), 350);
+    setTimeout(() => this.emitAmbientTreesChanged(), 360);
+    setTimeout(() => this.emitTreeEditorState(), 370);
 
     // Observe parent element size changes (e.g. sidenav toggle) to auto-resize canvas
     const parent = canvas.parentElement;
@@ -1178,17 +1081,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.targetOffsetY = this.offsetY;
         this.mapOptions.showSections = state.showSections ?? true;
         this.mapOptions.showLabels = state.showLabels ?? true;
-        this.mapOptions.showCanvasGrid = state.showCanvasGrid ?? false;
-        this.mapOptions.showTilemap = state.showTilemap ?? true;
         this.mapOptions.showGroundTextures = state.showGroundTextures ?? true;
         if (state.groundTilePx != null) {
           this.mapOptions.groundTilePx = clampGroundTilePx(state.groundTilePx);
           this.groundPatternCache.setTilePx(this.mapOptions.groundTilePx);
           this.mapBackdropCache.setTilePx(this.mapOptions.groundTilePx);
         }
-        if (state.canvasGridCellW) this.canvasGridCellW = state.canvasGridCellW;
-        if (state.canvasGridCellH) this.canvasGridCellH = state.canvasGridCellH;
-        if (state.canvasGridOpacity != null) this.canvasGridOpacity = state.canvasGridOpacity;
       }
     } catch (e) {
       console.warn('Error loading map state:', e);
@@ -1204,13 +1102,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         offsetY: this.offsetY,
         showSections: this.mapOptions.showSections,
         showLabels: this.mapOptions.showLabels,
-        showCanvasGrid: this.mapOptions.showCanvasGrid,
-        showTilemap: this.mapOptions.showTilemap,
         showGroundTextures: this.mapOptions.showGroundTextures,
         groundTilePx: this.mapOptions.groundTilePx,
-        canvasGridCellW: this.canvasGridCellW,
-        canvasGridCellH: this.canvasGridCellH,
-        canvasGridOpacity: this.canvasGridOpacity
       };
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
@@ -1288,13 +1181,23 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       }
 
       if (this.canvasRef?.nativeElement && this.hasActiveAmbientEffects()) {
-        const zone = this.getRainEffectOptions();
-        if (this.mapOptions.showCloudShadows) this.cloudShadowEffect.tick(zone);
-        if (this.mapOptions.showFogEffect) this.fogEffect.tick(zone);
+        const zone = this.getAmbientTickZone();
+        if (this.mapOptions.showCloudShadows) {
+          this.cloudShadowEffect.tick({ ...zone, wind: this.getEffectWind(this.mapOptions.cloudShadowWindDeg) });
+        }
+        if (this.mapOptions.showFogEffect) {
+          this.fogEffect.tick({ ...zone, wind: this.getEffectWind(this.mapOptions.fogWindDeg) });
+        }
         if (this.mapOptions.showNightMistEffect && this.isDarkTheme) this.nightMistEffect.tick(zone);
-        if (this.mapOptions.showRainEffect) this.rainEffect.tick(zone);
-        if (this.mapOptions.showMotesEffect) this.motesEffect.tick(zone);
-        if (this.mapOptions.showLeavesEffect) this.leavesEffect.tick(zone);
+        if (this.mapOptions.showRainEffect) {
+          this.rainEffect.tick({ ...zone, wind: this.getEffectWind(this.mapOptions.rainWindDeg) });
+        }
+        if (this.mapOptions.showMotesEffect) {
+          this.motesEffect.tick({ ...zone, wind: this.getEffectWind(this.mapOptions.motesWindDeg) });
+        }
+        if (this.mapOptions.showLeavesEffect) {
+          this.leavesEffect.tick({ ...zone, wind: this.getEffectWind(this.mapOptions.leavesWindDeg) });
+        }
         if (this.mapOptions.showLightningEffect) {
           this.lightningEffect.setRainIntensity(this.mapOptions.rainIntensity);
           this.lightningEffect.tick(this.mapOptions.showRainEffect);
@@ -1446,24 +1349,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     };
   }
 
-  /** Inverse of the grid’s own render transform (screen → grid-local drawing coords) */
-  private screenToGridLocal(sx: number, sy: number): { x: number; y: number } {
-    const canvasEl = this.canvasRef.nativeElement;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvasEl.width / dpr;
-    const h = canvasEl.height / dpr;
-    const gridRad = this.canvasGridRotation * Math.PI / 180;
-    const lo = this.layerOffsets.grid;
-    const cx = sx - w / 2 - this.offsetX;
-    const cy = sy - h / 2 - this.offsetY;
-    const cos = Math.cos(-gridRad);
-    const sin = Math.sin(-gridRad);
-    return {
-      x: (cx * cos - cy * sin) / this.scale + w / 2 - lo.x,
-      y: (cx * sin + cy * cos) / this.scale + h / 2 - lo.y,
-    };
-  }
-
   private canvasToGeo(canvas: CanvasPoint): GeoPoint {
     const canvasEl = this.canvasRef.nativeElement;
     const w = canvasEl.width / (window.devicePixelRatio || 1);
@@ -1528,6 +1413,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.save();
       this.ctx.translate(lo.x, lo.y);
       this.drawMapGroundBackdrop(w, h);
+      if (this.mapOptions.showTreesEffect) {
+        this.drawPlacedBackdropTrees(w, h);
+      }
       if (PARK_BOUNDARY.length >= 3) {
         this.drawParkGroundBase();
       }
@@ -1552,71 +1440,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.restore();
     }
 
-    // Reference image layer — drawn in grid-local space before tiles & grid
-    if (this.refImage && this.refImageLoaded && this.refImageOpacity > 0) {
-      const lo = this.layerOffsets.grid;
-      const gridRad = this.canvasGridRotation * Math.PI / 180;
-      this.ctx.save();
-      this.ctx.translate(w / 2, h / 2);
-      this.ctx.rotate(-this.rotation + gridRad);
-      this.ctx.translate(-w / 2, -h / 2);
-      this.ctx.translate(lo.x, lo.y);
-      this.ctx.globalAlpha = this.refImageOpacity;
-      this.ctx.drawImage(this.refImage, 0, 0);
-      this.ctx.globalAlpha = 1;
-      this.ctx.restore();
+    if (this.treeEditorMode) {
+      this.drawTreeEditorMarkers(w, h);
     }
-
-    // Painted tilemap layer — always renders if tiles exist and showTilemap is true
-    if (this.mapOptions.showTilemap && this.paintedTiles.size > 0) {
-      const lo = this.layerOffsets.grid;
-      const gridRad = this.canvasGridRotation * Math.PI / 180;
-      this.ctx.save();
-      this.ctx.translate(w / 2, h / 2);
-      this.ctx.rotate(-this.rotation + gridRad);
-      this.ctx.translate(-w / 2, -h / 2);
-      this.ctx.translate(lo.x, lo.y);
-      this.drawPaintedTilesLayer();
-      this.ctx.restore();
-    }
-
-    // Canvas grid lines: independent rotation, screen-aligned by default (gridRotation=0)
-    if (this.mapOptions.showCanvasGrid) {
-      const lo = this.layerOffsets.grid;
-      const gridRad = this.canvasGridRotation * Math.PI / 180;
-      this.ctx.save();
-      this.ctx.translate(w / 2, h / 2);
-      this.ctx.rotate(-this.rotation + gridRad);
-      this.ctx.translate(-w / 2, -h / 2);
-      this.ctx.translate(lo.x, lo.y);
-      this.drawCanvasGrid();
-      this.ctx.restore();
-    }
-
-    // Rectangle/line selection preview for paint tools
-    if (this.rectDragging || this.lineDragging) {
-      const lo = this.layerOffsets.grid;
-      const gridRad = this.canvasGridRotation * Math.PI / 180;
-      this.ctx.save();
-      this.ctx.translate(w / 2, h / 2);
-      this.ctx.rotate(-this.rotation + gridRad);
-      this.ctx.translate(-w / 2, -h / 2);
-      this.ctx.translate(lo.x, lo.y);
-      this.drawRectPreview();
-      this.drawLinePreview();
-      this.ctx.restore();
-    }
-
     if (this.mapOptions.showTreesEffect) {
-      this.treesEffect.drawWorld(this.ctx, {
-        geoToCanvas: (geo) => this.geoToCanvas(geo),
-        isInZone: (geo) => this.isInAmbientGeoZone(geo),
-        viewport: this.getWorldViewportBounds(w, h),
-        isDark: this.isDarkTheme,
-        baseHeight: PARK_MAP_VIS.treeBaseWorld,
-        sectionIndex: this.mapOptions.rainSectionIndex,
-        wind: this.getAmbientWind(),
-      });
+      this.treesEffect.drawWorld(this.ctx, this.buildTreesDrawOptions(w, h));
     }
 
     this.drawCameraPivotWorld(w, h);
@@ -1662,9 +1490,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       });
     }
 
-    // Sticker layers (drawn after main transform restore, using geoToScreen)
-    this.drawStickers();
-
     // Section names (screen-space, always readable)
     if (this.mapOptions.showSections && this.mapOptions.showSectionLabels) {
       this.drawSectionLabels();
@@ -1673,9 +1498,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (this.sectionEditorMode) {
       this.drawSectionEditorVertices();
     }
-
-    // Editor overlay layers (drawn on top of everything using geoToScreen)
-    if (this.editorLayers?.length) this.drawEditorOverlay();
 
     // Marker labels (screen-space) — shift by markers layer offset converted to screen delta
     if (this.mapOptions.showMarkers && this.mapOptions.showLabels) {
@@ -1695,7 +1517,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       }
     }
 
-    if (!this.editorMode && !this.sectionEditorMode) {
+    if (!this.sectionEditorMode) {
       this.drawCameraReticle(w, h, dpr);
     }
   }
@@ -1805,6 +1627,43 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.lineTo(p2.x, p2.y);
       this.ctx.stroke();
     }
+  }
+
+  private drawPlacedBackdropTrees(w: number, h: number): void {
+    this.treesEffect.drawBackdrop(this.ctx, this.buildTreesDrawOptions(w, h));
+  }
+
+  private buildTreesDrawOptions(w: number, h: number) {
+    return {
+      geoToCanvas: (geo: GeoPoint) => this.geoToCanvas(geo),
+      isParkTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
+        if (isBackdropTreeSlot(slot)) return false;
+        const polygon = this.editableSections[slot.section]?.polygon;
+        if (!polygon?.length) return isPointInPolygon(geo, PARK_BOUNDARY);
+        return isPointInPolygon(geo, polygon);
+      },
+      isBackdropTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
+        if (!isBackdropTreeSlot(slot)) return false;
+        return isGeoInBackdropFrame(geo, PARK_BOUNDARY);
+      },
+      viewport: this.getWorldViewportBounds(w, h),
+      isDark: this.isDarkTheme,
+      baseHeight: PARK_MAP_VIS.treeBaseWorld,
+      wind: this.getEffectWind(this.mapOptions.treesWindDeg),
+    };
+  }
+
+  get treeEditorBannerText(): string {
+    if (this.treePlaceActive) {
+      if (this.treeEditorSectionIndex === BACKDROP_TREE_SECTION) {
+        return 'Modo colocar: click fuera del parque (varios seguidos). Click en marcador = editar · arrastrar = mover.';
+      }
+      return 'Modo colocar: click en la zona activa (varios seguidos). Click en marcador = editar · arrastrar = mover.';
+    }
+    if (this.selectedTreeIndex !== null) {
+      return 'Árbol seleccionado — ajusta en el panel, arrastra en el mapa, o pulsa «Modo colocar» para añadir más.';
+    }
+    return 'Elige zona y silueta · «Modo colocar» activo al abrir el editor.';
   }
 
   private drawMapGroundBackdrop(w: number, h: number): void {
@@ -2193,7 +2052,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private updateSectionHover(x: number, y: number): void {
     if (this.sectionEditorMode || !this.mapOptions.showSections) return;
-    if (this.isDragging || this.draggingSectionVertex || this.tilePaintMode || this.editorMode) return;
+    if (this.isDragging || this.draggingSectionVertex) return;
 
     const geo = this.canvasToGeo({ x, y });
     const hit = this.hitTestSectionAtGeo(geo);
@@ -2382,6 +2241,232 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     URL.revokeObjectURL(url);
   }
 
+  setTreeEditorMode(enabled: boolean): void {
+    this.treeEditorMode = enabled;
+    if (!enabled) {
+      this.treePlaceActive = false;
+      this.selectedTreeIndex = null;
+      this.draggingTreeIndex = null;
+      this.treePlacementHint = '';
+    } else {
+      this.treePlaceActive = true;
+    }
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  setTreePlaceActive(active: boolean): void {
+    this.treePlaceActive = active;
+    if (active) this.treePlacementHint = '';
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  setTreeEditorSectionIndex(index: number): void {
+    if (index !== BACKDROP_TREE_SECTION && (index < 0 || index >= this.editableSections.length)) return;
+    this.treeEditorSectionIndex = index;
+    this.selectedTreeIndex = null;
+    this.treePlacementHint = '';
+    if (this.treeEditorMode) {
+      this.treePlaceActive = true;
+    }
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  setTreePlaceVariant(variant: 0 | 1 | 2): void {
+    this.treePlaceVariant = variant;
+    if (this.selectedTreeIndex !== null) {
+      this.updateAmbientTree(this.selectedTreeIndex, { variant });
+    } else {
+      this.emitTreeEditorState();
+    }
+  }
+
+  setTreePlaceStyleSection(section: number): void {
+    this.treePlaceStyleSection = Math.min(2, Math.max(0, Math.floor(section)));
+    if (this.selectedTreeIndex !== null) {
+      const slot = this.ambientTrees[this.selectedTreeIndex];
+      if (slot && isBackdropTreeSlot(slot)) {
+        this.updateAmbientTree(this.selectedTreeIndex, { styleSection: this.treePlaceStyleSection });
+      }
+    } else {
+      this.emitTreeEditorState();
+    }
+  }
+
+  selectAmbientTree(index: number | null): void {
+    this.selectedTreeIndex = index;
+    if (index !== null && this.ambientTrees[index]) {
+      const t = this.ambientTrees[index];
+      this.treePlaceVariant = t.variant;
+      if (isBackdropTreeSlot(t) && t.styleSection != null) {
+        this.treePlaceStyleSection = t.styleSection;
+      }
+      this.treePlaceActive = false;
+    } else if (this.treeEditorMode) {
+      this.treePlaceActive = true;
+    }
+    this.treePlacementHint = '';
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  updateAmbientTree(index: number, patch: Partial<AmbientTreeSlot>): void {
+    if (index < 0 || index >= this.ambientTrees.length) return;
+    this.ambientTrees = this.ambientTrees.map((t, i) => (i === index ? { ...t, ...patch } : t));
+    this.syncAmbientTrees();
+    this.emitAmbientTreesChanged();
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  private canPlaceTreeAtGeo(geo: GeoPoint): boolean {
+    return this.canPlaceTreeAtGeoForSection(geo, this.treeEditorSectionIndex);
+  }
+
+  private canPlaceTreeAtGeoForSection(geo: GeoPoint, section: number): boolean {
+    if (section === BACKDROP_TREE_SECTION) {
+      return isGeoInBackdropFrame(geo, PARK_BOUNDARY);
+    }
+    const sectionName = findParkSectionAt(geo.lat, geo.lng, this.editableSections);
+    const expected = this.editableSections[section]?.name;
+    return sectionName === expected && isGeoInPark(geo, PARK_BOUNDARY);
+  }
+
+  addAmbientTreeAtGeo(lat: number, lng: number): void {
+    const geo = { lat, lng };
+    if (!this.canPlaceTreeAtGeo(geo)) {
+      this.treePlacementHint = this.treeEditorSectionIndex === BACKDROP_TREE_SECTION
+        ? 'Debe quedar fuera del parque, en el marco visible.'
+        : 'El click debe caer dentro de la zona activa.';
+      this.emitTreeEditorState();
+      this.render();
+      return;
+    }
+    const slot: AmbientTreeSlot = {
+      lat: Number(lat.toFixed(8)),
+      lng: Number(lng.toFixed(8)),
+      section: this.treeEditorSectionIndex,
+      variant: this.treePlaceVariant,
+      seed: Math.random() * 180,
+      scale: 0.85 + Math.random() * 0.35,
+    };
+    if (this.treeEditorSectionIndex === BACKDROP_TREE_SECTION) {
+      slot.styleSection = this.treePlaceStyleSection;
+    }
+    this.ambientTrees = [...this.ambientTrees, slot];
+    this.selectedTreeIndex = this.ambientTrees.length - 1;
+    this.treePlacementHint = '';
+    this.syncAmbientTrees();
+    this.emitAmbientTreesChanged();
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  moveAmbientTreeToGeo(index: number, lat: number, lng: number): boolean {
+    if (index < 0 || index >= this.ambientTrees.length) return false;
+    const section = this.ambientTrees[index].section;
+    if (!this.canPlaceTreeAtGeoForSection({ lat, lng }, section)) return false;
+    this.ambientTrees = this.ambientTrees.map((t, i) => (i === index
+      ? { ...t, lat: Number(lat.toFixed(8)), lng: Number(lng.toFixed(8)) }
+      : t));
+    this.syncAmbientTrees();
+    this.emitAmbientTreesChanged();
+    this.render();
+    return true;
+  }
+
+  removeAmbientTree(index: number): void {
+    if (index < 0 || index >= this.ambientTrees.length) return;
+    this.ambientTrees = this.ambientTrees.filter((_, i) => i !== index);
+    if (this.selectedTreeIndex === index) this.selectedTreeIndex = null;
+    else if (this.selectedTreeIndex !== null && this.selectedTreeIndex > index) {
+      this.selectedTreeIndex--;
+    }
+    this.syncAmbientTrees();
+    this.emitAmbientTreesChanged();
+    this.emitTreeEditorState();
+    this.render();
+  }
+
+  getAmbientTrees(): AmbientTreeSlot[] {
+    return cloneAmbientTreeSlots(this.ambientTrees);
+  }
+
+  setAmbientTrees(slots: AmbientTreeSlot[]): void {
+    this.ambientTrees = cloneAmbientTreeSlots(slots);
+    this.syncAmbientTrees();
+    this.emitAmbientTreesChanged();
+    this.render();
+  }
+
+  downloadAmbientTreesJson(): void {
+    const blob = new Blob([exportAmbientTreesJson(this.ambientTrees)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ambient-trees.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  private syncAmbientTrees(): void {
+    this.treesEffect.setSlots(this.ambientTrees);
+  }
+
+  private emitAmbientTreesChanged(): void {
+    this.ambientTreesChanged.emit(this.getAmbientTrees());
+  }
+
+  private emitTreeEditorState(): void {
+    this.treeEditorStateChanged.emit({
+      selectedTreeIndex: this.selectedTreeIndex,
+      treePlaceVariant: this.treePlaceVariant,
+      treePlaceStyleSection: this.treePlaceStyleSection,
+      treePlacementHint: this.treePlacementHint,
+    });
+  }
+
+  private hitTestTreeMarker(screenX: number, screenY: number): number {
+    const hitR = 16;
+    for (let i = this.ambientTrees.length - 1; i >= 0; i--) {
+      const t = this.ambientTrees[i];
+      if (t.section !== this.treeEditorSectionIndex) continue;
+      const screen = this.geoToScreen({ lat: t.lat, lng: t.lng });
+      const dx = screen.x - screenX;
+      const dy = screen.y - screenY;
+      if (dx * dx + dy * dy <= hitR * hitR) return i;
+    }
+    return -1;
+  }
+
+  private drawTreeEditorMarkers(w: number, h: number): void {
+    const viewport = this.getWorldViewportBounds(w, h);
+    const pad = 48;
+    for (let i = 0; i < this.ambientTrees.length; i++) {
+      const t = this.ambientTrees[i];
+      const pos = this.geoToCanvas({ lat: t.lat, lng: t.lng });
+      if (pos.x < viewport.minX - pad || pos.x > viewport.maxX + pad
+        || pos.y < viewport.minY - pad || pos.y > viewport.maxY + pad) {
+        continue;
+      }
+      const inActiveZone = t.section === this.treeEditorSectionIndex;
+      const selected = i === this.selectedTreeIndex;
+      const dragging = i === this.draggingTreeIndex;
+      this.ctx.save();
+      this.ctx.fillStyle = dragging ? '#ff5722' : (selected ? '#ff9800' : (inActiveZone ? '#4caf50' : 'rgba(120,120,120,0.75)'));
+      this.ctx.strokeStyle = '#fff';
+      this.ctx.lineWidth = 1.2 / this.scale;
+      const r = (selected ? 5 : 4) / this.scale;
+      this.ctx.beginPath();
+      this.ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.restore();
+    }
+  }
+
   private emitSectionsChanged(): void {
     this.sectionsChanged.emit(this.getEditableSections());
   }
@@ -2495,382 +2580,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     });
   }
 
-  // === CANVAS GRID (full-canvas, configurable) ===
-
-  private drawCanvasGrid(): void {
-    const canvas = this.canvasRef.nativeElement;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
-    const ctx = this.ctx;
-    const cellW = Math.max(1, this.canvasGridCellW);
-    const cellH = Math.max(1, this.canvasGridCellH);
-    const opacity = Math.max(0, Math.min(1, this.canvasGridOpacity));
-
-    // Compute visible bounds in grid-local drawing coordinates (accounts for grid rotation)
-    const tl = this.screenToGridLocal(0, 0);
-    const tr = this.screenToGridLocal(w, 0);
-    const bl = this.screenToGridLocal(0, h);
-    const br = this.screenToGridLocal(w, h);
-    const minX = Math.min(tl.x, tr.x, bl.x, br.x);
-    const maxX = Math.max(tl.x, tr.x, bl.x, br.x);
-    const minY = Math.min(tl.y, tr.y, bl.y, br.y);
-    const maxY = Math.max(tl.y, tr.y, bl.y, br.y);
-
-    // Snap to cell boundaries
-    const startCol = Math.floor(minX / cellW);
-    const endCol = Math.ceil(maxX / cellW);
-    const startRow = Math.floor(minY / cellH);
-    const endRow = Math.ceil(maxY / cellH);
-
-    // Grid lines only (painted tiles are now a separate layer)
-    if (this.canvasGridColor) {
-      const r = parseInt(this.canvasGridColor.slice(1, 3), 16);
-      const g = parseInt(this.canvasGridColor.slice(3, 5), 16);
-      const b = parseInt(this.canvasGridColor.slice(5, 7), 16);
-      ctx.strokeStyle = `rgba(${r},${g},${b},${opacity})`;
-    } else {
-      ctx.strokeStyle = this.isDarkTheme
-        ? `rgba(255,255,255,${opacity})`
-        : `rgba(0,0,0,${opacity})`;
-    }
-    ctx.lineWidth = 0.5 / this.scale;
-
-    switch (this.canvasGridStyle) {
-      case 'dashed': ctx.setLineDash([6 / this.scale, 4 / this.scale]); break;
-      case 'dotted': ctx.setLineDash([1 / this.scale, 3 / this.scale]); break;
-      default: ctx.setLineDash([]); break;
-    }
-
-    for (let c = startCol; c <= endCol; c++) {
-      const x = c * cellW;
-      ctx.beginPath();
-      ctx.moveTo(x, minY);
-      ctx.lineTo(x, maxY);
-      ctx.stroke();
-    }
-    for (let r = startRow; r <= endRow; r++) {
-      const y = r * cellH;
-      ctx.beginPath();
-      ctx.moveTo(minX, y);
-      ctx.lineTo(maxX, y);
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-  }
-
-  private drawPaintedTiles(ctx: CanvasRenderingContext2D, startCol: number, startRow: number, endCol: number, endRow: number, cellW: number, cellH: number): void {
-    if (this.paintedTiles.size === 0) return;
-    this.paintedTiles.forEach((tile, key) => {
-      if (!tile.img) return;
-      const [cs, rs] = key.split(',');
-      const col = parseInt(cs, 10);
-      const row = parseInt(rs, 10);
-      if (col < startCol || col > endCol || row < startRow || row > endRow) return;
-      const x = col * cellW;
-      const y = row * cellH;
-      ctx.drawImage(tile.img, x, y, cellW, cellH);
-    });
-  }
-
-  /** Standalone method to render painted tiles layer (called from render()) */
-  private drawPaintedTilesLayer(): void {
-    const canvas = this.canvasRef.nativeElement;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
-    const cellW = Math.max(1, this.canvasGridCellW);
-    const cellH = Math.max(1, this.canvasGridCellH);
-    const tl = this.screenToGridLocal(0, 0);
-    const tr = this.screenToGridLocal(w, 0);
-    const bl = this.screenToGridLocal(0, h);
-    const br = this.screenToGridLocal(w, h);
-    const minX = Math.min(tl.x, tr.x, bl.x, br.x);
-    const maxX = Math.max(tl.x, tr.x, bl.x, br.x);
-    const minY = Math.min(tl.y, tr.y, bl.y, br.y);
-    const maxY = Math.max(tl.y, tr.y, bl.y, br.y);
-    const startCol = Math.floor(minX / cellW);
-    const endCol = Math.ceil(maxX / cellW);
-    const startRow = Math.floor(minY / cellH);
-    const endRow = Math.ceil(maxY / cellH);
-    this.drawPaintedTiles(this.ctx, startCol, startRow, endCol, endRow, cellW, cellH);
-  }
-
-  setCanvasGridDivisions(divisions: number): void {
-    // Legacy compat: convert divisions to cell size
-    const canvas = this.canvasRef?.nativeElement;
-    if (canvas) {
-      const dpr = window.devicePixelRatio || 1;
-      const w = canvas.width / dpr;
-      this.canvasGridCellW = Math.round(w / Math.max(2, Math.min(100, divisions)));
-      this.canvasGridCellH = this.canvasGridCellW;
-    }
-    this.onOptionChange();
-  }
-
-  setCanvasGridCellSize(cellW: number, cellH: number): void {
-    this.canvasGridCellW = Math.max(1, Math.min(512, cellW));
-    this.canvasGridCellH = Math.max(1, Math.min(512, cellH));
-    this.onOptionChange();
-  }
-
-  setCanvasGridOpacity(opacity: number): void {
-    this.canvasGridOpacity = Math.max(0, Math.min(1, opacity));
-    this.onOptionChange();
-  }
-
-  setCanvasGridColor(color: string): void {
-    this.canvasGridColor = color;
-    this.onOptionChange();
-  }
-
-  setCanvasGridStyle(style: 'solid' | 'dashed' | 'dotted'): void {
-    this.canvasGridStyle = style;
-    this.onOptionChange();
-  }
-
-  setCanvasGridRotation(degrees: number): void {
-    this.canvasGridRotation = degrees;
-    this.onOptionChange();
-  }
-
-  /** Load a reference image from a data URL or blob URL */
-  setRefImage(dataUrl: string | null): void {
-    if (!dataUrl) {
-      this.refImage = null;
-      this.refImageLoaded = false;
-      this.render();
-      return;
-    }
-    const img = new Image();
-    img.onload = () => { this.refImageLoaded = true; this.render(); };
-    img.src = dataUrl;
-    this.refImage = img;
-    this.refImageLoaded = false;
-  }
-
-  setRefImageOpacity(opacity: number): void {
-    this.refImageOpacity = Math.max(0, Math.min(1, opacity));
-    this.render();
-  }
-
-  // ── Tile painting helpers ─────────────────────────────────
-
-  private paintAtScreenPos(screenX: number, screenY: number): void {
-    const cellW = Math.max(1, this.canvasGridCellW);
-    const cellH = Math.max(1, this.canvasGridCellH);
-    const mp = this.screenToGridLocal(screenX, screenY);
-    const col = Math.floor(mp.x / cellW);
-    const row = Math.floor(mp.y / cellH);
-
-    if (this.tilePaintTool === 'eraser') {
-      const key = `${col},${row}`;
-      if (this.paintedTiles.has(key)) {
-        this.paintedTiles.delete(key);
-        this.render();
-      }
-      return;
-    }
-    if (this.tilePaintTool === 'picker') {
-      const key = `${col},${row}`;
-      const tile = this.paintedTiles.get(key);
-      if (tile) this.tilePickerPicked.emit(tile.url);
-      return;
-    }
-    if (!this.tilePaintDataUrl) return;
-
-    // Multi-tile painting: stamp the multi-tile selection pattern
-    if (this.multiTiles.length > 1) {
-      let changed = false;
-      for (const mt of this.multiTiles) {
-        const tc = col + mt.col;
-        const tr = row + mt.row;
-        const key = `${tc},${tr}`;
-        const existing = this.paintedTiles.get(key);
-        if (existing && existing.url === mt.dataUrl) continue;
-        let img = this.paintImageCache.get(mt.dataUrl) ?? null;
-        if (!img) { img = new Image(); img.src = mt.dataUrl; this.paintImageCache.set(mt.dataUrl, img); img.onload = () => this.render(); }
-        this.paintedTiles.set(key, { url: mt.dataUrl, img: img.complete ? img : null });
-        changed = true;
-      }
-      if (changed) this.render();
-      return;
-    }
-
-    // Single tile painting
-    const key = `${col},${row}`;
-    const existing = this.paintedTiles.get(key);
-    if (existing && existing.url === this.tilePaintDataUrl) return;
-    let img = this.paintImageCache.get(this.tilePaintDataUrl) ?? null;
-    if (!img) { img = new Image(); img.src = this.tilePaintDataUrl; this.paintImageCache.set(this.tilePaintDataUrl, img); img.onload = () => this.render(); }
-    this.paintedTiles.set(key, { url: this.tilePaintDataUrl, img: img.complete ? img : null });
-    if (img.complete) this.render();
-  }
-
-  // ── Undo / Redo ─────────────────────────────────────────
-  private pushUndo(): void {
-    this.undoStack.push(new Map(this.paintedTiles));
-    if (this.undoStack.length > this.MAX_UNDO) this.undoStack.shift();
-    this.redoStack.length = 0;
-  }
-
-  undo(): void {
-    if (this.undoStack.length === 0) return;
-    this.redoStack.push(new Map(this.paintedTiles));
-    this.paintedTiles = this.undoStack.pop()!;
-    this.render();
-  }
-
-  redo(): void {
-    if (this.redoStack.length === 0) return;
-    this.undoStack.push(new Map(this.paintedTiles));
-    this.paintedTiles = this.redoStack.pop()!;
-    this.render();
-  }
-
-  // ── Bucket fill (flood fill) ────────────────────────────
-  private bucketFill(startCol: number, startRow: number): void {
-    if (!this.tilePaintDataUrl) return;
-    const targetUrl = this.paintedTiles.get(`${startCol},${startRow}`)?.url ?? null;
-    if (targetUrl === this.tilePaintDataUrl) return;
-
-    let img = this.paintImageCache.get(this.tilePaintDataUrl) ?? null;
-    if (!img) { img = new Image(); img.src = this.tilePaintDataUrl; this.paintImageCache.set(this.tilePaintDataUrl, img); img.onload = () => this.render(); }
-
-    const stack: [number, number][] = [[startCol, startRow]];
-    const visited = new Set<string>();
-    const MAX_FILL = 5000;
-    let count = 0;
-
-    while (stack.length > 0 && count < MAX_FILL) {
-      const [c, r] = stack.pop()!;
-      const key = `${c},${r}`;
-      if (visited.has(key)) continue;
-      visited.add(key);
-      const cellUrl = this.paintedTiles.get(key)?.url ?? null;
-      if (cellUrl !== targetUrl) continue;
-      this.paintedTiles.set(key, { url: this.tilePaintDataUrl!, img: img!.complete ? img : null });
-      count++;
-      stack.push([c + 1, r], [c - 1, r], [c, r + 1], [c, r - 1]);
-    }
-    this.render();
-  }
-
-  clearPaintedTiles(): void {
-    this.pushUndo();
-    this.paintedTiles.clear();
-    this.render();
-  }
-
   /** Set which layer is currently movable for independent dragging */
-  setActiveMovableLayer(layer: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers'): void {
+  setActiveMovableLayer(layer: 'canvas' | 'boundary' | 'sections' | 'markers'): void {
     this.activeMovableLayer = layer;
     this.render();
-  }
-
-  /** Fill all cells in a bounding rectangle with the current tile (or erase, supports multi-tile) */
-  private fillRect(c1: number, r1: number, c2: number, r2: number): void {
-    if (this.multiTiles.length > 1) {
-      // Multi-tile: stamp the pattern tiling across the rect
-      for (let r = r1; r <= r2; r++) {
-        for (let c = c1; c <= c2; c++) {
-          const mt = this.multiTiles.find(t => t.col === ((c - c1) % this.multiTileCols) && t.row === ((r - r1) % this.multiTileRows));
-          const url = mt?.dataUrl ?? this.tilePaintDataUrl;
-          if (!url) continue;
-          const key = `${c},${r}`;
-          if (this.tilePaintTool === 'eraser') { this.paintedTiles.delete(key); continue; }
-          let img = this.paintImageCache.get(url) ?? null;
-          if (!img) { img = new Image(); img.src = url; this.paintImageCache.set(url, img); img.onload = () => this.render(); }
-          this.paintedTiles.set(key, { url, img: img.complete ? img : null });
-        }
-      }
-    } else {
-      for (let r = r1; r <= r2; r++) {
-        for (let c = c1; c <= c2; c++) {
-          const key = `${c},${r}`;
-          if (this.tilePaintTool === 'eraser') {
-            this.paintedTiles.delete(key);
-          } else if (this.tilePaintDataUrl) {
-            let img = this.paintImageCache.get(this.tilePaintDataUrl) ?? null;
-            if (!img) { img = new Image(); img.src = this.tilePaintDataUrl; this.paintImageCache.set(this.tilePaintDataUrl, img); img.onload = () => this.render(); }
-            this.paintedTiles.set(key, { url: this.tilePaintDataUrl, img: img.complete ? img : null });
-          }
-        }
-      }
-    }
-  }
-
-  /** Fill cells along a Bresenham line */
-  private fillLine(c1: number, r1: number, c2: number, r2: number): void {
-    const dx = Math.abs(c2 - c1);
-    const dy = Math.abs(r2 - r1);
-    const sx = c1 < c2 ? 1 : -1;
-    const sy = r1 < r2 ? 1 : -1;
-    let err = dx - dy;
-    let c = c1, r = r1;
-    while (true) {
-      const key = `${c},${r}`;
-      if (this.tilePaintTool === 'eraser') {
-        this.paintedTiles.delete(key);
-      } else if (this.tilePaintDataUrl) {
-        let img = this.paintImageCache.get(this.tilePaintDataUrl) ?? null;
-        if (!img) { img = new Image(); img.src = this.tilePaintDataUrl; this.paintImageCache.set(this.tilePaintDataUrl, img); img.onload = () => this.render(); }
-        this.paintedTiles.set(key, { url: this.tilePaintDataUrl, img: img.complete ? img : null });
-      }
-      if (c === c2 && r === r2) break;
-      const e2 = 2 * err;
-      if (e2 > -dy) { err -= dy; c += sx; }
-      if (e2 < dx) { err += dx; r += sy; }
-    }
-  }
-
-  /** Draw a semi-transparent rectangle preview during rect tool drag */
-  private drawRectPreview(): void {
-    const cellW = Math.max(1, this.canvasGridCellW);
-    const cellH = Math.max(1, this.canvasGridCellH);
-    const c1 = Math.min(this.rectStartCol, this.rectEndCol);
-    const r1 = Math.min(this.rectStartRow, this.rectEndRow);
-    const c2 = Math.max(this.rectStartCol, this.rectEndCol);
-    const r2 = Math.max(this.rectStartRow, this.rectEndRow);
-
-    this.ctx.fillStyle = 'rgba(124, 77, 255, 0.18)';
-    this.ctx.strokeStyle = 'rgba(124, 77, 255, 0.8)';
-    this.ctx.lineWidth = 1.5 / this.scale;
-    this.ctx.setLineDash([4 / this.scale, 3 / this.scale]);
-    const rx = c1 * cellW;
-    const ry = r1 * cellH;
-    const rw = (c2 - c1 + 1) * cellW;
-    const rh = (r2 - r1 + 1) * cellH;
-    this.ctx.fillRect(rx, ry, rw, rh);
-    this.ctx.strokeRect(rx + 0.5 / this.scale, ry + 0.5 / this.scale, rw, rh);
-    this.ctx.setLineDash([]);
-  }
-
-  /** Draw a line preview during line tool drag */
-  private drawLinePreview(): void {
-    if (!this.lineDragging) return;
-    const cellW = Math.max(1, this.canvasGridCellW);
-    const cellH = Math.max(1, this.canvasGridCellH);
-
-    // Draw preview cells along the Bresenham line
-    const dx = Math.abs(this.lineEndCol - this.lineStartCol);
-    const dy = Math.abs(this.lineEndRow - this.lineStartRow);
-    const sx = this.lineStartCol < this.lineEndCol ? 1 : -1;
-    const sy = this.lineStartRow < this.lineEndRow ? 1 : -1;
-    let err = dx - dy;
-    let c = this.lineStartCol, r = this.lineStartRow;
-
-    this.ctx.fillStyle = 'rgba(124, 77, 255, 0.25)';
-    this.ctx.strokeStyle = 'rgba(124, 77, 255, 0.8)';
-    this.ctx.lineWidth = 1 / this.scale;
-    while (true) {
-      this.ctx.fillRect(c * cellW, r * cellH, cellW, cellH);
-      this.ctx.strokeRect(c * cellW + 0.5 / this.scale, r * cellH + 0.5 / this.scale, cellW, cellH);
-      if (c === this.lineEndCol && r === this.lineEndRow) break;
-      const e2 = 2 * err;
-      if (e2 > -dy) { err -= dy; c += sx; }
-      if (e2 < dx) { err += dx; r += sy; }
-    }
   }
 
   private drawMarkerLabels(): void {
@@ -2927,436 +2640,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.ctx.fillText(`${meters}m`, x + scaleBarWidth / 2, y - 5);
   }
 
-  // === STICKERS ===
-
-  /**
-   * Draw all visible sticker layers on the canvas.
-   * Stickers are drawn in WORLD SPACE (inside the map transform) so they
-   * scale naturally with the zoom level — bigger when zoomed in, smaller when out.
-   * Selection chrome (dashes, handles) uses 1/scale compensation to stay at a
-   * constant screen-pixel size for usability.
-   */
-  private drawStickers(): void {
-    if (!this.stickerLayers || this.stickerLayers.length === 0) return;
-
-    const canvas = this.canvasRef.nativeElement;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
-
-    for (const layer of this.stickerLayers) {
-      if (!layer.visible) continue;
-
-      for (const sticker of layer.stickers) {
-        const img = this.stickerService.getCachedImage(sticker.stickerKey);
-        if (!img) {
-          this.stickerService.loadImage(sticker.stickerKey).then(() => this.render()).catch(() => {});
-          continue;
-        }
-
-        // World-space position (pre-zoom coordinates)
-        const pos = this.geoToCanvas({ lat: sticker.lat, lng: sticker.lng });
-        const size = this.STICKER_BASE_SIZE * sticker.scale;
-        const aspect = img.naturalWidth / img.naturalHeight;
-        const drawW = aspect >= 1 ? size : size * aspect;
-        const drawH = aspect >= 1 ? size / aspect : size;
-        // Inverse scale: keep UI chrome at constant screen pixel size
-        const inv = 1 / this.scale;
-
-        this.ctx.save();
-        // Reapply the world transform (same as render())
-        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        this.ctx.translate(w / 2 + this.offsetX, h / 2 + this.offsetY);
-        this.ctx.rotate(this.rotation);
-        this.ctx.scale(this.scale, this.scale);
-        this.ctx.translate(-w / 2, -h / 2);
-        // Move to sticker geo position
-        this.ctx.translate(pos.x, pos.y);
-        this.ctx.rotate(sticker.rotation * Math.PI / 180);
-        this.ctx.globalAlpha = layer.opacity ?? 1;
-        this.ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-
-        // Selection indicator (chrome drawn in screen-invariant world units)
-        if (this.selectedStickerRef?.sticker.id === sticker.id && this.stickerEditMode) {
-          this.ctx.globalAlpha = 1;
-          const pad = 4 * inv;  // 4 screen px in world coords
-          this.ctx.strokeStyle = '#7c4dff';
-          this.ctx.lineWidth = 2 * inv;
-          this.ctx.setLineDash([4 * inv, 4 * inv]);
-          this.ctx.strokeRect(-drawW / 2 - pad, -drawH / 2 - pad, drawW + 2 * pad, drawH + 2 * pad);
-          this.ctx.setLineDash([]);
-
-          // Corner handles
-          const r = 6 * inv;
-          const cr = 3 * inv;
-          const corners = [
-            [-drawW / 2 - pad, -drawH / 2 - pad],
-            [ drawW / 2 + pad, -drawH / 2 - pad],
-            [-drawW / 2 - pad,  drawH / 2 + pad],
-            [ drawW / 2 + pad,  drawH / 2 + pad]
-          ];
-          for (const [cx, cy] of corners) {
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.beginPath();
-            this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#7c4dff';
-            this.ctx.lineWidth = 2 * inv;
-            this.ctx.beginPath();
-            this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
-            this.ctx.stroke();
-            this.ctx.lineWidth = 1.5 * inv;
-            this.ctx.beginPath();
-            this.ctx.moveTo(cx - cr, cy - cr); this.ctx.lineTo(cx + cr, cy + cr);
-            this.ctx.moveTo(cx + cr, cy - cr); this.ctx.lineTo(cx - cr, cy + cr);
-            this.ctx.stroke();
-          }
-
-          // Rotation handle — stem + filled circle above top of bounding box
-          const stemInv = this.ROTATE_HANDLE_STEM * inv;
-          const rhr    = this.ROTATE_HANDLE_RADIUS * inv;
-          const stemBaseY = -(drawH / 2 + pad);
-          this.ctx.strokeStyle = '#7c4dff';
-          this.ctx.lineWidth = 2 * inv;
-          this.ctx.beginPath();
-          this.ctx.moveTo(0, stemBaseY);
-          this.ctx.lineTo(0, stemBaseY - stemInv - rhr);
-          this.ctx.stroke();
-          // Handle circle
-          const hcy = stemBaseY - stemInv - rhr;
-          this.ctx.fillStyle = '#7c4dff';
-          this.ctx.beginPath();
-          this.ctx.arc(0, hcy, rhr, 0, Math.PI * 2);
-          this.ctx.fill();
-          // Inner arc symbol
-          this.ctx.strokeStyle = '#ffffff';
-          this.ctx.lineWidth = 1.5 * inv;
-          const ir = rhr * 0.5;
-          this.ctx.beginPath();
-          this.ctx.arc(0, hcy, ir, -Math.PI * 0.75, Math.PI * 0.75);
-          this.ctx.stroke();
-          // tiny arrowhead at arc end
-          const ae = { x: Math.cos(Math.PI * 0.75) * ir, y: hcy + Math.sin(Math.PI * 0.75) * ir };
-          const at = 2 * inv;
-          this.ctx.beginPath();
-          this.ctx.moveTo(ae.x - at, ae.y); this.ctx.lineTo(ae.x + at, ae.y - at * 1.5);
-          this.ctx.stroke();
-
-          // Center move icon
-          const mr = 10 * inv;
-          const asz = 5 * inv;
-          this.ctx.fillStyle = 'rgba(124, 77, 255, 0.3)';
-          this.ctx.beginPath();
-          this.ctx.arc(0, 0, mr, 0, Math.PI * 2);
-          this.ctx.fill();
-          this.ctx.strokeStyle = '#7c4dff';
-          this.ctx.lineWidth = 1.5 * inv;
-          this.ctx.beginPath();
-          this.ctx.moveTo(0, -asz); this.ctx.lineTo(0, asz);
-          this.ctx.moveTo(-asz, 0); this.ctx.lineTo(asz, 0);
-          const arr = 2 * inv;
-          this.ctx.moveTo(0, -asz); this.ctx.lineTo(-arr, -asz + 3 * inv); this.ctx.moveTo(0, -asz); this.ctx.lineTo(arr, -asz + 3 * inv);
-          this.ctx.moveTo(0, asz);  this.ctx.lineTo(-arr,  asz - 3 * inv); this.ctx.moveTo(0, asz);  this.ctx.lineTo(arr,  asz - 3 * inv);
-          this.ctx.moveTo(-asz, 0); this.ctx.lineTo(-asz + 3 * inv, -arr); this.ctx.moveTo(-asz, 0); this.ctx.lineTo(-asz + 3 * inv, arr);
-          this.ctx.moveTo(asz, 0);  this.ctx.lineTo(asz - 3 * inv, -arr);  this.ctx.moveTo(asz, 0);  this.ctx.lineTo(asz - 3 * inv, arr);
-          this.ctx.stroke();
-        }
-
-        this.ctx.restore();
-      }
-    }
-  }
-
-  /**
-   * Get the screen-space bounding box of a sticker.
-   */
-  private getStickerScreenBounds(sticker: StickerInstance): { cx: number; cy: number; halfW: number; halfH: number } | null {
-    const img = this.stickerService.getCachedImage(sticker.stickerKey);
-    if (!img) return null;
-    const screen = this.geoToScreen({ lat: sticker.lat, lng: sticker.lng });
-    // Stickers are in world space: world size × zoom = screen pixels
-    const size = this.STICKER_BASE_SIZE * sticker.scale * this.scale;
-    const aspect = img.naturalWidth / img.naturalHeight;
-    const halfW = (aspect >= 1 ? size : size * aspect) / 2;
-    const halfH = (aspect >= 1 ? size / aspect : size) / 2;
-    return { cx: screen.x, cy: screen.y, halfW, halfH };
-  }
-
-  /**
-   * Returns true if (screenX, screenY) is near the rotation handle above
-   * the selected sticker, correctly accounting for map + sticker rotation.
-   */
-  private isNearRotateHandle(screenX: number, screenY: number): boolean {
-    if (!this.selectedStickerRef) return false;
-    const sticker = this.selectedStickerRef.sticker;
-    const img = this.stickerService.getCachedImage(sticker.stickerKey);
-    if (!img) return false;
-
-    const center = this.geoToScreen({ lat: sticker.lat, lng: sticker.lng });
-
-    // Half-height in world units, then project to screen
-    const size  = this.STICKER_BASE_SIZE * sticker.scale;
-    const aspect = img.naturalWidth / img.naturalHeight;
-    const halfH  = (aspect >= 1 ? size / aspect : size) / 2;
-    const pad    = 4; // screen px
-    // Total offset from center upward (screen px), along sticker+map rotated axis
-    const totalOff = halfH * this.scale + pad + this.ROTATE_HANDLE_STEM + this.ROTATE_HANDLE_RADIUS;
-
-    // Up direction in screen space: start with world-up (0,-1), rotate by sticker then map
-    const stkRad = sticker.rotation * Math.PI / 180;
-    // sticker local up: rotate (0,-1) by stkRad → (-sin(stkRad), -cos(stkRad))
-    let ux = -Math.sin(stkRad);
-    let uy = -Math.cos(stkRad);
-    // then rotate by map rotation
-    const cosM = Math.cos(this.rotation);
-    const sinM = Math.sin(this.rotation);
-    const rux  = cosM * ux - sinM * uy;
-    const ruy  = sinM * ux + cosM * uy;
-
-    const hcx = center.x + rux * totalOff;
-    const hcy = center.y + ruy * totalOff;
-
-    const dx = screenX - hcx;
-    const dy = screenY - hcy;
-    return Math.sqrt(dx * dx + dy * dy) <= this.ROTATE_HANDLE_RADIUS + 3;
-  }
-
-  /**
-   * Returns true if (screenX, screenY) is within HANDLE_RADIUS of any corner
-   * handle of the selected sticker, correctly accounting for both map rotation
-   * and the sticker's own rotation.
-   */
-  private isNearCornerHandle(screenX: number, screenY: number): boolean {
-    if (!this.selectedStickerRef) return false;
-    const sticker = this.selectedStickerRef.sticker;
-    const img = this.stickerService.getCachedImage(sticker.stickerKey);
-    if (!img) return false;
-
-    // Sticker center in screen space (already accounts for map rotation)
-    const center = this.geoToScreen({ lat: sticker.lat, lng: sticker.lng });
-
-    // Translate mouse relative to sticker center
-    let dx = screenX - center.x;
-    let dy = screenY - center.y;
-
-    // Unrotate by map rotation
-    const cosMap = Math.cos(-this.rotation);
-    const sinMap = Math.sin(-this.rotation);
-    let rx = cosMap * dx - sinMap * dy;
-    let ry = sinMap * dx + cosMap * dy;
-
-    // Unscale to world (canvas) units
-    rx /= this.scale;
-    ry /= this.scale;
-
-    // Unrotate by sticker's own rotation
-    const stkRad = -(sticker.rotation * Math.PI / 180);
-    const cosStk = Math.cos(stkRad);
-    const sinStk = Math.sin(stkRad);
-    const lx = cosStk * rx - sinStk * ry;
-    const ly = sinStk * rx + cosStk * ry;
-
-    // Half-sizes in world units (before zoom)
-    const size = this.STICKER_BASE_SIZE * sticker.scale;
-    const aspect = img.naturalWidth / img.naturalHeight;
-    const halfW = (aspect >= 1 ? size : size * aspect) / 2;
-    const halfH = (aspect >= 1 ? size / aspect : size) / 2;
-    const pad = 4 / this.scale;            // 4 screen-px in world units
-    const hitR = (this.HANDLE_RADIUS + 2) / this.scale;
-
-    const corners: [number, number][] = [
-      [-halfW - pad, -halfH - pad],
-      [ halfW + pad, -halfH - pad],
-      [-halfW - pad,  halfH + pad],
-      [ halfW + pad,  halfH + pad],
-    ];
-
-    for (const [cx, cy] of corners) {
-      if (Math.sqrt((lx - cx) ** 2 + (ly - cy) ** 2) <= hitR) return true;
-    }
-    return false;
-  }
-
-  /**
-   * Hit-test the corner handles of the selected sticker.
-   * Returns true if a corner was hit and starts scaling mode.
-   */
-  private hitTestCornerHandle(screenX: number, screenY: number): boolean {
-    if (!this.isNearCornerHandle(screenX, screenY)) return false;
-    const center = this.geoToScreen({
-      lat: this.selectedStickerRef!.sticker.lat,
-      lng: this.selectedStickerRef!.sticker.lng
-    });
-    this.isScalingSticker = true;
-    this.scaleDragStartDist = Math.sqrt(
-      (screenX - center.x) ** 2 + (screenY - center.y) ** 2
-    );
-    this.scaleDragStartScale = this.selectedStickerRef!.sticker.scale;
-    return true;
-  }
-
-  /**
-   * Hit-test stickers at a screen position.
-   * Returns the first sticker hit (topmost = last drawn).
-   */
-  private hitTestSticker(screenX: number, screenY: number): { layerId: string; sticker: StickerInstance } | null {
-    if (!this.stickerLayers) return null;
-
-    // Iterate in reverse (top layer / last sticker = on top)
-    for (let li = this.stickerLayers.length - 1; li >= 0; li--) {
-      const layer = this.stickerLayers[li];
-      if (!layer.visible) continue;
-
-      for (let si = layer.stickers.length - 1; si >= 0; si--) {
-        const sticker = layer.stickers[si];
-        const img = this.stickerService.getCachedImage(sticker.stickerKey);
-        if (!img) continue;
-
-        const screen = this.geoToScreen({ lat: sticker.lat, lng: sticker.lng });
-        // Stickers are in world space: world size × zoom = screen pixels
-        const size = this.STICKER_BASE_SIZE * sticker.scale * this.scale;
-        const aspect = img.naturalWidth / img.naturalHeight;
-        const halfW = (aspect >= 1 ? size : size * aspect) / 2 + 5;
-        const halfH = (aspect >= 1 ? size / aspect : size) / 2 + 5;
-
-        // Simple AABB check (ignoring sticker rotation for hit-test simplicity)
-        const dx = screenX - screen.x;
-        const dy = screenY - screen.y;
-        if (Math.abs(dx) <= halfW && Math.abs(dy) <= halfH) {
-          return { layerId: layer.id, sticker };
-        }
-      }
-    }
-    return null;
-  }
-
-  /** Called externally when the selected sticker's properties were updated */
-  updateSelectedSticker(updated: StickerInstance): void {
-    if (this.selectedStickerRef) {
-      this.selectedStickerRef.sticker = { ...updated };
-      this.stickerService.updateSticker(this.selectedStickerRef.layerId, updated, true);
-      this.render();
-    }
-  }
-
-  /** Called externally to remove the selected sticker */
-  removeSelectedSticker(): void {
-    if (this.selectedStickerRef) {
-      this.stickerService.removeSticker(this.selectedStickerRef.layerId, this.selectedStickerRef.sticker.id);
-      this.selectedStickerRef = null;
-      this.stickerSelectedOnMap.emit(null);
-      this.render();
-    }
-  }
-
-  /** Force re-render (called by container when layers change) */
-  refreshStickers(): void {
-    this.render();
-  }
-
-  // === EDITOR OVERLAY ===
-
-  /**
-   * Draws tilemap editor layers on top of the park map canvas.
-   * Uses the same geoToScreen() coordinate transform so items align
-   * perfectly with the park boundary, sections, and anchor markers.
-   */
-  private drawEditorOverlay(): void {
-    for (const layer of this.editorLayers) {
-      if (!layer.visible) continue;
-      for (const item of layer.data) {
-        this.drawEditorItem(item, layer.opacity);
-      }
-    }
-  }
-
-  private drawEditorItem(item: TilemapLayerData, layerOpacity = 1): void {
-    const pos = this.geoToScreen({ lat: item.lat, lng: item.lng });
-    const size = 28 * item.scale; // 28px base — visible at default zoom
-
-    this.ctx.save();
-    this.ctx.globalAlpha = item.opacity * layerOpacity;
-
-    if (item.type === 'sticker' && item.stickerKey) {
-      const img = this.stickerService.getCachedImage(item.stickerKey);
-      if (img?.complete && img.naturalWidth > 0) {
-        this.ctx.save();
-        this.ctx.translate(pos.x, pos.y);
-        this.ctx.rotate((item.rotation * Math.PI) / 180);
-        this.ctx.drawImage(img, -size / 2, -size / 2, size, size);
-        this.ctx.restore();
-      } else {
-        this.stickerService.loadImage(item.stickerKey).catch(() => {});
-        this.ctx.fillStyle = 'rgba(124,131,255,0.35)';
-        this.ctx.fillRect(pos.x - size / 2, pos.y - size / 2, size, size);
-      }
-    } else if (item.type === 'tile') {
-      this.ctx.fillStyle = item.color ?? '#2E7D32';
-      this.ctx.save();
-      this.ctx.translate(pos.x, pos.y);
-      this.ctx.rotate((item.rotation * Math.PI) / 180);
-      this.ctx.fillRect(-size / 2, -size / 2, size, size);
-      this.ctx.restore();
-    } else if (item.type === 'text' && item.text) {
-      const fs = item.fontSize ?? 14;
-      this.ctx.fillStyle = item.color ?? (this.isDarkTheme ? '#ffffff' : '#111111');
-      this.ctx.font = `bold ${fs}px sans-serif`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      // Drop shadow for readability on any background
-      this.ctx.shadowColor = this.isDarkTheme ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
-      this.ctx.shadowBlur = 4;
-      this.ctx.fillText(item.text, pos.x, pos.y);
-      this.ctx.shadowBlur = 0;
-    } else if (item.type === 'polygon' && item.points && item.points.length >= 3) {
-      const pts = item.points.map(p => this.geoToScreen({ lat: p.lat, lng: p.lng }));
-      this.ctx.beginPath();
-      this.ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) this.ctx.lineTo(pts[i].x, pts[i].y);
-      this.ctx.closePath();
-      if (item.fillColor) {
-        this.ctx.fillStyle = item.fillColor;
-        this.ctx.fill();
-      }
-      this.ctx.strokeStyle = item.color ?? '#7c83ff';
-      this.ctx.lineWidth = item.strokeWidth ?? 2;
-      this.ctx.stroke();
-    } else if (item.type === 'path' && item.points && item.points.length >= 2) {
-      const pts = item.points.map(p => this.geoToScreen({ lat: p.lat, lng: p.lng }));
-      this.ctx.beginPath();
-      this.ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) this.ctx.lineTo(pts[i].x, pts[i].y);
-      this.ctx.strokeStyle = item.color ?? '#7c83ff';
-      this.ctx.lineWidth = item.strokeWidth ?? 2;
-      this.ctx.stroke();
-    }
-
-    this.ctx.restore();
-
-    // Selection indicator for the currently selected editor item
-    if (this.editorSelectedItem?.id === item.id) {
-      this.ctx.save();
-      this.ctx.strokeStyle = '#7c83ff';
-      this.ctx.lineWidth = 1.5;
-      this.ctx.setLineDash([4, 3]);
-      this.ctx.strokeRect(pos.x - size / 2 - 4, pos.y - size / 2 - 4, size + 8, size + 8);
-      this.ctx.setLineDash([]);
-      // Corner dots
-      this.ctx.fillStyle = '#7c83ff';
-      for (const [cx, cy] of [
-        [pos.x - size / 2 - 4, pos.y - size / 2 - 4],
-        [pos.x + size / 2 + 4, pos.y - size / 2 - 4],
-        [pos.x - size / 2 - 4, pos.y + size / 2 + 4],
-        [pos.x + size / 2 + 4, pos.y + size / 2 + 4],
-      ] as [number, number][]) {
-        this.ctx.beginPath();
-        this.ctx.arc(cx, cy, 3, 0, Math.PI * 2);
-        this.ctx.fill();
-      }
-      this.ctx.restore();
-    }
-  }
-
   // === EVENTOS ===
 
   onMouseDown(e: MouseEvent): void {
@@ -3367,44 +2650,17 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.pointerDownX = e.clientX;
     this.pointerDownY = e.clientY;
 
-    // ── Tile paint mode: paint on grid cells ──────────────────
-    if (this.tilePaintMode && e.button === 0) {
-      const cellW = Math.max(1, this.canvasGridCellW);
-      const cellH = Math.max(1, this.canvasGridCellH);
-      const mp = this.screenToGridLocal(x, y);
-      const col = Math.floor(mp.x / cellW);
-      const row = Math.floor(mp.y / cellH);
+    if (this.treeEditorMode && this.treePlaceActive && e.button === 0) {
+      return;
+    }
 
-      if (this.tilePaintTool === 'grab') {
-        // Grab tool — fall through to normal map panning below
-      } else if (this.tilePaintTool === 'rect') {
-        this.pushUndo();
-        this.rectDragging = true;
-        this.rectStartCol = col;
-        this.rectStartRow = row;
-        this.rectEndCol = col;
-        this.rectEndRow = row;
-        return;
-      } else if (this.tilePaintTool === 'line') {
-        this.pushUndo();
-        this.lineDragging = true;
-        this.lineStartCol = col;
-        this.lineStartRow = row;
-        this.lineEndCol = col;
-        this.lineEndRow = row;
-        return;
-      } else if (this.tilePaintTool === 'bucket') {
-        this.pushUndo();
-        this.bucketFill(col, row);
-        return;
-      } else if (this.tilePaintTool === 'picker') {
-        this.paintAtScreenPos(x, y);
-        return;
-      } else {
-        // paint or eraser
-        this.pushUndo();
-        this.isPainting = true;
-        this.paintAtScreenPos(x, y);
+    if (this.treeEditorMode && !this.treePlaceActive && e.button === 0) {
+      const hit = this.hitTestTreeMarker(x, y);
+      if (hit >= 0) {
+        this.selectAmbientTree(hit);
+        this.draggingTreeIndex = hit;
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
         return;
       }
     }
@@ -3431,56 +2687,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       return;
     }
 
-    // In editor mode, only allow map panning (pan tool or middle button)
-    if (this.editorMode) {
-      if (this.editorActiveTool === 'pan' || e.button === 1) {
-        this.isDragging = true;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        const container = this.canvasRef.nativeElement.parentElement;
-        if (container) container.style.cursor = 'grabbing';
-      }
-      // Other editor tools handle clicks through onClick→editorGeoClick
-      return;
-    }
-
-    // In sticker edit mode, check rotation handle, then corner handles, then sticker body
-    if (this.stickerEditMode) {
-      // Rotation handle takes priority
-      if (this.selectedStickerRef && this.isNearRotateHandle(x, y)) {
-        const center = this.geoToScreen({
-          lat: this.selectedStickerRef.sticker.lat,
-          lng: this.selectedStickerRef.sticker.lng
-        });
-        this.isRotatingSticker = true;
-        this.rotateDragStartAngle = Math.atan2(y - center.y, x - center.x);
-        this.rotateDragStartStkRot = this.selectedStickerRef.sticker.rotation;
-        return;
-      }
-
-      // Corner handles for scaling
-      if (this.selectedStickerRef && this.hitTestCornerHandle(x, y)) {
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        return;
-      }
-
-      // Then check sticker body for dragging
-      const hit = this.hitTestSticker(x, y);
-      if (hit) {
-        this.selectedStickerRef = hit;
-        this.isDraggingSticker = true;
-        this.stickerSelectedOnMap.emit(hit.sticker);
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        this.render();
-        return;
-      }
-    }
-
     // Vista jugador: tap en zona — no iniciar pan hasta confirmar que no es drag
-    if (e.button === 0 && !this.sectionEditorMode && !this.editorMode && !this.stickerEditMode
-        && !this.coordPickerMode && !this.tilePaintMode && this.mapOptions.showSections) {
+    if (e.button === 0 && !this.sectionEditorMode
+        && !this.coordPickerMode && this.mapOptions.showSections) {
       const geo = this.canvasToGeo({ x, y });
       const hit = this.hitTestSectionAtGeo(geo);
       if (hit >= 0) {
@@ -3517,34 +2726,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.pendingZoneTapIndex = -1;
     }
 
-    // ── Tile paint drag ──────────────────────────────────────
-    if (this.isPainting && this.tilePaintMode) {
-      this.paintAtScreenPos(x, y);
-      return;
-    }
-
-    // ── Rect tool drag preview ───────────────────────────────
-    if (this.rectDragging && this.tilePaintMode) {
-      const cellW = Math.max(1, this.canvasGridCellW);
-      const cellH = Math.max(1, this.canvasGridCellH);
-      const mp = this.screenToGridLocal(x, y);
-      this.rectEndCol = Math.floor(mp.x / cellW);
-      this.rectEndRow = Math.floor(mp.y / cellH);
-      this.render();
-      return;
-    }
-
-    // ── Line tool drag preview ───────────────────────────────
-    if (this.lineDragging && this.tilePaintMode) {
-      const cellW = Math.max(1, this.canvasGridCellW);
-      const cellH = Math.max(1, this.canvasGridCellH);
-      const mp = this.screenToGridLocal(x, y);
-      this.lineEndCol = Math.floor(mp.x / cellW);
-      this.lineEndRow = Math.floor(mp.y / cellH);
-      this.render();
-      return;
-    }
-
     const geo = this.canvasToGeo({ x, y });
     this._cursorLat = geo.lat;
     this._cursorLng = geo.lng;
@@ -3559,90 +2740,19 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       return;
     }
 
+    if (this.draggingTreeIndex !== null) {
+      const idx = this.draggingTreeIndex;
+      const t = this.ambientTrees[idx];
+      if (t) {
+        const ok = this.moveAmbientTreeToGeo(idx, geo.lat, geo.lng);
+        this.treePlacementHint = ok ? '' : 'Posición inválida para esta zona.';
+        if (!ok) this.emitTreeEditorState();
+      }
+      return;
+    }
+
     this.updateSectionHover(x, y);
 
-    // In editor mode, emit geo position for cursor display + item dragging
-    if (this.editorMode) {
-      this.editorGeoMove.emit({ lat: geo.lat, lng: geo.lng });
-      // Still allow map panning so user can navigate
-      if (this.isDragging) {
-        const dx = e.clientX - this.lastX;
-        const dy = e.clientY - this.lastY;
-        this.offsetX += dx;
-        this.offsetY += dy;
-        this.targetOffsetX = this.offsetX;
-        this.targetOffsetY = this.offsetY;
-        this.lastX = e.clientX;
-        this.lastY = e.clientY;
-        this.render();
-      }
-      return;
-    }
-
-    // Sticker rotation drag
-    if (this.isRotatingSticker && this.selectedStickerRef) {
-      const center = this.geoToScreen({
-        lat: this.selectedStickerRef.sticker.lat,
-        lng: this.selectedStickerRef.sticker.lng
-      });
-      const currentAngle = Math.atan2(y - center.y, x - center.x);
-      const delta = currentAngle - this.rotateDragStartAngle;
-      let newRot = this.rotateDragStartStkRot + delta * (180 / Math.PI);
-      newRot = ((newRot % 360) + 360) % 360;
-      this.selectedStickerRef.sticker = {
-        ...this.selectedStickerRef.sticker,
-        rotation: Math.round(newRot)
-      };
-      this.stickerService.updateSticker(
-        this.selectedStickerRef.layerId,
-        this.selectedStickerRef.sticker
-      );
-      this.stickerSelectedOnMap.emit(this.selectedStickerRef.sticker);
-      this.render();
-      return;
-    }
-
-    // Sticker corner-handle scaling
-    if (this.isScalingSticker && this.selectedStickerRef) {
-      const bounds = this.getStickerScreenBounds(this.selectedStickerRef.sticker);
-      if (bounds) {
-        const currentDist = Math.sqrt((x - bounds.cx) ** 2 + (y - bounds.cy) ** 2);
-        const ratio = currentDist / Math.max(this.scaleDragStartDist, 1);
-        const newScale = Math.max(0.1, Math.min(5, this.scaleDragStartScale * ratio));
-        this.selectedStickerRef.sticker = {
-          ...this.selectedStickerRef.sticker,
-          scale: Math.round(newScale * 100) / 100
-        };
-        this.stickerService.updateSticker(
-          this.selectedStickerRef.layerId,
-          this.selectedStickerRef.sticker
-        );
-        this.stickerSelectedOnMap.emit(this.selectedStickerRef.sticker);
-        this.render();
-      }
-      return;
-    }
-
-    // Sticker dragging
-    if (this.isDraggingSticker && this.selectedStickerRef) {
-      const newGeo = this.canvasToGeo({ x, y });
-      this.selectedStickerRef.sticker = {
-        ...this.selectedStickerRef.sticker,
-        lat: newGeo.lat,
-        lng: newGeo.lng
-      };
-      this.stickerService.updateSticker(
-        this.selectedStickerRef.layerId,
-        this.selectedStickerRef.sticker
-      );
-      this.stickerSelectedOnMap.emit(this.selectedStickerRef.sticker);
-      this.lastX = e.clientX;
-      this.lastY = e.clientY;
-      this.render();
-      return;
-    }
-
-    // Check if hovering over a marker or sticker to change cursor
     if (!this.isDragging) {
       // Throttle: skip expensive hit-test if cursor barely moved
       const movedEnough =
@@ -3656,33 +2766,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       let overInteractive = false;
       let cursorType = 'grab';
 
-      // Check rotation handle of selected sticker
-      if (this.stickerEditMode && this.selectedStickerRef) {
-        if (this.isNearRotateHandle(x, y)) {
-          overInteractive = true;
-          cursorType = 'grab';
-        }
-      }
-
-      // Check corner handles of selected sticker (rotation-aware)
-      if (!overInteractive && this.stickerEditMode && this.selectedStickerRef) {
-        if (this.isNearCornerHandle(x, y)) {
-          overInteractive = true;
-          cursorType = 'nwse-resize';
-        }
-      }
-
-      // Check stickers in edit mode
-      if (!overInteractive && this.stickerEditMode) {
-        if (this.hitTestSticker(x, y)) {
-          overInteractive = true;
-          cursorType = 'move';
-        }
-      }
-
-      // Check markers
-      if (!overInteractive) {
-        for (const marker of this.markers) {
+      for (const marker of this.markers) {
           const mp = this.geoToScreen(marker.geo);
           const dx = x - mp.x;
           const dy = y - mp.y;
@@ -3691,21 +2775,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
             cursorType = 'pointer';
             break;
           }
-        }
       }
 
       const container = this.canvasRef.nativeElement.parentElement;
       if (container) {
-        if (this.tilePaintMode) {
-          // Tool-specific cursors for tile painting
-          const toolCursors: Record<string, string> = {
-            paint: 'crosshair', eraser: 'not-allowed', bucket: 'cell',
-            rect: 'crosshair', line: 'crosshair', picker: 'copy', grab: 'grab'
-          };
-          container.style.cursor = toolCursors[this.tilePaintTool] ?? 'crosshair';
-        } else if (this.stickerEditMode && this.placingStickerKey) {
-          container.style.cursor = 'crosshair';
-        } else if (overInteractive) {
+        if (overInteractive) {
           container.style.cursor = cursorType;
         } else {
           container.style.cursor = 'grab';
@@ -3721,16 +2795,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.offsetY += dy;
         this.targetOffsetX = this.offsetX;
         this.targetOffsetY = this.offsetY;
-      } else if (this.activeMovableLayer === 'grid') {
-        // Grid has its own rotation — use gridRad for correct delta conversion
-        const gridRad = this.canvasGridRotation * Math.PI / 180;
-        const c = Math.cos(-gridRad);
-        const sn = Math.sin(-gridRad);
-        const lo = this.layerOffsets.grid;
-        lo.x += (dx * c - dy * sn) / this.scale;
-        lo.y += (dx * sn + dy * c) / this.scale;
       } else {
-        // Other layers use the map rotation
         const c = Math.cos(-this.rotation);
         const sn = Math.sin(-this.rotation);
         const mdx = (dx * c - dy * sn) / this.scale;
@@ -3746,89 +2811,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   onMouseUp(): void {
+    if (this.draggingTreeIndex !== null) {
+      this.draggingTreeIndex = null;
+      this.emitTreeEditorState();
+    }
     if (this.draggingSectionVertex) {
       this.draggingSectionVertex = false;
-    }
-    // Tile painting end
-    if (this.isPainting) {
-      this.isPainting = false;
-      return;
-    }
-    // Rectangle fill end
-    if (this.rectDragging) {
-      this.rectDragging = false;
-      this.fillRect(
-        Math.min(this.rectStartCol, this.rectEndCol),
-        Math.min(this.rectStartRow, this.rectEndRow),
-        Math.max(this.rectStartCol, this.rectEndCol),
-        Math.max(this.rectStartRow, this.rectEndRow),
-      );
-      this.rectStartCol = -1;
-      this.rectStartRow = -1;
-      this.rectEndCol = -1;
-      this.rectEndRow = -1;
-      this.render();
-      return;
-    }
-    // Line fill end
-    if (this.lineDragging) {
-      this.lineDragging = false;
-      this.fillLine(this.lineStartCol, this.lineStartRow, this.lineEndCol, this.lineEndRow);
-      this.lineStartCol = -1;
-      this.lineStartRow = -1;
-      this.lineEndCol = -1;
-      this.lineEndRow = -1;
-      this.render();
-      return;
-    }
-    // Editor mode: notify parent + reset map pan
-    if (this.editorMode) {
-      this.editorGeoMouseUp.emit();
-      if (this.isDragging) {
-        this.isDragging = false;
-        const container = this.canvasRef.nativeElement.parentElement;
-        if (container) container.style.cursor = 'grab';
-        this.saveState();
-      }
-      return;
-    }
-    if (this.isRotatingSticker) {
-      this.isRotatingSticker = false;
-      if (this.selectedStickerRef) {
-        this.stickerService.updateSticker(
-          this.selectedStickerRef.layerId,
-          this.selectedStickerRef.sticker,
-          true
-        );
-        this.stickerMoved.emit(this.selectedStickerRef.sticker);
-      }
-      return;
-    }
-    if (this.isScalingSticker) {
-      this.isScalingSticker = false;
-      if (this.selectedStickerRef) {
-        // Persist final position with undo snapshot
-        this.stickerService.updateSticker(
-          this.selectedStickerRef.layerId,
-          this.selectedStickerRef.sticker,
-          true
-        );
-        this.stickerMoved.emit(this.selectedStickerRef.sticker);
-      }
-      return;
-    }
-    if (this.isDraggingSticker) {
-      this.isDraggingSticker = false;
-      if (this.selectedStickerRef) {
-        // Persist final position with undo snapshot
-        this.stickerService.updateSticker(
-          this.selectedStickerRef.layerId,
-          this.selectedStickerRef.sticker,
-          true
-        );
-        this.stickerMoved.emit(this.selectedStickerRef.sticker);
-      }
-      return;
     }
     if (this.pendingZoneTapIndex >= 0) {
       if (!this.pointerMovedSinceDown) {
@@ -3849,9 +2837,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   onMouseLeave(): void {
     this.isDragging = false;
-    this.isDraggingSticker = false;
-    this.isScalingSticker = false;
-    this.isRotatingSticker = false;
     this.pendingZoneTapIndex = -1;
     this.stopContinuousRotation();
     if (this.hoveredSectionIndex >= 0) {
@@ -3923,6 +2908,23 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       return;
     }
 
+    // ── Colocar árbol ambiental ─────────────────────────────
+    if (this.treeEditorMode && this.treePlaceActive && !this.pointerMovedSinceDown) {
+      const geo = this.canvasToGeo({ x, y });
+      this.addAmbientTreeAtGeo(geo.lat, geo.lng);
+      return;
+    }
+
+    // ── Seleccionar árbol (tap sin arrastre) ────────────────
+    if (this.treeEditorMode && !this.treePlaceActive && !this.pointerMovedSinceDown) {
+      const hit = this.hitTestTreeMarker(x, y);
+      if (hit >= 0) {
+        this.selectAmbientTree(hit);
+        return;
+      }
+      this.selectAmbientTree(null);
+    }
+
     // ── Colocar referencia espacial ─────────────────────────
     if (this.spatialReferencePlaceIndex >= 0 && !this.pointerMovedSinceDown) {
       const geo = this.canvasToGeo({ x, y });
@@ -3947,7 +2949,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
 
     // ── Vista jugador: referencia espacial → ficha ──────────
-    if (!this.sectionEditorMode && !this.editorMode && !this.stickerEditMode && !this.coordPickerMode
+    if (!this.sectionEditorMode && !this.coordPickerMode
         && !this.pointerMovedSinceDown && this.mapOptions.showSpatialReferences) {
       const refHit = this.spatialRefLayer.hitTest(
         this.spatialReferences, x, y, (geo) => this.geoToScreen(geo),
@@ -3955,30 +2957,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       if (refHit >= 0) {
         this.openSpatialRefFicha(refHit);
         return;
-      }
-    }
-
-    // ── Editor mode: route click to tilemap editor ──────────
-    if (this.editorMode) {
-      const geo = this.canvasToGeo({ x, y });
-      this.editorGeoClick.emit({ lat: geo.lat, lng: geo.lng });
-      return;
-    }
-
-    // ── Sticker edit mode: select or deselect ──────────────
-    if (this.stickerEditMode) {
-      // Try to select a sticker (not on corner handle)
-      const hit = this.hitTestSticker(x, y);
-      if (hit) {
-        this.selectedStickerRef = hit;
-        this.stickerSelectedOnMap.emit(hit.sticker);
-        this.render();
-        return;
-      } else {
-        // Deselect
-        this.selectedStickerRef = null;
-        this.stickerSelectedOnMap.emit(null);
-        this.render();
       }
     }
 
@@ -4014,28 +2992,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
   }
 
-  /** Allow drag over the map canvas */
-  onDragOver(e: DragEvent): void {
-    e.preventDefault();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = 'copy';
-    }
-  }
-
-  /** Handle sticker dropped from the panel onto the map */
-  onMapDrop(e: DragEvent): void {
-    e.preventDefault();
-    const key = e.dataTransfer?.getData('text/plain');
-    if (!key) return;
-
-    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const geo = this.canvasToGeo({ x, y });
-    this.stickerDroppedOnMap.emit({ key, lat: geo.lat, lng: geo.lng });
-  }
-
-  setMapOption(option: 'showSections' | 'showLabels' | 'showCanvasGrid' | 'showTilemap' | 'showBoundary' | 'showMarkers' | 'showGroundTextures', value: boolean): void {
+  setMapOption(option: 'showSections' | 'showLabels' | 'showBoundary' | 'showMarkers' | 'showGroundTextures', value: boolean): void {
     this.mapOptions[option] = value;
     this.onOptionChange();
     this.emitViewInfo();
@@ -4126,7 +3083,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.leavesEffect.setContainsPoint(contains);
     this.nightMistEffect.setContainsPoint(contains);
     this.leavesEffect.setSectionAt((bx, by) => this.hitTestSectionAtCanvas(bx, by));
-    this.treesEffect.setSectionIndex(this.mapOptions.rainSectionIndex);
   }
 
   private hitTestSectionAtCanvas(bx: number, by: number): number {
@@ -4376,6 +3332,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     nightMistIntensity: number;
     ambientWindDeg: number;
     ambientWindStrength: number;
+    rainWindDeg: number;
+    fogWindDeg: number;
+    motesWindDeg: number;
+    cloudShadowWindDeg: number;
+    leavesWindDeg: number;
+    treesWindDeg: number;
     spatialAnimSpeed: number;
   } {
     return {
@@ -4404,6 +3366,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       nightMistIntensity: this.mapOptions.nightMistIntensity,
       ambientWindDeg: this.mapOptions.ambientWindDeg,
       ambientWindStrength: this.mapOptions.ambientWindStrength,
+      rainWindDeg: this.mapOptions.rainWindDeg,
+      fogWindDeg: this.mapOptions.fogWindDeg,
+      motesWindDeg: this.mapOptions.motesWindDeg,
+      cloudShadowWindDeg: this.mapOptions.cloudShadowWindDeg,
+      leavesWindDeg: this.mapOptions.leavesWindDeg,
+      treesWindDeg: this.mapOptions.treesWindDeg,
       spatialAnimSpeed: this.mapOptions.spatialAnimSpeed,
     };
   }
@@ -4457,6 +3425,26 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     };
   }
 
+  private getEffectWind(deg: number): AmbientWind {
+    return {
+      directionDeg: deg < 0 ? this.mapOptions.ambientWindDeg : normalizeWindDegrees(deg),
+      strength: this.mapOptions.ambientWindStrength,
+    };
+  }
+
+  setEffectWindDirection(effect: AmbientEffectWindKey, deg: number): void {
+    const value = deg < 0 ? EFFECT_WIND_INHERIT : normalizeWindDegrees(deg);
+    switch (effect) {
+      case 'rain': this.mapOptions.rainWindDeg = value; break;
+      case 'fog': this.mapOptions.fogWindDeg = value; break;
+      case 'motes': this.mapOptions.motesWindDeg = value; break;
+      case 'cloudShadows': this.mapOptions.cloudShadowWindDeg = value; break;
+      case 'leaves': this.mapOptions.leavesWindDeg = value; break;
+      case 'trees': this.mapOptions.treesWindDeg = value; break;
+    }
+    this.onOptionChange();
+  }
+
   setAmbientWindDirection(deg: number): void {
     this.mapOptions.ambientWindDeg = normalizeWindDegrees(deg);
     this.onOptionChange();
@@ -4465,6 +3453,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   setAmbientWindStrength(value: number): void {
     this.mapOptions.ambientWindStrength = Math.min(1, Math.max(0, value));
     this.onOptionChange();
+  }
+
+  private getAmbientTickZone(): Pick<RainTickOptions, 'bounds' | 'containsPoint'> {
+    const opts = this.getRainEffectOptions();
+    return { bounds: opts.bounds, containsPoint: opts.containsPoint };
   }
 
   private getRainEffectOptions(): RainTickOptions {
@@ -4502,7 +3495,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return { minX, maxX, minY, maxY };
   }
 
-  /** Global keyboard handler for sticker editing shortcuts */
   private emitViewInfo(): void {
     if (!this.isBrowser || !this.canvasRef?.nativeElement) return;
     const canvasEl = this.canvasRef.nativeElement;
@@ -4517,18 +3509,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       rotDeg: this.rotationDeg,
       showSections: this.mapOptions.showSections,
       showLabels: this.mapOptions.showLabels,
-      showCanvasGrid: this.mapOptions.showCanvasGrid,
-      showTilemap: this.mapOptions.showTilemap,
       showGroundTextures: this.mapOptions.showGroundTextures,
       groundTilePx: this.mapOptions.groundTilePx,
       showBoundary: this.mapOptions.showBoundary,
       showMarkers: this.mapOptions.showMarkers,
-      canvasGridCellW: this.canvasGridCellW,
-      canvasGridCellH: this.canvasGridCellH,
-      canvasGridOpacity: this.canvasGridOpacity,
-      canvasGridColor: this.canvasGridColor,
-      canvasGridStyle: this.canvasGridStyle,
-      canvasGridRotation: this.canvasGridRotation,
     });
   }
 
@@ -4552,35 +3536,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         case 'S':            // Ctrl+Shift+S toggle sections
           if (e.shiftKey) { e.preventDefault(); this.setMapOption('showSections', !this.mapOptions.showSections); return; }
           break;
-        case 'd': case 'D':  // Ctrl+D toggle canvas grid
-          if (!e.shiftKey) { e.preventDefault(); this.setMapOption('showCanvasGrid', !this.mapOptions.showCanvasGrid); return; }
-          break;
-        case 't': case 'T':  // Ctrl+T (unused now)
-          break;
-      }
-    }
-
-    // ── Tile paint undo/redo (Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y) ──
-    if (this.tilePaintMode && e.ctrlKey && !e.shiftKey && e.key === 'z') {
-      e.preventDefault();
-      this.undo();
-      return;
-    }
-    if (this.tilePaintMode && ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.shiftKey && e.key === 'Z'))) {
-      e.preventDefault();
-      this.redo();
-      return;
-    }
-
-    // ── Tile paint tool shortcuts (single key, no modifier) ──
-    if (this.tilePaintMode && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      const toolMap: Record<string, string> = { b: 'paint', r: 'rect', l: 'line', g: 'bucket', e: 'eraser', i: 'picker', h: 'grab' };
-      const tool = toolMap[e.key.toLowerCase()];
-      if (tool) {
-        e.preventDefault();
-        this.tilePaintTool = tool as any;
-        this.tilePaintToolChange.emit(this.tilePaintTool);
-        return;
       }
     }
 
@@ -4590,83 +3545,6 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         e.preventDefault();
         this.deleteSectionVertex(this.sectionEditorIndex, this.sectionEditorSelectedVertex);
       }
-      return;
-    }
-
-    // ── Sticker edit-mode only shortcuts ────────────────────────
-    if (!this.stickerEditMode) return;
-
-    // Ctrl+Z — Undo
-    if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
-      e.preventDefault();
-      this.stickerService.undo();
-      this.selectedStickerRef = null;
-      this.stickerSelectedOnMap.emit(null);
-      this.render();
-      return;
-    }
-
-    // Ctrl+Y or Ctrl+Shift+Z — Redo
-    if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
-      e.preventDefault();
-      this.stickerService.redo();
-      this.selectedStickerRef = null;
-      this.stickerSelectedOnMap.emit(null);
-      this.render();
-      return;
-    }
-
-    // Ctrl+D — Duplicate selected sticker
-    if (e.ctrlKey && (e.key === 'd' || e.key === 'D') && this.selectedStickerRef) {
-      e.preventDefault();
-      const src = this.selectedStickerRef.sticker;
-      const activeLayer = this.stickerService.getActiveLayer();
-      if (activeLayer) {
-        const dup = this.stickerService.addSticker(activeLayer.id, src.stickerKey, src.lat + 0.00005, src.lng + 0.00005);
-        this.stickerService.updateSticker(activeLayer.id, { ...dup, scale: src.scale, rotation: src.rotation, opacity: src.opacity });
-        this.render();
-      }
-      return;
-    }
-
-    // Ctrl+C — Copy selected sticker coords to clipboard
-    if (e.ctrlKey && (e.key === 'c' || e.key === 'C') && this.selectedStickerRef) {
-      const s = this.selectedStickerRef.sticker;
-      const text = `${s.lat.toFixed(8)}, ${s.lng.toFixed(8)}`;
-      navigator.clipboard?.writeText(text);
-      return;
-    }
-
-    // Arrow keys — nudge selected sticker
-    if (this.selectedStickerRef && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-      e.preventDefault();
-      const nudge = e.shiftKey ? 0.0001 : 0.00002;
-      const s = this.selectedStickerRef.sticker;
-      const updated: typeof s = { ...s };
-      if (e.key === 'ArrowUp')    updated.lat = s.lat + nudge;
-      if (e.key === 'ArrowDown')  updated.lat = s.lat - nudge;
-      if (e.key === 'ArrowLeft')  updated.lng = s.lng - nudge;
-      if (e.key === 'ArrowRight') updated.lng = s.lng + nudge;
-      const layer = this.stickerService.getActiveLayer();
-      if (layer) this.stickerService.updateSticker(layer.id, updated);
-      this.selectedStickerRef.sticker = updated;
-      this.stickerSelectedOnMap.emit(updated);
-      this.render();
-      return;
-    }
-
-    // Delete / Backspace — remove selected sticker
-    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedStickerRef) {
-      e.preventDefault();
-      this.removeSelectedSticker();
-      return;
-    }
-
-    // Escape — deselect
-    if (e.key === 'Escape') {
-      this.selectedStickerRef = null;
-      this.stickerSelectedOnMap.emit(null);
-      this.render();
     }
   }
 
@@ -4785,7 +3663,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // === MAP STATE CAPTURE / RESTORE (for layer config system) ===
 
   /** Capture current map view state as a serializable object */
-  getMapViewState(): { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid: boolean; showGroundTextures: boolean; groundTilePx: number; canvasGridCellW: number; canvasGridCellH: number; canvasGridOpacity: number } {
+  getMapViewState(): { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showGroundTextures: boolean; groundTilePx: number } {
     return {
       scale: this.scale,
       rotation: this.rotation,
@@ -4793,17 +3671,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       offsetY: this.offsetY,
       showSections: this.mapOptions.showSections,
       showLabels: this.mapOptions.showLabels,
-      showCanvasGrid: this.mapOptions.showCanvasGrid,
       showGroundTextures: this.mapOptions.showGroundTextures,
       groundTilePx: this.mapOptions.groundTilePx,
-      canvasGridCellW: this.canvasGridCellW,
-      canvasGridCellH: this.canvasGridCellH,
-      canvasGridOpacity: this.canvasGridOpacity
     };
   }
 
   /** Restore map view state from a saved configuration */
-  setMapViewState(state: { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showCanvasGrid?: boolean; showTilemap?: boolean; showGroundTextures?: boolean; groundTilePx?: number; showBoundary?: boolean; showMarkers?: boolean; markerSize?: number; canvasGridCellW?: number; canvasGridCellH?: number; canvasGridOpacity?: number; canvasGridColor?: string; canvasGridStyle?: 'solid' | 'dashed' | 'dotted'; canvasGridRotation?: number }): void {
+  setMapViewState(state: { scale: number; rotation: number; offsetX: number; offsetY: number; showSections: boolean; showLabels: boolean; showGroundTextures?: boolean; groundTilePx?: number; showBoundary?: boolean; showMarkers?: boolean; markerSize?: number }): void {
     this.scale = state.scale;
     this.targetScale = state.scale;
     this.rotation = state.rotation;
@@ -4814,67 +3688,27 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.targetOffsetY = state.offsetY;
     this.mapOptions.showSections = state.showSections;
     this.mapOptions.showLabels = state.showLabels;
-    this.mapOptions.showCanvasGrid = state.showCanvasGrid ?? false;
-    this.mapOptions.showTilemap = state.showTilemap ?? true;
     this.mapOptions.showGroundTextures = state.showGroundTextures ?? true;
     if (state.groundTilePx != null) this.setGroundTilePx(state.groundTilePx);
     this.mapOptions.showBoundary = state.showBoundary ?? true;
     this.mapOptions.showMarkers = state.showMarkers ?? true;
     if (state.markerSize != null) this.markerRadius = state.markerSize;
-    if (state.canvasGridCellW) this.canvasGridCellW = state.canvasGridCellW;
-    if (state.canvasGridCellH) this.canvasGridCellH = state.canvasGridCellH;
-    if (state.canvasGridOpacity != null) this.canvasGridOpacity = state.canvasGridOpacity;
-    if (state.canvasGridColor != null) this.canvasGridColor = state.canvasGridColor;
-    if (state.canvasGridStyle) this.canvasGridStyle = state.canvasGridStyle;
-    if (state.canvasGridRotation != null) this.canvasGridRotation = state.canvasGridRotation;
     this.saveState();
     this.render();
     this.emitViewInfo();
   }
 
-  /** Serializable painted tiles for session / checkpoints */
-  exportPaintedTiles(): { col: number; row: number; url: string }[] {
-    const out: { col: number; row: number; url: string }[] = [];
-    this.paintedTiles.forEach((tile, key) => {
-      const [col, row] = key.split(',').map(Number);
-      if (!Number.isFinite(col) || !Number.isFinite(row)) return;
-      out.push({ col, row, url: tile.url });
-    });
-    return out;
-  }
-
-  /** Restore painted tiles from serialized data */
-  applyPaintedTiles(tiles: { col: number; row: number; url: string }[]): void {
-    this.paintedTiles.clear();
-    for (const t of tiles) {
-      const key = `${t.col},${t.row}`;
-      let img = this.paintImageCache.get(t.url) ?? null;
-      if (!img) {
-        img = new Image();
-        img.src = t.url;
-        this.paintImageCache.set(t.url, img);
-        img.onload = () => this.render();
-      }
-      this.paintedTiles.set(key, { url: t.url, img: img.complete ? img : null });
-    }
-    this.render();
-  }
-
-  /** Full map-side snapshot (stickers handled by container). */
+  /** Full map-side snapshot. */
   exportMapPersistedState() {
     const base = this.getMapViewState();
     return {
       mapState: {
         ...base,
-        showTilemap: this.mapOptions.showTilemap,
         showGroundTextures: this.mapOptions.showGroundTextures,
         groundTilePx: this.mapOptions.groundTilePx,
         showBoundary: this.mapOptions.showBoundary,
         showMarkers: this.mapOptions.showMarkers,
         markerSize: this.markerRadius,
-        canvasGridColor: this.canvasGridColor,
-        canvasGridStyle: this.canvasGridStyle,
-        canvasGridRotation: this.canvasGridRotation,
       },
       layerOffsets: JSON.parse(JSON.stringify(this.layerOffsets)),
       activeMovableLayer: this.activeMovableLayer,
@@ -4884,24 +3718,20 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         ...this.getSceneOptions(),
         activeScenarioId: this.getActiveAmbientScenarioId(),
       },
-      paintedTiles: this.exportPaintedTiles(),
-      refImageDataUrl: this.refImage?.src?.startsWith('data:') ? this.refImage.src : null,
-      refImageOpacity: this.refImageOpacity,
+      ambientTrees: this.getAmbientTrees(),
     };
   }
 
-  /** Restore map-side state from snapshot (stickers handled by container). */
+  /** Restore map-side state from snapshot. */
   applyMapPersistedState(
     data: {
       mapState?: Parameters<MapControlComponent['setMapViewState']>[0];
-      layerOffsets?: { grid: { x: number; y: number }; boundary: { x: number; y: number }; sections: { x: number; y: number }; markers: { x: number; y: number } };
+      layerOffsets?: { boundary: { x: number; y: number }; sections: { x: number; y: number }; markers: { x: number; y: number } };
       activeMovableLayer?: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers';
       sections?: ParkSectionRecord[];
       spatialReferences?: SpatialReference[];
-      ambientScene?: ReturnType<MapControlComponent['getSceneOptions']> & { activeScenarioId?: string | null };
-      paintedTiles?: { col: number; row: number; url: string }[];
-      refImageDataUrl?: string | null;
-      refImageOpacity?: number;
+      ambientScene?: AmbientSceneData & { activeScenarioId?: string | null };
+      ambientTrees?: AmbientTreeSlot[];
     },
     opts?: { skipLegacySave?: boolean },
   ): void {
@@ -4910,7 +3740,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.layerOffsets = JSON.parse(JSON.stringify(data.layerOffsets));
     }
     if (data.activeMovableLayer) {
-      this.activeMovableLayer = data.activeMovableLayer;
+      this.activeMovableLayer = data.activeMovableLayer === 'grid' ? 'canvas' : data.activeMovableLayer;
     }
     if (data.sections?.length) {
       this.editableSections = data.sections.map((s) => ({
@@ -4928,21 +3758,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (data.ambientScene) {
       this.applySceneSnapshot(data.ambientScene);
     }
-    if (data.paintedTiles) {
-      this.applyPaintedTiles(data.paintedTiles);
-    }
-    if (data.refImageDataUrl) {
-      this.setRefImage(data.refImageDataUrl);
-      if (data.refImageOpacity != null) this.setRefImageOpacity(data.refImageOpacity);
-    } else if (data.refImageOpacity != null) {
-      this.setRefImageOpacity(data.refImageOpacity);
+    if (data.ambientTrees != null) {
+      this.setAmbientTrees(data.ambientTrees);
     }
     if (!opts?.skipLegacySave) this.saveState();
     this.render();
     this.emitViewInfo();
   }
 
-  private applySceneSnapshot(scene: ReturnType<MapControlComponent['getSceneOptions']> & { activeScenarioId?: string | null }): void {
+  private applySceneSnapshot(scene: AmbientSceneData & { activeScenarioId?: string | null }): void {
     this.ambientScenarioId = scene.activeScenarioId ?? null;
     if (!scene.activeScenarioId) {
       this.ambientScenarioTint = null;
@@ -4973,6 +3797,12 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.mapOptions.nightMistIntensity = scene.nightMistIntensity;
     this.mapOptions.ambientWindDeg = scene.ambientWindDeg;
     this.mapOptions.ambientWindStrength = scene.ambientWindStrength;
+    this.mapOptions.rainWindDeg = scene.rainWindDeg ?? EFFECT_WIND_INHERIT;
+    this.mapOptions.fogWindDeg = scene.fogWindDeg ?? EFFECT_WIND_INHERIT;
+    this.mapOptions.motesWindDeg = scene.motesWindDeg ?? EFFECT_WIND_INHERIT;
+    this.mapOptions.cloudShadowWindDeg = scene.cloudShadowWindDeg ?? EFFECT_WIND_INHERIT;
+    this.mapOptions.leavesWindDeg = scene.leavesWindDeg ?? EFFECT_WIND_INHERIT;
+    this.mapOptions.treesWindDeg = scene.treesWindDeg ?? EFFECT_WIND_INHERIT;
     this.mapOptions.spatialAnimSpeed = scene.spatialAnimSpeed;
 
     this.rainEffect.setIntensity(scene.rainIntensity);

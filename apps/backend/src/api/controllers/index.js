@@ -8,7 +8,6 @@ const AnalyticsController = require('./analytics.controller');
 const ConfigController = require('./config.controller');
 const FileController = require('./file.controller');
 const MapConfigurationController = require('./mapConfiguration.controller');
-const MapTileController = require('./mapTile.controller');
 
 module.exports = {
   UserController,
@@ -21,5 +20,4 @@ module.exports = {
   ConfigController,
   FileController,
   MapConfigurationController,
-  MapTileController,
 };

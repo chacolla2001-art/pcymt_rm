@@ -92,16 +92,6 @@ export interface ApiEndpoints {
     global: string;
     byId: (id: string) => string;
   };
-  // Map Tiles
-  mapTiles: {
-    manifest: string;
-    tile: (z: number, x: number, y: number) => string;
-    overlay: (name: string) => string;
-    publish: string;
-    tilesets: string;
-    stickers: string;
-    zoomZip: (z: number) => string;
-  };
   // Config
   config: {
     base: string;
@@ -248,19 +238,6 @@ export class ApiRoutesService {
         public: `${api}/map-configurations/public`,
         global: `${api}/map-configurations/global`,
         byId: (id: string) => `${api}/map-configurations/${id}`,
-      },
-
-      // ═══════════════════════════════════════════════════════════════
-      // MAP TILES
-      // ═══════════════════════════════════════════════════════════════
-      mapTiles: {
-        manifest: `${api}/map/manifest`,
-        tile: (z: number, x: number, y: number) => `${api}/map/tiles/${z}/${x}_${y}.png`,
-        overlay: (name: string) => `${api}/map/overlays/${name}`,
-        publish: `${api}/map/publish`,
-        tilesets: `${api}/map/tilesets`,
-        stickers: `${api}/map/stickers`,
-        zoomZip: (z: number) => `${api}/map/tiles/${z}/all.zip`,
       },
 
       // ═══════════════════════════════════════════════════════════════

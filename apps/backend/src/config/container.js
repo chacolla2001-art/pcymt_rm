@@ -37,7 +37,6 @@ const {
   UserSessionService,
   AnalyticsService,
   MapConfigurationService,
-  MapTileService,
   AppSettingsService,
   ProfilePictureService,
 } = require('../domain/services');
@@ -54,7 +53,6 @@ const {
   ConfigController,
   FileController,
   MapConfigurationController,
-  MapTileController,
 } = require('../api/controllers');
 
 // API - Middlewares
@@ -163,12 +161,6 @@ class Container {
       this._instances.mapConfigurationRepository,
     );
 
-    this._instances.mapTileService = new MapTileService(
-      this._instances.locationRepository,
-      this._instances.virtualAssetRepository,
-      env.uploadDir,
-    );
-
     // Controllers
     this._instances.userController = new UserController(
       this._instances.userService,
@@ -213,10 +205,6 @@ class Container {
 
     this._instances.mapConfigurationController = new MapConfigurationController(
       this._instances.mapConfigurationService,
-    );
-
-    this._instances.mapTileController = new MapTileController(
-      this._instances.mapTileService,
     );
 
     // Middlewares
@@ -267,7 +255,6 @@ class Container {
       configController: this._instances.configController,
       fileController: this._instances.fileController,
       mapConfigurationController: this._instances.mapConfigurationController,
-      mapTileController: this._instances.mapTileController,
       authMiddleware: this._instances.authMiddleware,
       uploadMiddleware: this._instances.uploadMiddleware,
     };
