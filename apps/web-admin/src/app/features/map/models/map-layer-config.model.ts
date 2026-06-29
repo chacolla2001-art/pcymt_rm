@@ -40,6 +40,8 @@ export interface MapConfigData {
   ambientTrees?: AmbientTreeSlot[];
   /** Estilo procedural del suelo por zona (0,1,2,-1,-2). Overrides sobre preset. */
   groundStyle?: Record<number, ZoneGroundStyle>;
+  /** 3 = -1 base interior, -2 fondo exterior (v2 estaba invertido). */
+  groundStyleLayerVersion?: number;
   /** Preset global, escala, LOD del suelo. */
   groundSettings?: GroundMapSettings;
   themeMode?: 'light' | 'dark';

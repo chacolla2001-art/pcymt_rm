@@ -4158,6 +4158,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       ambientTrees?: AmbientTreeSlot[];
       groundStyle?: Record<number, ZoneGroundStyle>;
       groundSettings?: GroundMapSettings;
+      version?: number;
+      groundStyleLayerVersion?: number;
     },
     opts?: { skipLegacySave?: boolean },
   ): void {
@@ -4191,7 +4193,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       importGroundMapSettings(data.groundSettings);
     }
     if (data.groundStyle != null) {
-      importGroundStyleSnapshot(data.groundStyle);
+      importGroundStyleSnapshot(data.groundStyle, {
+        configVersion: data.version,
+        groundStyleLayerVersion: data.groundStyleLayerVersion,
+      });
     }
     if (data.groundSettings != null || data.groundStyle != null) {
       if (getManualGroundTilePx() == null || data.mapState?.groundTilePx == null) {

@@ -14,6 +14,7 @@ import { GroundSettingsCardComponent } from '../components/ground-settings-card.
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
 import { MapSessionService } from '../services/map-session.service';
 import { MapConfigData, MAP_CONFIG_VERSION } from '../models/map-layer-config.model';
+import { GROUND_STYLE_LAYER_ENCODING_VERSION } from '../utils/draw-ground-texture';
 import type { ZoneGroundStyle } from '../utils/draw-ground-texture';
 import type { GroundMapSettings } from '../utils/ground-preset';
 import type { ParkSectionRecord } from '../data/park-geometry';
@@ -328,6 +329,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       ambientTrees: map.ambientTrees,
       groundStyle: map.groundStyle,
       groundSettings: map.groundSettings,
+      groundStyleLayerVersion: GROUND_STYLE_LAYER_ENCODING_VERSION,
       themeMode: this.themeService.isDarkMode() ? 'dark' : 'light',
     };
   }
@@ -356,6 +358,8 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       ambientTrees: configData.ambientTrees,
       groundStyle: configData.groundStyle,
       groundSettings: configData.groundSettings,
+      version: configData.version,
+      groundStyleLayerVersion: configData.groundStyleLayerVersion,
     }, { skipLegacySave: true });
 
     if (scenarioId) {

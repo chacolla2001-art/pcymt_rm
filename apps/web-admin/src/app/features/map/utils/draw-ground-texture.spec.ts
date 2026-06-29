@@ -4,10 +4,15 @@ import {
   fillPolygonWithGroundTexture,
   getGroundStyleOverride,
   GroundPatternCache,
+  GROUND_BASE_PARK_SECTION,
+  GROUND_MAP_BACKDROP_SECTION,
   groundPaletteForSection,
   importGroundStyleSnapshot,
   mapBackdropPalette,
+  migrateGroundStyleMapFromV2,
   parkBasePalette,
+  parseGroundLayerSelectValue,
+  groundLayerSelectValueForTarget,
   resetGroundStyleToDefaults,
   clearAllGroundLayers,
   applyGroundStyleToLayerKeys,
@@ -158,6 +163,39 @@ describe('draw-ground-texture', () => {
     );
     const data = ctx.getImageData(100, 100, 1, 1).data;
     expect(data[0] + data[1] + data[2]).toBeGreaterThan(0);
+  });
+
+  it('migrateGroundStyleMapFromV2 swaps -1 fondo and -2 base to v3 encoding', () => {
+    const fondoStyle = {
+      elements: [{ type: 'stone' as const, density: 0.5, sizeMin: 0.1, sizeMax: 0.2 }],
+      macroDensity: 0, macroAlpha: 0, edgeBlend: 0, edgeBlendAlpha: 0,
+    };
+    const baseStyle = {
+      elements: [{ type: 'grass' as const, density: 0.3, sizeMin: 0.15, sizeMax: 0.35 }],
+      macroDensity: 0, macroAlpha: 0, edgeBlend: 0, edgeBlendAlpha: 0,
+    };
+    const migrated = migrateGroundStyleMapFromV2({ [-1]: fondoStyle, [-2]: baseStyle });
+    expect(migrated[GROUND_MAP_BACKDROP_SECTION].elements[0]?.type).toBe('stone');
+    expect(migrated[GROUND_BASE_PARK_SECTION].elements[0]?.type).toBe('grass');
+  });
+
+  it('importGroundStyleSnapshot migrates v2 layer keys when config version < 3', () => {
+    const style = {
+      elements: [{ type: 'reed' as const, density: 0.25, sizeMin: 0.1, sizeMax: 0.2 }],
+      macroDensity: 0, macroAlpha: 0, edgeBlend: 0, edgeBlendAlpha: 0,
+    };
+    importGroundStyleSnapshot({ '-1': style }, { configVersion: 2 });
+    const out = exportGroundStyleSnapshot();
+    expect(out[GROUND_MAP_BACKDROP_SECTION].elements[0]?.type).toBe('reed');
+    expect(out[GROUND_BASE_PARK_SECTION].elements[0]?.type).not.toBe('reed');
+    resetGroundStyleToDefaults();
+  });
+
+  it('parseGroundLayerSelectValue maps base_park and map_backdrop to correct sections', () => {
+    expect(parseGroundLayerSelectValue('base_park')).toBe(GROUND_BASE_PARK_SECTION);
+    expect(parseGroundLayerSelectValue('map_backdrop')).toBe(GROUND_MAP_BACKDROP_SECTION);
+    expect(groundLayerSelectValueForTarget(GROUND_BASE_PARK_SECTION)).toBe('base_park');
+    expect(groundLayerSelectValueForTarget(GROUND_MAP_BACKDROP_SECTION)).toBe('map_backdrop');
   });
 
   it('importGroundStyleSnapshot normalizes string keys and backfills -1 from zones', () => {

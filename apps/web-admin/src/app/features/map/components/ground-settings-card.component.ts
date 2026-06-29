@@ -8,10 +8,16 @@ import { PARK_MAP_VIS, groundElementSizeFrac } from '../utils/map-park-visual-sc
 import {
   GROUND_ELEMENT_LABELS,
   GROUND_ELEMENT_TYPES,
-  GROUND_PARK_LAYER_KEYS,
-  GROUND_ZONE_KEYS,
+  GROUND_BASE_PARK_SECTION,
+  GROUND_MAP_BACKDROP_SECTION,
+  GROUND_LAYER_SELECT_OPTIONS,
   GROUND_ZONE_LABELS,
+  emptyZoneGroundStyle,
+  groundLayerSelectValueForTarget,
+  groundLayerSectionIndex,
+  parseGroundLayerSelectValue,
   type GroundElementType,
+  type GroundStyleEditTarget,
   type ZoneGroundStyle,
 } from '../utils/draw-ground-texture';
 import {
@@ -80,14 +86,17 @@ import type { MapControlEvent } from './sticker-panel.component';
               [ngModel]="groundStyleEditSelectValue"
               (ngModelChange)="onGroundStyleTargetChange($event)">
               <option value="park">Todo el parque (sin fondo)</option>
-              <option *ngFor="let z of groundZoneKeys" [value]="z">{{ groundZoneLabels[z] }}</option>
+              <option *ngFor="let opt of groundLayerSelectOptions" [value]="opt.value">{{ opt.label }}</option>
             </select>
           </div>
           <p class="section-hint" *ngIf="groundStyleEditTarget === 'park'">
-            Aplica a las 3 zonas y a la base del parque. No afecta al fondo exterior.
+            Aplica a las 3 zonas y a la base del parque (verde, interior). No afecta al fondo gris exterior.
           </p>
-          <p class="section-hint" *ngIf="groundStyleEditTarget === -1">
-            Capa bajo las zonas: solo se ve en caminos y bordes no cubiertos por Tierras Altas/Medias/Bajas.
+          <p class="section-hint" *ngIf="groundStyleEditTarget === baseParkSection">
+            {{ baseParkLayerHint }}
+          </p>
+          <p class="section-hint" *ngIf="groundStyleEditTarget === mapBackdropSection">
+            {{ mapBackdropLayerHint }}
           </p>
           <ng-container *ngIf="editZone as zone">
             <p class="section-hint">Ecotono — suaviza el salto con las zonas vecinas.</p>
@@ -385,10 +394,14 @@ export class GroundSettingsCardComponent implements OnChanges {
   readonly groundElementSizePctMax = PARK_MAP_VIS.groundElementSizePctMax;
   readonly groundScalePercentMin = PARK_MAP_VIS.groundScalePercentMin;
   readonly groundScalePercentMax = PARK_MAP_VIS.groundScalePercentMax;
-  readonly groundZoneKeys = GROUND_ZONE_KEYS;
   readonly groundZoneLabels = GROUND_ZONE_LABELS;
+  readonly groundLayerSelectOptions = GROUND_LAYER_SELECT_OPTIONS;
+  readonly baseParkSection = GROUND_BASE_PARK_SECTION;
+  readonly mapBackdropSection = GROUND_MAP_BACKDROP_SECTION;
+  readonly baseParkLayerHint = GROUND_LAYER_SELECT_OPTIONS.find((o) => o.value === 'base_park')?.hint ?? '';
+  readonly mapBackdropLayerHint = GROUND_LAYER_SELECT_OPTIONS.find((o) => o.value === 'map_backdrop')?.hint ?? '';
   readonly groundElementTypes = GROUND_ELEMENT_TYPES;
-  groundStyleEditTarget: number | 'park' = 'park';
+  groundStyleEditTarget: GroundStyleEditTarget = 'park';
   groundAddType: GroundElementType = 'stone';
 
   posX = 0;
@@ -486,11 +499,11 @@ export class GroundSettingsCardComponent implements OnChanges {
   }
 
   get groundStyleEditSelectValue(): string {
-    return this.groundStyleEditTarget === 'park' ? 'park' : String(this.groundStyleEditTarget);
+    return groundLayerSelectValueForTarget(this.groundStyleEditTarget);
   }
 
   onGroundStyleTargetChange(raw: string): void {
-    this.groundStyleEditTarget = raw === 'park' ? 'park' : Number(raw);
+    this.groundStyleEditTarget = parseGroundLayerSelectValue(raw);
     this.syncEditZoneFromInput(true);
     this.cdr.markForCheck();
   }
@@ -522,11 +535,18 @@ export class GroundSettingsCardComponent implements OnChanges {
   }
 
   private resolveGroundStyleLayer(key: number): ZoneGroundStyle | null {
-    return this.groundStyle[key] ?? this.groundStyle[0] ?? this.groundStyle[1] ?? null;
+    const direct = this.groundStyle[key];
+    if (direct) return direct;
+    if (key === GROUND_BASE_PARK_SECTION || key === GROUND_MAP_BACKDROP_SECTION) {
+      return { ...emptyZoneGroundStyle() };
+    }
+    return this.groundStyle[0] ?? this.groundStyle[1] ?? null;
   }
 
   private resolveParkGroundEditTemplate(): ZoneGroundStyle | null {
-    for (const key of GROUND_PARK_LAYER_KEYS) {
+    const base = this.groundStyle[GROUND_BASE_PARK_SECTION];
+    if (base?.elements?.length) return base;
+    for (const key of [0, 1, 2] as const) {
       const z = this.groundStyle[key];
       if (z?.elements?.length) return z;
     }
@@ -674,7 +694,7 @@ export class GroundSettingsCardComponent implements OnChanges {
     }
     this.mapControlEvent.emit({
       type: 'groundStyleZoneChange',
-      sectionIndex: this.groundStyleEditTarget,
+      sectionIndex: groundLayerSectionIndex(this.groundStyleEditTarget),
       style: zone,
     });
   }
