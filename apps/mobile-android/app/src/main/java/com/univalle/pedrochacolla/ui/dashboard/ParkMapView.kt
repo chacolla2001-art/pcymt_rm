@@ -13,6 +13,20 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import com.univalle.pedrochacolla.utils.map.ParkSectionResolver
+import com.univalle.pedrochacolla.utils.map.MapGroundRenderer
+import com.univalle.pedrochacolla.utils.map.MapTreesRenderer
+import com.univalle.pedrochacolla.utils.map.AmbientScenarioTints
+import com.univalle.pedrochacolla.utils.map.AmbientTickOptions
+import com.univalle.pedrochacolla.utils.map.AmbientWind
+import com.univalle.pedrochacolla.utils.map.MapAmbientZone
+import com.univalle.pedrochacolla.utils.map.MapPlaneBounds
+import com.univalle.pedrochacolla.utils.map.PublishedParkMapper
+import com.univalle.pedrochacolla.data.model.AmbientSceneData
+import com.univalle.pedrochacolla.data.model.AmbientTreeSlotData
+import com.univalle.pedrochacolla.data.model.LayerOffsetsData
+import com.univalle.pedrochacolla.data.model.ParkSectionRecordData
+import com.univalle.pedrochacolla.data.model.GroundMapSettingsData
+import com.univalle.pedrochacolla.data.model.ZoneGroundStyleData
 import com.univalle.pedrochacolla.data.local.ParkDataLoader
 import com.univalle.pedrochacolla.data.model.Location
 import com.univalle.pedrochacolla.R
@@ -49,7 +63,9 @@ class ParkMapView @JvmOverloads constructor(
 
     private val parkData by lazy { ParkDataLoader.load(context) }
     private val parkBoundary: List<GeoPoint> get() = parkData.boundary
-    private val parkSections: List<ParkSection> get() = parkData.sections
+    private var publishedSectionsOverride: List<ParkSection>? = null
+    private val parkSections: List<ParkSection>
+        get() = publishedSectionsOverride ?: parkData.sections
     private val bounds by lazy { calculateBounds(parkBoundary, 0.00035) }
 
     private fun latCorrectionFactor(): Double {
@@ -180,6 +196,24 @@ class ParkMapView @JvmOverloads constructor(
     var showLabels = true
     var showBoundary = true
 
+    /** Suelo procedural publicado desde web-admin (fase 1 sync). */
+    var showGroundTextures = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private var showPublishedTrees = false
+    private var publishedTrees: List<AmbientTreeSlotData> = emptyList()
+    private var publishedGroundStyle: Map<Int, ZoneGroundStyleData> = emptyMap()
+    private var publishedGroundSettings: GroundMapSettingsData? = null
+    private var publishedTreesSizeMul = 1f
+
+    private data class LayerOffset(val x: Float = 0f, val y: Float = 0f)
+    private var layerOffsetBoundary = LayerOffset()
+    private var layerOffsetSections = LayerOffset()
+    private var layerOffsetMarkers = LayerOffset()
+
     /** When false, the scale bar at the bottom-right is hidden */
     var showScaleBar = true
 
@@ -189,13 +223,60 @@ class ParkMapView @JvmOverloads constructor(
     /** Lluvia — capa ambiental separada de referencias espaciales. */
     var showRainEffect = false
     var rainIntensity = 0.45f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            mapRainEffect.intensity = field
+            invalidate()
+        }
     var rainSize = 1f
+        set(value) {
+            field = value.coerceIn(0.08f, 2.5f)
+            mapRainEffect.sizeMul = field
+            invalidate()
+        }
     /** -1 = todo el parque; 0..n = índice de sección. */
     var rainSectionIndex = -1
+        set(value) {
+            if (field == value) return
+            field = value
+            clearAmbientEffectParticles()
+            invalidate()
+        }
     var spatialAnimSpeed = 1f
+        set(value) { field = value.coerceIn(0.2f, 2f) }
 
     private var spatialRefsPhase = 0f
     private val mapRainEffect = MapRainEffect()
+    private val mapFogEffect = MapFogEffect()
+    private val mapMotesEffect = MapMotesEffect()
+    private val mapCloudShadowEffect = MapCloudShadowEffect()
+    private val mapLeavesEffect = MapLeavesEffect().also { effect ->
+        effect.setSectionAt { bx, by ->
+            val geo = canvasToGeo(bx, by)
+            parkSections.indexOfFirst { section -> isPointInPolygon(geo, section.polygon) }
+        }
+    }
+    private val mapLightningEffect = MapLightningEffect()
+    private val mapNightMistEffect = MapNightMistEffect()
+    private var scenarioTint: com.univalle.pedrochacolla.utils.map.AmbientScenarioTint? = null
+    private val scenarioTintPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var ambientWindDeg = 245f
+    private var ambientWindStrength = 0.45f
+    var showFogEffect = false
+    var showMotesEffect = false
+    var showCloudShadows = false
+    var showLeavesEffect = false
+    var showLightningEffect = false
+    var showNightMistEffect = false
+    var fogIntensity = 0.35f
+    var fogSize = 1f
+    var motesIntensity = 0.4f
+    var motesSize = 1f
+    var cloudShadowIntensity = 0.4f
+    var cloudShadowSize = 1f
+    var leavesIntensity = 0.45f
+    var leavesSize = 1f
+    var nightMistIntensity = 0.35f
     private var sceneFrameCallback: Choreographer.FrameCallback? = null
     private val parkClipPath = Path()
 
@@ -883,15 +964,19 @@ class ParkMapView @JvmOverloads constructor(
         }
 
         // Draw illustrated image if available, otherwise fill outside with beige
-        if (showBackgroundImage && backgroundBitmap != null) {
-            canvas.drawBitmap(
-                backgroundBitmap!!,
-                null,
-                RectF(0f, 0f, width.toFloat(), height.toFloat()),
-                backgroundPaint
-            )
+        if (!showGroundTextures) {
+            if (showBackgroundImage && backgroundBitmap != null) {
+                canvas.drawBitmap(
+                    backgroundBitmap!!,
+                    null,
+                    RectF(0f, 0f, width.toFloat(), height.toFloat()),
+                    backgroundPaint
+                )
+            } else {
+                canvas.drawColor(ThemeColors.mapOutside)
+            }
         } else {
-            canvas.drawColor(ThemeColors.mapOutside)
+            canvas.drawColor(if (isDarkTheme) ThemeColors.darkBackground else ThemeColors.lightBackground)
         }
 
         // If 2D overlay is hidden, draw only user location and navigation on top and return.
@@ -908,11 +993,42 @@ class ParkMapView @JvmOverloads constructor(
         canvas.scale(scale, scale)
         canvas.translate(-width / 2f, -height / 2f)
 
+        val groundVp = getPublishedGroundViewport(width.toFloat(), height.toFloat())
+        if (showGroundTextures) {
+            canvas.save()
+            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
+            drawPublishedGround(canvas, width.toFloat(), height.toFloat(), groundVp)
+            if (showPublishedTrees) {
+                drawPublishedBackdropAndBaseTrees(canvas, groundVp)
+            }
+            canvas.restore()
+        }
+
         // Dibujar capas (el orden importa)
         if (showGrid) drawGrid(canvas)
-        if (showSections) drawSections(canvas)
-        if (showBoundary) drawBoundary(canvas)
+        if (showSections) {
+            canvas.save()
+            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
+            drawSections(canvas)
+            canvas.restore()
+        }
+        if (showBoundary) {
+            canvas.save()
+            canvas.translate(layerOffsetBoundary.x, layerOffsetBoundary.y)
+            drawBoundary(canvas)
+            canvas.restore()
+        }
+        canvas.save()
+        canvas.translate(layerOffsetMarkers.x, layerOffsetMarkers.y)
         drawMarkerDots(canvas)
+        canvas.restore()
+
+        if (showPublishedTrees) {
+            canvas.save()
+            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
+            drawPublishedZoneTrees(canvas, groundVp)
+            canvas.restore()
+        }
 
         canvas.restore()
 
@@ -922,26 +1038,8 @@ class ParkMapView @JvmOverloads constructor(
         if (showMapLegend) drawMapLegend(canvas)
         if (showScaleBar) drawScale(canvas)
 
-        // Lluvia bajo las referencias espaciales
-        if (showRainEffect) {
-            parkClipPath.reset()
-            val clipPolygon = rainClipPolygon()
-            val clipPts = clipPolygon.map { geoToScreen(it) }
-            if (clipPts.size >= 3) {
-                parkClipPath.moveTo(clipPts[0].x, clipPts[0].y)
-                for (i in 1 until clipPts.size) {
-                    parkClipPath.lineTo(clipPts[i].x, clipPts[i].y)
-                }
-                parkClipPath.close()
-            }
-            mapRainEffect.sizeMul = rainSize
-            mapRainEffect.draw(
-                canvas,
-                if (clipPts.size >= 3) parkClipPath else null,
-            ) { bx, by -> baseCanvasToScreen(bx, by) },
-                scale,
-            )
-        }
+        // Capa ambiental (bajo referencias espaciales)
+        drawAmbientEffects(canvas)
 
         poiOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, spatialRefsPhase)
 
@@ -956,8 +1054,154 @@ class ParkMapView @JvmOverloads constructor(
         drawUserLocation(canvas)
     }
 
+    private fun hasActiveAmbientEffects(): Boolean =
+        showRainEffect || showFogEffect || showMotesEffect || showCloudShadows
+            || showLeavesEffect || showLightningEffect
+            || (showNightMistEffect && isDarkTheme)
+
     private fun needsSceneAnimation(): Boolean =
-        showRainEffect || (poiOverlayManager?.isOverlayVisible == true)
+        hasActiveAmbientEffects() || (poiOverlayManager?.isOverlayVisible == true)
+
+    private fun ambientWind(): AmbientWind = AmbientWind(ambientWindDeg, ambientWindStrength)
+
+    private fun getAmbientPlaneBounds(): MapPlaneBounds {
+        val b = getRainPlaneBounds()
+        return MapPlaneBounds(b.minX, b.maxX, b.minY, b.maxY)
+    }
+
+    private fun getAmbientTickOptions(): AmbientTickOptions =
+        AmbientTickOptions(
+            bounds = getAmbientPlaneBounds(),
+            containsPoint = getRainContainsPoint(),
+            wind = ambientWind(),
+        )
+
+    private fun buildAmbientClipPath(): Path? {
+        parkClipPath.reset()
+        val clipPts = rainClipPolygon().map { geoToScreen(it) }
+        if (clipPts.size < 3) return null
+        parkClipPath.moveTo(clipPts[0].x, clipPts[0].y)
+        for (i in 1 until clipPts.size) {
+            parkClipPath.lineTo(clipPts[i].x, clipPts[i].y)
+        }
+        parkClipPath.close()
+        return parkClipPath
+    }
+
+    private fun clearAmbientEffectParticles() {
+        mapRainEffect.clear()
+        mapFogEffect.clear()
+        mapMotesEffect.clear()
+        mapCloudShadowEffect.clear()
+        mapLeavesEffect.clear()
+        mapNightMistEffect.clear()
+        val contains = getRainContainsPoint()
+        mapRainEffect.setContainsPoint(contains)
+        mapFogEffect.setContainsPoint(contains)
+        mapMotesEffect.setContainsPoint(contains)
+        mapCloudShadowEffect.setContainsPoint(contains)
+        mapLeavesEffect.setContainsPoint(contains)
+        mapNightMistEffect.setContainsPoint(contains)
+    }
+
+    private fun drawScenarioTint(canvas: Canvas, clipPath: Path?, w: Float, h: Float) {
+        val tint = scenarioTint ?: return
+        if (tint.alpha <= 0f) return
+        val alpha = (tint.alpha * 255).toInt().coerceIn(0, 255)
+        canvas.save()
+        clipPath?.let { canvas.clipPath(it) }
+        scenarioTintPaint.shader = LinearGradient(
+            0f, 0f, 0f, h,
+            intArrayOf(
+                Color.argb(alpha, Color.red(tint.topColor), Color.green(tint.topColor), Color.blue(tint.topColor)),
+                Color.argb(alpha, Color.red(tint.bottomColor), Color.green(tint.bottomColor), Color.blue(tint.bottomColor)),
+            ),
+            floatArrayOf(0f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        canvas.drawRect(0f, 0f, w, h, scenarioTintPaint)
+        scenarioTintPaint.shader = null
+        canvas.restore()
+    }
+
+    private fun drawAmbientEffects(canvas: Canvas) {
+        if (!hasActiveAmbientEffects() && scenarioTint == null) return
+        val clipPath = buildAmbientClipPath()
+        val toScreen = { bx: Float, by: Float -> baseCanvasToScreen(bx, by) }
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (showCloudShadows) {
+            mapCloudShadowEffect.intensity = cloudShadowIntensity
+            mapCloudShadowEffect.sizeMul = cloudShadowSize
+            mapCloudShadowEffect.draw(canvas, clipPath, toScreen, scale)
+        }
+        if (showFogEffect) {
+            mapFogEffect.intensity = fogIntensity
+            mapFogEffect.sizeMul = fogSize
+            mapFogEffect.draw(canvas, clipPath, toScreen, scale)
+        }
+        if (showNightMistEffect) {
+            mapNightMistEffect.intensity = nightMistIntensity
+            mapNightMistEffect.draw(canvas, clipPath, toScreen, scale, isDarkTheme, w, h)
+        }
+        if (showRainEffect) {
+            mapRainEffect.intensity = rainIntensity
+            mapRainEffect.sizeMul = rainSize
+            mapRainEffect.draw(canvas, clipPath, toScreen, scale)
+        }
+        if (showMotesEffect) {
+            mapMotesEffect.intensity = motesIntensity
+            mapMotesEffect.sizeMul = motesSize
+            mapMotesEffect.draw(canvas, clipPath, toScreen, scale)
+        }
+        if (showLeavesEffect) {
+            mapLeavesEffect.intensity = leavesIntensity
+            mapLeavesEffect.sizeMul = leavesSize
+            mapLeavesEffect.draw(canvas, clipPath, toScreen, scale)
+        }
+        if (showLightningEffect) {
+            mapLightningEffect.draw(canvas, clipPath, w, h)
+        }
+        drawScenarioTint(canvas, clipPath, w, h)
+    }
+
+    private fun tickAmbientEffects() {
+        if (width <= 0 || height <= 0) return
+        val options = getAmbientTickOptions()
+        if (showCloudShadows) {
+            mapCloudShadowEffect.intensity = cloudShadowIntensity
+            mapCloudShadowEffect.sizeMul = cloudShadowSize
+            mapCloudShadowEffect.tick(options)
+        }
+        if (showFogEffect) {
+            mapFogEffect.intensity = fogIntensity
+            mapFogEffect.sizeMul = fogSize
+            mapFogEffect.tick(options)
+        }
+        if (showNightMistEffect && isDarkTheme) {
+            mapNightMistEffect.intensity = nightMistIntensity
+            mapNightMistEffect.tick(options)
+        }
+        if (showRainEffect) {
+            mapRainEffect.intensity = rainIntensity
+            mapRainEffect.sizeMul = rainSize
+            mapRainEffect.tick(getRainEffectOptions())
+        }
+        if (showMotesEffect) {
+            mapMotesEffect.intensity = motesIntensity
+            mapMotesEffect.sizeMul = motesSize
+            mapMotesEffect.tick(options)
+        }
+        if (showLeavesEffect) {
+            mapLeavesEffect.intensity = leavesIntensity
+            mapLeavesEffect.sizeMul = leavesSize
+            mapLeavesEffect.tick(options)
+        }
+        if (showLightningEffect) {
+            mapLightningEffect.setRainIntensity(rainIntensity)
+            mapLightningEffect.tick(showRainEffect)
+        }
+    }
 
     private fun updateSceneAnimationLoop() {
         if (needsSceneAnimation()) startSceneAnimationLoop() else stopSceneAnimationLoop()
@@ -970,10 +1214,8 @@ class ParkMapView @JvmOverloads constructor(
             if (poiOverlayManager?.isOverlayVisible == true) {
                 spatialRefsPhase += 0.018f * spatialAnimSpeed
             }
-            if (showRainEffect && width > 0 && height > 0) {
-                mapRainEffect.intensity = rainIntensity
-                mapRainEffect.sizeMul = rainSize
-                mapRainEffect.tick(getRainEffectOptions())
+            if (hasActiveAmbientEffects()) {
+                tickAmbientEffects()
             }
             invalidate()
             if (needsSceneAnimation()) {
@@ -994,30 +1236,6 @@ class ParkMapView @JvmOverloads constructor(
         if (!enabled) mapRainEffect.clear()
         updateSceneAnimationLoop()
         invalidate()
-    }
-
-    fun setRainIntensity(value: Float) {
-        rainIntensity = value.coerceIn(0f, 1f)
-        mapRainEffect.intensity = rainIntensity
-        invalidate()
-    }
-
-    fun setRainSize(value: Float) {
-        rainSize = value.coerceIn(0.08f, 2.5f)
-        mapRainEffect.sizeMul = rainSize
-        invalidate()
-    }
-
-    fun setRainSectionIndex(index: Int) {
-        if (rainSectionIndex == index) return
-        rainSectionIndex = index
-        mapRainEffect.clear()
-        mapRainEffect.setContainsPoint(getRainContainsPoint())
-        invalidate()
-    }
-
-    fun setSpatialAnimSpeed(value: Float) {
-        spatialAnimSpeed = value.coerceIn(0.2f, 2f)
     }
 
     fun notifySceneOptionsChanged() {
@@ -1125,6 +1343,10 @@ class ParkMapView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         stopSceneAnimationLoop()
+        locationAnimator?.cancel()
+        headingAnimator?.cancel()
+        pulseAnimator?.cancel()
+        userSonarAnimator?.cancel()
         super.onDetachedFromWindow()
     }
 
@@ -1186,11 +1408,26 @@ class ParkMapView @JvmOverloads constructor(
     }
 
     /** Etiquetas de ecosistema (P0) — espacio pantalla, sin rotar con el mapa. */
+    private fun geoToScreenWithLayerOffset(geo: GeoPoint, offset: LayerOffset): ScreenPoint {
+        val base = geoToCanvas(geo)
+        val cx = width / 2f
+        val cy = height / 2f
+        var x = base.x + offset.x - cx
+        var y = base.y + offset.y - cy
+        x *= scale
+        y *= scale
+        val cosr = cos(rotation.toDouble()).toFloat()
+        val sinr = sin(rotation.toDouble()).toFloat()
+        val rx = cosr * x - sinr * y
+        val ry = sinr * x + cosr * y
+        return ScreenPoint(rx + cx + offsetX, ry + cy + offsetY)
+    }
+
     private fun drawSectionLabels(canvas: Canvas) {
         for (section in parkSections) {
             if (section.polygon.size < 3) continue
             val centroid = ParkSectionResolver.polygonCentroid(section.polygon)
-            val screenPos = geoToScreen(centroid)
+            val screenPos = geoToScreenWithLayerOffset(centroid, layerOffsetSections)
 
             labelPaint.textSize = 30f
             labelPaint.typeface = Typeface.DEFAULT_BOLD
@@ -1394,7 +1631,7 @@ class ParkMapView @JvmOverloads constructor(
 
     private fun drawMarkerLabels(canvas: Canvas) {
         for (marker in markers) {
-            val screenPos = geoToScreen(marker.geo)
+            val screenPos = geoToScreenWithLayerOffset(marker.geo, layerOffsetMarkers)
 
             labelPaint.color = if (isDarkTheme) ThemeColors.darkText else ThemeColors.lightText
             val textWidth = labelPaint.measureText(marker.name)
@@ -2003,14 +2240,6 @@ class ParkMapView @JvmOverloads constructor(
 
     fun isNavigating(): Boolean = isNavigating
 
-    override fun onDetachedFromWindow() {
-        super.onDetachedFromWindow()
-        locationAnimator?.cancel()
-        headingAnimator?.cancel()
-        pulseAnimator?.cancel()
-        userSonarAnimator?.cancel()
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // MAP STATE — Capture/restore map configuration for layers
     // ═══════════════════════════════════════════════════════════════
@@ -2047,5 +2276,161 @@ class ParkMapView @JvmOverloads constructor(
         showSections = state.showSections
         showLabels = state.showLabels
         invalidate()
+    }
+
+    fun applyPublishedSections(records: List<ParkSectionRecordData>?) {
+        publishedSectionsOverride = records
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { PublishedParkMapper.toParkSections(it) }
+        invalidate()
+    }
+
+    fun applyPublishedLayerOffsets(offsets: LayerOffsetsData?) {
+        layerOffsetBoundary = LayerOffset(
+            offsets?.boundary?.x?.toFloat() ?: 0f,
+            offsets?.boundary?.y?.toFloat() ?: 0f,
+        )
+        layerOffsetSections = LayerOffset(
+            offsets?.sections?.x?.toFloat() ?: 0f,
+            offsets?.sections?.y?.toFloat() ?: 0f,
+        )
+        layerOffsetMarkers = LayerOffset(
+            offsets?.markers?.x?.toFloat() ?: 0f,
+            offsets?.markers?.y?.toFloat() ?: 0f,
+        )
+        invalidate()
+    }
+
+    /** Escena ambiental publicada (efectos + escenario + viento). */
+    fun applyPublishedAmbientScene(scene: AmbientSceneData) {
+        scenarioTint = AmbientScenarioTints.tintForScenario(scene.activeScenarioId)
+        scene.ambientWindDeg?.let { ambientWindDeg = it.toFloat() }
+        scene.ambientWindStrength?.let { ambientWindStrength = it.toFloat().coerceIn(0f, 1f) }
+        scene.spatialAnimSpeed?.let { spatialAnimSpeed = it.toFloat() }
+
+        scene.rainSectionIndex?.let { rainSectionIndex = it }
+        scene.rainIntensity?.let { rainIntensity = it.toFloat().coerceIn(0f, 1f) }
+        scene.rainSize?.let { rainSize = it.toFloat().coerceIn(0.08f, 2.5f) }
+        showRainEffect = scene.showRainEffect == true
+        if (!showRainEffect) mapRainEffect.clear()
+
+        scene.fogIntensity?.let { fogIntensity = it.toFloat().coerceIn(0f, 1f) }
+        scene.fogSize?.let { fogSize = it.toFloat().coerceIn(0.08f, 2.5f) }
+        showFogEffect = scene.showFogEffect == true
+        if (!showFogEffect) mapFogEffect.clear()
+
+        scene.motesIntensity?.let { motesIntensity = it.toFloat().coerceIn(0f, 1f) }
+        scene.motesSize?.let { motesSize = it.toFloat().coerceIn(0.08f, 2.5f) }
+        showMotesEffect = scene.showMotesEffect == true
+        if (!showMotesEffect) mapMotesEffect.clear()
+
+        scene.cloudShadowIntensity?.let { cloudShadowIntensity = it.toFloat().coerceIn(0f, 1f) }
+        scene.cloudShadowSize?.let { cloudShadowSize = it.toFloat().coerceIn(0.08f, 2.5f) }
+        showCloudShadows = scene.showCloudShadows == true
+        if (!showCloudShadows) mapCloudShadowEffect.clear()
+
+        scene.leavesIntensity?.let { leavesIntensity = it.toFloat().coerceIn(0f, 1f) }
+        scene.leavesSize?.let { leavesSize = it.toFloat().coerceIn(0.08f, 2.5f) }
+        showLeavesEffect = scene.showLeavesEffect == true
+        if (!showLeavesEffect) mapLeavesEffect.clear()
+
+        showLightningEffect = scene.showLightningEffect == true
+        mapLightningEffect.setEnabled(showLightningEffect)
+        if (!showLightningEffect) mapLightningEffect.clear()
+
+        scene.nightMistIntensity?.let { nightMistIntensity = it.toFloat().coerceIn(0f, 1f) }
+        showNightMistEffect = scene.showNightMistEffect == true
+        if (!showNightMistEffect) mapNightMistEffect.clear()
+
+        val contains = getRainContainsPoint()
+        mapRainEffect.setContainsPoint(contains)
+        mapFogEffect.setContainsPoint(contains)
+        mapMotesEffect.setContainsPoint(contains)
+        mapCloudShadowEffect.setContainsPoint(contains)
+        mapLeavesEffect.setContainsPoint(contains)
+        mapNightMistEffect.setContainsPoint(contains)
+        updateSceneAnimationLoop()
+        invalidate()
+    }
+
+    /** Contenido visual publicado (suelo + árboles) — solo lectura visitante. */
+    fun setPublishedMapVisuals(
+        showGroundTextures: Boolean,
+        showPublishedTrees: Boolean,
+        groundStyle: Map<Int, ZoneGroundStyleData>,
+        groundSettings: GroundMapSettingsData?,
+        ambientTrees: List<AmbientTreeSlotData>,
+        treesSizeMul: Float,
+    ) {
+        this.showGroundTextures = showGroundTextures
+        this.showPublishedTrees = showPublishedTrees
+        this.publishedGroundStyle = groundStyle
+        this.publishedGroundSettings = groundSettings
+        this.publishedTrees = ambientTrees
+        this.publishedTreesSizeMul = treesSizeMul.coerceIn(0.08f, 2.5f)
+        invalidate()
+    }
+
+    private fun getPublishedGroundViewport(w: Float, h: Float): MapGroundRenderer.Viewport {
+        val pts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+        var minX = 0f
+        var maxX = w
+        var minY = 0f
+        var maxY = h
+        if (pts.isNotEmpty()) {
+            minX = pts.minOf { it.x } - 80f
+            maxX = pts.maxOf { it.x } + 80f
+            minY = pts.minOf { it.y } - 80f
+            maxY = pts.maxOf { it.y } + 80f
+        }
+        return MapGroundRenderer.Viewport(minX, minY, maxX, maxY)
+    }
+
+    private fun drawPublishedGround(canvas: Canvas, w: Float, h: Float, vp: MapGroundRenderer.Viewport) {
+        MapGroundRenderer.drawMapBackdrop(
+            canvas, w, h, isDarkTheme, scale,
+            publishedGroundStyle, publishedGroundSettings, vp,
+        )
+        val boundaryPts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+        if (boundaryPts.size >= 3) {
+            MapGroundRenderer.drawPolygonLayer(
+                canvas, boundaryPts, -1, isDarkTheme, scale,
+                publishedGroundStyle, publishedGroundSettings, vp,
+            )
+        }
+        for ((index, section) in parkSections.withIndex()) {
+            if (section.polygon.size < 3) continue
+            val pts = section.polygon.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+            MapGroundRenderer.drawPolygonLayer(
+                canvas, pts, index, isDarkTheme, scale,
+                publishedGroundStyle, publishedGroundSettings, vp,
+            )
+        }
+    }
+
+    private fun drawPublishedBackdropAndBaseTrees(canvas: Canvas, vp: MapGroundRenderer.Viewport) {
+        val treeVp = MapTreesRenderer.Viewport(vp.minX, vp.minY, vp.maxX, vp.maxY)
+        val geoFn: (GeoPoint) -> ScreenPoint = { geoToCanvas(it) }
+        MapTreesRenderer.drawBackdrop(
+            canvas, publishedTrees, geoFn, parkBoundary, isDarkTheme, publishedTreesSizeMul, treeVp,
+        )
+        MapTreesRenderer.drawBasePark(
+            canvas, publishedTrees, geoFn, parkBoundary, isDarkTheme, publishedTreesSizeMul, treeVp,
+        )
+    }
+
+    private fun drawPublishedZoneTrees(canvas: Canvas, vp: MapGroundRenderer.Viewport) {
+        val sectionPolygons = parkSections.map { it.polygon }
+        val treeVp = MapTreesRenderer.Viewport(vp.minX, vp.minY, vp.maxX, vp.maxY)
+        MapTreesRenderer.drawWorld(
+            canvas,
+            publishedTrees,
+            { geoToCanvas(it) },
+            sectionPolygons,
+            parkBoundary,
+            isDarkTheme,
+            publishedTreesSizeMul,
+            treeVp,
+        )
     }
 }

@@ -77,8 +77,6 @@ class ProfileFragment : Fragment() {
 
         binding.imgProfileAvatar.setOnClickListener { pickProfilePhoto.launch("image/*") }
 
-        binding.btnBack.setOnClickListener { findNavController().popBackStack() }
-
         binding.btnProfileSaveinfo.setOnClickListener { changePassword() }
         binding.btnDeleteAccount.setOnClickListener { confirmDeleteAccount() }
 

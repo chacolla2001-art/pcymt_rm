@@ -1,6 +1,6 @@
 import {
-  BACKDROP_TREE_SECTION,
   isBackdropTreeSlot,
+  isBaseParkTreeSlot,
   paletteSectionForTree,
   type AmbientTreeSlot,
 } from '../data/ambient-tree-slots';
@@ -11,6 +11,7 @@ import { drawSimpleTree } from './draw-simple-tree';
 export interface MapTreesDrawOptions {
   geoToCanvas: (geo: { lat: number; lng: number }) => { x: number; y: number };
   isParkTreeVisible: (slot: AmbientTreeSlot, geo: { lat: number; lng: number }) => boolean;
+  isBaseParkTreeVisible: (slot: AmbientTreeSlot, geo: { lat: number; lng: number }) => boolean;
   isBackdropTreeVisible: (slot: AmbientTreeSlot, geo: { lat: number; lng: number }) => boolean;
   viewport: MapPlaneBounds;
   isDark: boolean;
@@ -44,8 +45,12 @@ export class MapTreesEffect {
     // ponytail: árboles estáticos — sin fase de viento
   }
 
-  private parkPool(): AmbientTreeSlot[] {
-    return this.slots.filter((s) => !isBackdropTreeSlot(s));
+  private zonePool(): AmbientTreeSlot[] {
+    return this.slots.filter((s) => !isBackdropTreeSlot(s) && !isBaseParkTreeSlot(s));
+  }
+
+  private baseParkPool(): AmbientTreeSlot[] {
+    return this.slots.filter((s) => isBaseParkTreeSlot(s));
   }
 
   private backdropPool(): AmbientTreeSlot[] {
@@ -55,7 +60,7 @@ export class MapTreesEffect {
   private collectVisible(
     pool: AmbientTreeSlot[],
     opts: MapTreesDrawOptions,
-    mode: 'park' | 'backdrop',
+    mode: 'zone' | 'basePark' | 'backdrop',
   ): PlacedTree[] {
     if (!pool.length) return [];
 
@@ -70,7 +75,9 @@ export class MapTreesEffect {
       const geo = { lat: slot.lat, lng: slot.lng };
       const visible = mode === 'backdrop'
         ? opts.isBackdropTreeVisible(slot, geo)
-        : opts.isParkTreeVisible(slot, geo);
+        : mode === 'basePark'
+          ? opts.isBaseParkTreeVisible(slot, geo)
+          : opts.isParkTreeVisible(slot, geo);
       if (!visible) continue;
       const pos = opts.geoToCanvas(geo);
       if (pos.x < viewport.minX - pad || pos.x > viewport.maxX + pad
@@ -104,16 +111,23 @@ export class MapTreesEffect {
     }
   }
 
-  /** Árboles del marco exterior (section=-1), bajo el parque. */
+  /** Árboles de la capa base del parque (section=-1), bajo las zonas. */
+  drawBasePark(ctx: CanvasRenderingContext2D, opts: MapTreesDrawOptions): void {
+    const trees = this.collectVisible(this.baseParkPool(), opts, 'basePark');
+    if (!trees.length) return;
+    this.drawPlaced(ctx, trees, opts);
+  }
+
+  /** Árboles del fondo del mapa (section=-2), bajo el parque. */
   drawBackdrop(ctx: CanvasRenderingContext2D, opts: MapTreesDrawOptions): void {
     const trees = this.collectVisible(this.backdropPool(), opts, 'backdrop');
     if (!trees.length) return;
     this.drawPlaced(ctx, trees, opts);
   }
 
-  /** Árboles dentro del parque por ecosistema. */
+  /** Árboles de ecosistema (0/1/2), sobre las zonas. */
   drawWorld(ctx: CanvasRenderingContext2D, opts: MapTreesDrawOptions): void {
-    const trees = this.collectVisible(this.parkPool(), opts, 'park');
+    const trees = this.collectVisible(this.zonePool(), opts, 'zone');
     if (!trees.length) return;
     this.drawPlaced(ctx, trees, opts);
   }

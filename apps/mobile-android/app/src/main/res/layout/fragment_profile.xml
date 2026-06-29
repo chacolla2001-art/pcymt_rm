@@ -11,21 +11,8 @@
     xmlns:tools ="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".ui.notifications.NotificationsFragment">
-
-    <!-- Fondo del parque -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:src="@drawable/background_game"
-        android:scaleType="centerCrop"
-        android:contentDescription="" />
-
-    <!-- Gradiente overlay oscuro (mismo que inicio) -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/gradient_game_overlay" />
+    android:background="@drawable/bg_visitor_screen"
+    tools:context=".ui.notifications.ProfileFragment">
 
     <!-- Contenido scrollable -->
     <androidx.core.widget.NestedScrollView
@@ -37,7 +24,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingTop="64dp"
+            android:paddingTop="@dimen/screen_padding_top"
             android:paddingBottom="32dp"
             android:paddingStart="16dp"
             android:paddingEnd="16dp">
@@ -387,16 +374,11 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Botón Volver (top-left flotante) -->
     <ImageButton
         android:id="@+id/btnBack"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_margin="12dp"
-        android:background="@drawable/bg_back_circle"
-        android:src="@drawable/ic_arrow_back"
-        android:scaleType="centerInside"
-        android:padding="8dp"
-        android:contentDescription="Volver" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:contentDescription="@null" />
 
 </FrameLayout>

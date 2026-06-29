@@ -1,685 +1,308 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    ╔══════════════════════════════════════════════════════════════╗
-    ║  PANTALLA DE INICIO — ESTILO JUEGO                          ║
-    ║  Fondo: mapa del parque (background-game.jpg)               ║
-    ║  Overlay: gradiente oscuro para legibilidad                 ║
-    ║  Contenido: logo, bienvenida, trofeos de animales, botones  ║
-    ╚══════════════════════════════════════════════════════════════╝
--->
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app   ="http://schemas.android.com/apk/res-auto"
-    xmlns:tools ="http://schemas.android.com/tools"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@drawable/bg_visitor_screen"
     tools:context=".ui.home.StatsFragment">
 
-    <!-- ── CAPA 1: Imagen de fondo del parque ──────────────────── -->
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:src="@drawable/background_game"
-        android:scaleType="centerCrop"
-        android:contentDescription="" />
-
-    <!-- ── CAPA 2: Gradiente oscuro (transparente arriba → negro abajo) -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@drawable/gradient_game_overlay" />
-
-    <!-- ── CAPA 3: Contenido principal scrollable ──────────────── -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/scrollCollection"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="@dimen/spacing_lg">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingBottom="32dp">
+            android:paddingHorizontal="@dimen/screen_padding_h"
+            android:paddingTop="@dimen/screen_padding_top">
 
-            <!-- ════════════════════════════════
-                 HERO: Logo + Título del juego
-                 ════════════════════════════════ -->
-            <LinearLayout
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="60dp"
+                android:layout_gravity="center_horizontal"
+                android:contentDescription="@string/app_name"
+                android:scaleType="centerInside"
+                android:src="@drawable/logo_parque" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:text="@string/app_name"
+                android:textAppearance="@style/TextAppearance.PCyMT.Label" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.PCyMT.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:paddingTop="48dp"
-                android:paddingBottom="8dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp">
-
-                <ImageView
-                    android:layout_width="150dp"
-                    android:layout_height="76dp"
-                    android:src="@drawable/logo_parque"
-                    android:scaleType="centerInside"
-                    android:contentDescription="Logo PCyMT" />
-
-                <TextView
-                    android:id="@+id/tvAppName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="JUKU GO"
-                    android:textSize="40sp"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-black"
-                    android:textColor="#FFFFFFFF"
-                    android:letterSpacing="0.10"
-                    android:shadowColor="#DD000000"
-                    android:shadowRadius="8"
-                    android:shadowDx="2"
-                    android:shadowDy="4" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="PARQUE DE LAS CULTURAS Y LA MADRE TIERRA"
-                    android:textSize="10sp"
-                    android:textColor="#FFFFFFFF"
-                    android:textStyle="bold"
-                    android:letterSpacing="0.06"
-                    android:shadowColor="#AA000000"
-                    android:shadowRadius="4"
-                    android:gravity="center" />
-
-            </LinearLayout>
-
-            <!-- ════════════════════════════════
-                 BIENVENIDA: Mascota Jukumario + stats
-                 ════════════════════════════════ -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/bg_game_card"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="12dp"
-                android:padding="14dp">
-
-                <ImageView
-                    android:id="@+id/ivMascot"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:src="@drawable/juku_gamer"
-                    android:scaleType="centerInside"
-                    android:contentDescription="Mascota Jukumario" />
+                android:layout_marginTop="@dimen/spacing_lg">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="14dp"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_md">
 
-                    <TextView
-                        android:id="@+id/tvWelcome"
-                        android:layout_width="match_parent"
+                    <ImageView
+                        android:id="@+id/ivMascot"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:contentDescription="Jukumario"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/juku_gamer" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text="¡Bienvenido!"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFFFFFFF"
-                        tools:text="¡Bienvenido!" />
+                        android:layout_marginStart="@dimen/spacing_md"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                    <!-- tvStats: visible cuando terminó la carga -->
-                    <TextView
-                        android:id="@+id/tvStats"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Has encontrado 0 de 12 figuras"
-                        android:textSize="13sp"
-                        android:textColor="#CCFFFFFF"
-                        android:visibility="gone"
-                        tools:text="Has encontrado 3 de 12" />
+                        <TextView
+                            android:id="@+id/tvWelcome"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Title"
+                            tools:text="¡Bienvenido, Pedro!" />
 
-                    <!-- loadingOverlay: visible mientras carga -->
-                    <FrameLayout
-                        android:id="@+id/loadingOverlay"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:visibility="gone">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/home_progress_label"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Label" />
 
-                        <ProgressBar
-                            android:id="@+id/progressStats"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:indeterminateTint="#FFD9B992" />
-                    </FrameLayout>
+                        <TextView
+                            android:id="@+id/tvStats"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Body"
+                            android:visibility="gone"
+                            tools:text="Has encontrado 3 de 12 figuras"
+                            tools:visibility="visible" />
 
+                        <FrameLayout
+                            android:id="@+id/loadingOverlay"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:visibility="gone">
+
+                            <ProgressBar
+                                android:id="@+id/progressStats"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:indeterminateTint="?attr/colorPrimary" />
+                        </FrameLayout>
+                    </LinearLayout>
                 </LinearLayout>
-            </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-            <!-- ════════════════════════════════
-                 TARJETA ADMIN (solo visible para admins)
-                 Informa que como admin puede ver todos los
-                 animales del parque en el mapa y el explorador.
-                 ════════════════════════════════ -->
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAdminNotice"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="10dp"
-                android:background="#CC1565C0"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="12dp"
-                android:paddingBottom="12dp"
-                android:visibility="gone">
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                app:cardCornerRadius="@dimen/radius_md">
 
                 <TextView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:text="\ud83d\udd10"
-                    android:textSize="22sp"
-                    android:gravity="center" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="10dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="MODO ADMINISTRADOR"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFD9B992"
-                        android:letterSpacing="0.06" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="Puedes ver todos los animales del parque en el mapa y en Juku Go, aunque a\u00fan no los hayas descubierto."
-                        android:textSize="12sp"
-                        android:textColor="#DDFFFFFF" />
-
-                </LinearLayout>
-
-            </LinearLayout>
+                    android:padding="@dimen/spacing_md"
+                    android:text="Modo administrador: ves todos los animales en mapa y explorador."
+                    android:textAppearance="@style/TextAppearance.PCyMT.Body"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+            </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:id="@+id/banner_out_of_bounds"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="10dp"
-                android:background="#CCB71C1C"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:background="?attr/colorErrorContainer"
                 android:gravity="center"
-                android:padding="10dp"
+                android:padding="@dimen/spacing_sm"
                 android:text="@string/out_of_park_banner"
-                android:textColor="#FFFFFFFF"
-                android:textSize="13sp"
+                android:textColor="?attr/colorOnErrorContainer"
                 android:textStyle="bold"
                 android:visibility="gone" />
 
-            <!-- ════════════════════════════════
-                 ANIMALES CAPTURADOS (trofeos)
-                 ════════════════════════════════ -->
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.PCyMT.Card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/bg_game_card"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="10dp"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="10dp"
-                android:paddingBottom="12dp">
+                android:layout_marginTop="@dimen/spacing_md">
 
-                <!-- Encabezado: título + contador -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="8dp">
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="🏆 ANIMALES CAPTURADOS"
-                        android:textSize="12sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFD9B992"
-                        android:letterSpacing="0.04" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tvAnimalCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0 / 12"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:textColor="#FF34C759"
-                        tools:text="3 / 12" />
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/home_trophies_label"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Title" />
+
+                        <TextView
+                            android:id="@+id/tvAnimalCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/green"
+                            android:textStyle="bold"
+                            tools:text="3 / 12" />
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAnimalTrophies"
+                        android:layout_width="match_parent"
+                        android:layout_height="96dp"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:orientation="horizontal"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                        tools:listitem="@layout/item_animal_trophy" />
                 </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
-                <!-- Fila horizontal de badges de animales -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvAnimalTrophies"
-                    android:layout_width="match_parent"
-                    android:layout_height="90dp"
-                    android:orientation="horizontal"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:listitem="@layout/item_animal_trophy" />
-
-            </LinearLayout>
-
-            <!-- ════════════════════════════════
-                 BOTONES DE JUEGO
-                 ════════════════════════════════ -->
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cardExplorer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginStart="16dp"
-                android:layout_marginEnd="16dp"
-                android:layout_marginTop="14dp">
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:background="@drawable/bg_cta_primary"
+                android:minHeight="64dp"
+                android:text="@string/home_explore_cta"
+                android:textAllCaps="false"
+                android:textSize="18sp"
+                app:icon="@drawable/ic_explorer"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/spacing_sm" />
 
-                <!-- ── CTA: EXPLORAR (botón principal, grande) ─── -->
-                <LinearLayout
-                    android:id="@+id/cardExplorer"
-                    android:layout_width="match_parent"
-                    android:layout_height="70dp"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/bg_btn_explorar"
-                    android:paddingStart="18dp"
-                    android:paddingEnd="18dp"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
-                        android:src="@drawable/ic_explorer"
-                        android:scaleType="centerInside"
-                        android:contentDescription=""
-                        app:tint="#FFFFFFFF" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="14dp"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvCardExplorerTitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="EXPLORAR EL PARQUE"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:fontFamily="sans-serif-black"
-                            android:textColor="#FFFFFFFF"
-                            android:letterSpacing="0.08"
-                            />
-
-                        <TextView
-                            android:id="@+id/tvCardExplorerSubtitle"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Encuentra animales con Juku Go"
-                            android:textSize="11sp"
-                            android:textColor="#DDF2C4BF" />
-
-                    </LinearLayout>
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="▶"
-                        android:textSize="22sp"
-                        android:textColor="#FFFFFFFF" />
-
-                </LinearLayout>
-
-                <!-- ── Fila: MAPA + COLECCIÓN ──────────────────── -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="10dp">
-
-                    <!-- Botón MAPA -->
-                    <LinearLayout
-                        android:id="@+id/cardMap"
-                        android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="5dp"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:background="@drawable/bg_btn_nav"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:src="@drawable/ic_map_outline"
-                            android:scaleType="centerInside"
-                            android:contentDescription=""
-                            app:tint="#FFD9B992" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:text="MAPA"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:textColor="#FFFFFFFF"
-                            android:letterSpacing="0.05" />
-
-                    </LinearLayout>
-
-                    <!-- Botón COLECCIÓN -->
-                    <LinearLayout
-                        android:id="@+id/cardCollection"
-                        android:layout_width="0dp"
-                        android:layout_height="58dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="5dp"
-                        android:orientation="horizontal"
-                        android:gravity="center"
-                        android:background="@drawable/bg_btn_nav"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:src="@drawable/ic_collection"
-                            android:scaleType="centerInside"
-                            android:contentDescription=""
-                            app:tint="#FFD9B992" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="8dp"
-                            android:text="COLECCIÓN"
-                            android:textSize="14sp"
-                            android:textStyle="bold"
-                            android:textColor="#FFFFFFFF"
-                            android:letterSpacing="0.05" />
-
-                    </LinearLayout>
-
-                </LinearLayout>
-
-                <!-- ── MI PERFIL ────────────────────────────────── -->
-                <LinearLayout
-                    android:id="@+id/cardProfile"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal"
-                    android:gravity="center"
-                    android:background="@drawable/bg_btn_nav"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:src="@drawable/icon_usuario"
-                        android:scaleType="centerInside"
-                        android:contentDescription=""
-                        app:tint="#FFD9B992" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:text="MI PERFIL"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="#FFFFFFFF"
-                        android:letterSpacing="0.05" />
-
-                </LinearLayout>
-
-            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:gravity="center"
+                android:text="@string/home_explore_subtitle"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- ── CAPA 4: Overlay de Felicitación (visible cuando captura todos los animales) -->
     <FrameLayout
         android:id="@+id/celebrationOverlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#E6000000"
+        android:background="#CC000000"
         android:visibility="gone">
 
-        <!-- ── PANEL 1: Felicitación principal ───────────────── -->
         <LinearLayout
             android:id="@+id/celebrationContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:orientation="vertical"
             android:gravity="center"
-            android:paddingStart="32dp"
-            android:paddingEnd="32dp">
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_xl">
 
             <TextView
                 android:id="@+id/tvCelebrationTrophy"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="🏆"
-                android:textSize="96sp"
-                android:gravity="center" />
+                android:textSize="88sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="¡FELICITACIONES!"
-                android:textSize="32sp"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-black"
-                android:textColor="#FFD9B992"
-                android:letterSpacing="0.08"
-                android:gravity="center"
-                android:shadowColor="#DD000000"
-                android:shadowRadius="8"
-                android:shadowDx="2"
-                android:shadowDy="4" />
+                android:layout_marginTop="@dimen/spacing_md"
+                android:text="¡Felicidades!"
+                android:textAppearance="@style/TextAppearance.PCyMT.Display" />
 
             <TextView
                 android:id="@+id/tvCelebrationSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="¡Encontraste todos los animales del parque!"
-                android:textSize="16sp"
-                android:textColor="#FFFFFFFF"
+                android:layout_marginTop="@dimen/spacing_sm"
                 android:gravity="center"
-                android:shadowColor="#AA000000"
-                android:shadowRadius="4" />
+                android:text="Encontraste los 12 animales del parque"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="Eres un verdadero jugador de Juku Go 🌿"
-                android:textSize="13sp"
-                android:textColor="#CCDDFFD9"
-                android:gravity="center"
-                android:lineSpacingExtra="4dp" />
-
-            <View
-                android:layout_width="80dp"
-                android:layout_height="2dp"
-                android:layout_marginTop="24dp"
-                android:background="#80D9B992" />
-
-            <!-- Botón REINICIAR JUEGO — muestra panel de confirmación inline -->
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnResetGame"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
-                android:layout_marginTop="28dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_btn_explorar"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:layout_marginEnd="10dp"
-                    android:src="@drawable/ic_refresh"
-                    android:scaleType="centerInside"
-                    android:contentDescription="" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="REINICIAR JUEGO"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-black"
-                    android:textColor="#FFFFFFFF"
-                    android:letterSpacing="0.06" />
-
-            </LinearLayout>
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:text="Reiniciar juego" />
 
             <TextView
                 android:id="@+id/tvCelebrationClose"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Omitir"
-                android:textSize="13sp"
-                android:textColor="#99FFFFFF"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:clickable="true"
-                android:focusable="true" />
-
+                android:layout_marginTop="@dimen/spacing_md"
+                android:padding="@dimen/spacing_sm"
+                android:text="Cerrar"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
         </LinearLayout>
 
-        <!-- ── PANEL 2: Confirmación inline (sin dialog) ──────── -->
         <LinearLayout
             android:id="@+id/celebrationConfirm"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:orientation="vertical"
             android:gravity="center"
-            android:paddingStart="32dp"
-            android:paddingEnd="32dp"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_xl"
             android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🔄"
-                android:textSize="56sp"
-                android:gravity="center" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
                 android:text="¿Reiniciar el juego?"
-                android:textSize="22sp"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-black"
-                android:textColor="#FFFFFFFF"
-                android:gravity="center" />
+                android:textAppearance="@style/TextAppearance.PCyMT.Display" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Se borrarán todos tus registros de animales encontrados y podrás volver a explorar el parque desde cero."
-                android:textSize="14sp"
-                android:textColor="#CCDDFFD9"
+                android:layout_marginTop="@dimen/spacing_sm"
                 android:gravity="center"
-                android:lineSpacingExtra="4dp" />
+                android:text="Se borrarán tus registros de encuentros."
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
 
-            <!-- Botón confirmar reinicio -->
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnConfirmReset"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:layout_marginTop="28dp"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_btn_explorar"
-                android:clickable="true"
-                android:focusable="true">
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:text="Sí, reiniciar" />
 
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_marginEnd="8dp"
-                    android:src="@drawable/ic_refresh"
-                    android:scaleType="centerInside"
-                    android:contentDescription="" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Sí, reiniciar"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFFFF" />
-
-            </LinearLayout>
-
-            <!-- Botón cancelar (vuelve al panel de felicitación) -->
             <TextView
                 android:id="@+id/tvCancelReset"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:padding="@dimen/spacing_sm"
                 android:text="Cancelar"
-                android:textSize="13sp"
-                android:textColor="#99FFFFFF"
-                android:paddingTop="8dp"
-                android:paddingBottom="8dp"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:clickable="true"
-                android:focusable="true" />
-
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
         </LinearLayout>
-
     </FrameLayout>
-
 </FrameLayout>

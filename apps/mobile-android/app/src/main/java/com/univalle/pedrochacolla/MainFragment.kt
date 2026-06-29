@@ -3,6 +3,7 @@ package com.univalle.pedrochacolla
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -12,6 +13,8 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.univalle.pedrochacolla.adapters.SectionAdapter
+import com.univalle.pedrochacolla.data.model.AnchorIcon
+import com.univalle.pedrochacolla.ui.collection.AnimalActionBottomSheet
 import com.univalle.pedrochacolla.ui.home.CollectionViewModel
 import com.univalle.pedrochacolla.utils.loading_screen.LoadingDialogFragment
 import kotlinx.coroutines.launch
@@ -28,17 +31,26 @@ class MainFragment : Fragment(R.layout.fragment_main) {
             layoutManager = LinearLayoutManager(requireContext())
         }
 
-        // Back navigation
-        view.findViewById<View>(R.id.btnBackCollection).setOnClickListener {
-            findNavController().popBackStack()
-        }
-
         val layoutCompleted = view.findViewById<View>(R.id.layoutCompleted)
         val btnResetProgress = view.findViewById<View>(R.id.btnResetProgress)
         btnResetProgress.setOnClickListener { viewModel.resetProgress() }
 
         observeState(rvSections, layoutCompleted)
         viewModel.loadCollection()
+    }
+
+    private fun onAnimalSelected(icon: AnchorIcon) {
+        val sheet = AnimalActionBottomSheet.newInstance(icon)
+        sheet.onShowOnMap = { selected ->
+            findNavController().navigate(
+                R.id.navigation_map,
+                bundleOf("selectedAnchorId" to selected.anchorId),
+            )
+        }
+        sheet.onOpenAr = {
+            (requireActivity() as MainActivity).navigateToAr(findNavController())
+        }
+        sheet.show(childFragmentManager, AnimalActionBottomSheet.TAG)
     }
 
     private fun observeState(rvSections: RecyclerView, layoutCompleted: View) {
@@ -56,13 +68,12 @@ class MainFragment : Fragment(R.layout.fragment_main) {
                         loadingDialog = null
                     }
 
-                    // Mostrar banner cuando se completa el álbum
                     layoutCompleted.visibility = if (state.isCompleted) View.VISIBLE else View.GONE
 
                     if (state.sections.isNotEmpty()) {
                         val adapter = rvSections.adapter as? SectionAdapter
                             ?: SectionAdapter(state.interactedIds) { icon ->
-                                (requireActivity() as MainActivity).navigateToAr(findNavController())
+                                onAnimalSelected(icon)
                             }.also { rvSections.adapter = it }
                         adapter.updateInteractedIds(state.interactedIds)
                         adapter.submitList(state.sections)

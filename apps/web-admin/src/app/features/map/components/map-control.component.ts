@@ -60,7 +60,24 @@ import { MapMotesEffect } from '../utils/map-motes-effect';
 import { MapCloudShadowEffect } from '../utils/map-cloud-shadow-effect';
 import { MapLeavesEffect } from '../utils/map-leaves-effect';
 import { MapTreesEffect } from '../utils/map-trees-effect';
-import { BACKDROP_TREE_SECTION, cloneAmbientTreeSlots, exportAmbientTreesJson, isGeoInBackdropFrame, isBackdropTreeSlot, type AmbientTreeSlot } from '../data/ambient-tree-slots';
+import {
+  TREE_BACKDROP_SECTION,
+  TREE_BASE_PARK_SECTION,
+  canPlaceTreeInParkMode,
+  canPlaceTreeOnBaseParkLayer,
+  canPlaceTreeOnBackdropLayer,
+  cloneAmbientTreeSlots,
+  exportAmbientTreesJson,
+  isBackdropTreeSlot,
+  isBaseParkTreeSlot,
+  migrateAmbientTreeSlots,
+  needsTreeStyleSection,
+  resolveTreePlacementForParkMode,
+  resolveTreePlacementSection,
+  treeMatchesEditorTarget,
+  type AmbientTreeSlot,
+  type TreeEditorTarget,
+} from '../data/ambient-tree-slots';
 import type { AmbientSceneData } from '../models/map-layer-config.model';
 import type { AmbientWind } from '../utils/map-ambient-zone';
 import { DEFAULT_AMBIENT_WIND, EFFECT_WIND_INHERIT, normalizeWindDegrees, type AmbientEffectWindKey } from '../utils/map-ambient-wind';
@@ -80,8 +97,20 @@ import {
   resetGroundStyleToDefaults,
   resetGroundStyleZone,
   updateGroundStyleZone,
+  applyGroundStyleToLayerKeys,
+  clearAllGroundLayers,
+  getGroundStyleOverride,
+  GROUND_ZONE_KEYS,
+  GROUND_PARK_LAYER_KEYS,
+  exportGroundMapSettings,
+  importGroundMapSettings,
+  resolveGroundTilePx,
+  setManualGroundTilePx,
+  getManualGroundTilePx,
   type ZoneGroundStyle,
+  type GroundViewport,
 } from '../utils/draw-ground-texture';
+import type { GroundMapSettings } from '../utils/ground-preset';
 
 type GeoPoint = SharedGeoPoint;
 type ParkSection = SharedParkSection;
@@ -168,25 +197,6 @@ const THEME_COLORS = {
         <div class="section-chip" *ngIf="visitorSectionLabel">
           Estás en: {{ visitorSectionLabel }}
         </div>
-        <div class="section-chip muted" *ngIf="geoActive && !visitorSectionLabel">
-          Fuera de las zonas del parque
-        </div>
-        <div class="map-legend" *ngIf="mapOptions.showSections">
-          <div class="legend-title">Zonas del parque</div>
-          <button type="button" class="section-play-btn"
-            *ngFor="let s of editableSections; let i = index"
-            [class.active]="!sectionEditorMode && playerFichaSectionIndex === i"
-            [class.editor-active]="sectionEditorMode && sectionEditorIndex === i"
-            [style.--zone-color]="s.chartColor"
-            (click)="onZoneButtonClick(i); $event.stopPropagation()">
-            <span class="legend-swatch" [style.background]="s.chartColor"></span>
-            <span>{{ s.name }}</span>
-          </button>
-          <div class="legend-row you-row">
-            <span class="legend-swatch you"></span>
-            <span>Tú (GPS)</span>
-          </div>
-        </div>
       </div>
 
       <!-- Hint -->
@@ -194,14 +204,18 @@ const THEME_COLORS = {
         {{ sectionEditorMode
              ? (sectionEditorAddVertexMode
                ? 'Click en el mapa para añadir vértice a la sección activa'
-               : 'Botones de zona · click dentro del polígono para seleccionar · arrastra vértices')
+               : 'Botones de zona en el panel · click dentro del polígono para seleccionar · arrastra vértices')
            : treeEditorMode && treePlaceActive
-             ? (treeEditorSectionIndex === -1
-               ? 'Click fuera del parque para colocar · sigue colocando sin pulsar de nuevo'
-               : 'Click en la zona activa para colocar · puedes poner varios seguidos')
+             ? (treeEditorTarget === backdropTreeSection
+               ? 'Click en el marco exterior del mapa para colocar'
+               : treeEditorTarget === 'park'
+                 ? 'Click en el parque o en el marco cercano (base)'
+                 : 'Click en la zona activa para colocar')
            : coordPickerMode
              ? 'Click en el mapa para copiar coordenadas GPS | Usa vista Z↓ para máxima precisión'
-             : 'Scroll = zoom | Zonas: botón encuadra y abre ficha · hover resalta contorno' }}
+             : mapLayersConfigOpen
+               ? 'Scroll = zoom · Cierra «Capas» en el panel para ver la ficha de zona'
+               : 'Scroll = zoom | Click en una zona para ver su ficha · hover resalta contorno' }}
       </div>
 
       <div class="edit-banner section-editor-banner" *ngIf="sectionEditorMode">
@@ -217,15 +231,9 @@ const THEME_COLORS = {
         (mousedown)="$event.stopPropagation()" (click)="$event.stopPropagation()">
         <button type="button" class="section-edu-close" *ngIf="!sectionEditorMode"
           (click)="closePlayerFicha()" title="Cerrar">✕</button>
-        <div class="section-edu-tabs">
-          <button type="button" class="section-edu-tab"
-            *ngFor="let s of editableSections; let i = index"
-            [class.active]="fichaSectionIndex === i"
-            [style.--tab-color]="s.chartColor"
-            (click)="onZoneButtonClick(i)">
-            <span class="tab-swatch" [style.background]="s.chartColor"></span>
-            {{ s.name }}
-          </button>
+        <div class="section-edu-heading">
+          <span class="section-edu-heading-swatch" [style.background]="sec.chartColor"></span>
+          <h3 class="section-edu-heading-title">{{ sec.name }}</h3>
         </div>
 
         <!-- Vista jugador (solo lectura) -->
@@ -561,6 +569,30 @@ const THEME_COLORS = {
       border: 1px solid rgba(0, 0, 0, 0.12);
     }
 
+    .section-edu-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px 8px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .section-edu-heading-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+    }
+
+    .section-edu-heading-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
     .section-edu-body {
       padding: 10px 12px 12px;
       display: flex;
@@ -804,7 +836,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   // Editor de árboles por zona
   treeEditorMode = false;
   treePlaceActive = false;
-  treeEditorSectionIndex = 0;
+  treeEditorTarget: TreeEditorTarget = 'park';
+  readonly backdropTreeSection = TREE_BACKDROP_SECTION;
+  readonly treeBaseParkSection = TREE_BASE_PARK_SECTION;
   selectedTreeIndex: number | null = null;
   treePlaceVariant: 0 | 1 | 2 = 0;
   treePlaceStyleSection = 1;
@@ -817,6 +851,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private pointerDownY = 0;
   /** Tap en polígono de zona (mousedown) — evita que el pan robe el click. */
   private pendingZoneTapIndex = -1;
+  /** Oculta ficha de zona mientras el panel lateral tiene «Capas» abierto. */
+  mapLayersConfigOpen = false;
+
   /** Vista jugador: ficha abierta para esta sección (null = cerrada). */
   playerFichaSectionIndex: number | null = null;
   playerSpatialRefIndex: number | null = null;
@@ -837,7 +874,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   get showSectionFicha(): boolean {
+    if (this.mapLayersConfigOpen) return false;
     return this.sectionEditorMode || this.playerFichaSectionIndex !== null;
+  }
+
+  setMapLayersConfigOpen(open: boolean): void {
+    if (this.mapLayersConfigOpen === open) return;
+    this.mapLayersConfigOpen = open;
+    if (open) this.closePlayerFicha();
+    this.render();
   }
 
   get fichaSectionIndex(): number {
@@ -1313,6 +1358,26 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return { x: cx + relX, y: cy + relY };
   }
 
+  private geoToScreenAtParkLayer(geo: GeoPoint): CanvasPoint {
+    const base = this.geoToCanvas(geo);
+    const lo = this.layerOffsets.sections;
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.width / (window.devicePixelRatio || 1);
+    const h = canvas.height / (window.devicePixelRatio || 1);
+    const cx = w / 2;
+    const cy = h / 2;
+    let x = base.x + lo.x - cx;
+    let y = base.y + lo.y - cy;
+    x *= this.scale;
+    y *= this.scale;
+    const cos = Math.cos(this.rotation);
+    const sin = Math.sin(this.rotation);
+    return {
+      x: cos * x - sin * y + cx + this.offsetX,
+      y: sin * x + cos * y + cy + this.offsetY,
+    };
+  }
+
   private geoToScreen(geo: GeoPoint): CanvasPoint {
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.width / (window.devicePixelRatio || 1);
@@ -1353,6 +1418,34 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       x: (cx * cos - cy * sin) / this.scale + w / 2,
       y: (cx * sin + cy * cos) / this.scale + h / 2
     };
+  }
+
+  private mapCanvasPointToGeo(mx: number, my: number): GeoPoint {
+    const canvasEl = this.canvasRef.nativeElement;
+    const w = canvasEl.width / (window.devicePixelRatio || 1);
+    const h = canvasEl.height / (window.devicePixelRatio || 1);
+    const geoW = this.bounds.maxLng - this.bounds.minLng;
+    const geoH = this.bounds.maxLat - this.bounds.minLat;
+    const latCorrectionFactor = Math.cos(LAT_CENTER * Math.PI / 180);
+    const correctedGeoW = geoW * latCorrectionFactor;
+    const scaleX = w / correctedGeoW;
+    const scaleY = h / geoH;
+    const s = Math.min(scaleX, scaleY) * 0.9;
+    const geoMidLat = (this.bounds.minLat + this.bounds.maxLat) / 2;
+    const geoMidLng = (this.bounds.minLng + this.bounds.maxLng) / 2;
+    const cx = w / 2;
+    const cy = h / 2;
+    return {
+      lat: geoMidLat - (my - cy) / s,
+      lng: geoMidLng + (mx - cx) / (latCorrectionFactor * s),
+    };
+  }
+
+  /** Geo alineado con capas del parque (compensa layerOffsets al colocar o arrastrar). */
+  private canvasToGeoAtParkLayer(canvas: CanvasPoint): GeoPoint {
+    const map = this.screenToMap(canvas.x, canvas.y);
+    const lo = this.layerOffsets.sections;
+    return this.mapCanvasPointToGeo(map.x - lo.x, map.y - lo.y);
   }
 
   private canvasToGeo(canvas: CanvasPoint): GeoPoint {
@@ -1416,21 +1509,25 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     // Ground layers in map space: backdrop → park base → sections (zones)
     if (this.mapOptions.showGroundTextures) {
       const lo = this.layerOffsets.sections;
+      const vp = this.getGroundViewport(w, h, lo);
       this.ctx.save();
       this.ctx.translate(lo.x, lo.y);
-      this.drawMapGroundBackdrop(w, h);
+      this.drawMapGroundBackdrop(w, h, vp);
       if (this.mapOptions.showTreesEffect) {
         this.drawPlacedBackdropTrees(w, h);
       }
       if (PARK_BOUNDARY.length >= 3) {
-        this.drawParkGroundBase();
+        this.drawParkGroundBase(vp);
+      }
+      if (this.mapOptions.showTreesEffect) {
+        this.drawPlacedBaseParkTrees(w, h);
       }
       this.ctx.restore();
     }
     if (this.mapOptions.showSections) {
       const lo = this.layerOffsets.sections;
       this.ctx.save(); this.ctx.translate(lo.x, lo.y);
-      this.drawSections(w, h);
+      this.drawSections(w, h, this.getGroundViewport(w, h, lo));
       this.ctx.restore();
     }
     if (this.mapOptions.showBoundary) {
@@ -1639,18 +1736,26 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.treesEffect.drawBackdrop(this.ctx, this.buildTreesDrawOptions(w, h));
   }
 
+  private drawPlacedBaseParkTrees(w: number, h: number): void {
+    this.treesEffect.drawBasePark(this.ctx, this.buildTreesDrawOptions(w, h));
+  }
+
   private buildTreesDrawOptions(w: number, h: number) {
     return {
       geoToCanvas: (geo: GeoPoint) => this.geoToCanvas(geo),
       isParkTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
-        if (isBackdropTreeSlot(slot)) return false;
+        if (isBackdropTreeSlot(slot) || isBaseParkTreeSlot(slot)) return false;
         const polygon = this.editableSections[slot.section]?.polygon;
         if (!polygon?.length) return isPointInPolygon(geo, PARK_BOUNDARY);
         return isPointInPolygon(geo, polygon);
       },
+      isBaseParkTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
+        if (!isBaseParkTreeSlot(slot)) return false;
+        return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY);
+      },
       isBackdropTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
         if (!isBackdropTreeSlot(slot)) return false;
-        return isGeoInBackdropFrame(geo, PARK_BOUNDARY);
+        return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY);
       },
       viewport: this.getWorldViewportBounds(w, h),
       isDark: this.isDarkTheme,
@@ -1661,10 +1766,16 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   get treeEditorBannerText(): string {
     if (this.treePlaceActive) {
-      if (this.treeEditorSectionIndex === BACKDROP_TREE_SECTION) {
-        return 'Modo colocar: click fuera del parque (varios seguidos). Click en marcador = editar · arrastrar = mover.';
+      if (this.treeEditorTarget === TREE_BACKDROP_SECTION) {
+        return 'Colocar en el fondo del mapa (gris, fuera del contorno).';
       }
-      return 'Modo colocar: click en la zona activa (varios seguidos). Click en marcador = editar · arrastrar = mover.';
+      if (this.treeEditorTarget === 'park') {
+        return 'Dentro del contorno → zona o base (-1). Marco gris cercano → fondo (-2).';
+      }
+      if (this.treeEditorTarget === TREE_BASE_PARK_SECTION) {
+        return 'Colocar en la base del parque (dentro del contorno, bajo las zonas).';
+      }
+      return 'Colocar en la zona seleccionada.';
     }
     if (this.selectedTreeIndex !== null) {
       return 'Árbol seleccionado — ajusta en el panel, arrastra en el mapa, o pulsa «Modo colocar» para añadir más.';
@@ -1672,7 +1783,19 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return 'Elige zona y silueta · «Modo colocar» activo al abrir el editor.';
   }
 
-  private drawMapGroundBackdrop(w: number, h: number): void {
+  /** Viewport del mundo (para cull del scatter del suelo), inflado por margen. */
+  private getGroundViewport(w: number, h: number, lo: { x: number; y: number }): GroundViewport {
+    const vp = this.getWorldViewportBounds(w, h);
+    const m = 60;
+    return {
+      minX: vp.minX - lo.x - m,
+      minY: vp.minY - lo.y - m,
+      maxX: vp.maxX - lo.x + m,
+      maxY: vp.maxY - lo.y + m,
+    };
+  }
+
+  private drawMapGroundBackdrop(w: number, h: number, viewport: GroundViewport): void {
     const pad = Math.max(w, h) * 2;
     fillMapRectWithBackdrop(
       this.ctx,
@@ -1683,10 +1806,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.isDarkTheme,
       this.mapBackdropCache,
       this.scale,
+      viewport,
     );
   }
 
-  private drawParkGroundBase(): void {
+  private drawParkGroundBase(viewport: GroundViewport): void {
     const points = PARK_BOUNDARY.map(g => this.geoToCanvas(g));
     fillPolygonWithGroundTexture(
       this.ctx,
@@ -1697,10 +1821,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.isDarkTheme ? PARK_MAP_VIS.parkBaseTintDark : PARK_MAP_VIS.parkBaseTintLight,
       this.groundPatternCache,
       this.scale,
+      viewport,
     );
   }
 
-  private drawSections(w: number, h: number): void {
+  private drawSections(w: number, h: number, viewport: GroundViewport): void {
     const sections = toParkSectionsView(this.editableSections);
     sections.forEach((section, idx) => {
       if (section.polygon.length < 3) return;
@@ -1741,6 +1866,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
             parkGroundTintOpacity(effectiveOp),
             this.groundPatternCache,
             this.scale,
+            viewport,
           );
         } else {
           this.ctx.fillStyle = fillColor;
@@ -1900,17 +2026,14 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.render();
   }
 
-  onZoneButtonClick(index: number): void {
-    this.focusZone(index);
-  }
-
-  /** Encuadra zona + abre ficha (vista jugador) o selecciona en editor. */
   focusZone(index: number): void {
     if (index < 0 || index >= this.editableSections.length) return;
     if (this.sectionEditorMode) {
       this.setSectionEditorIndex(index);
     } else {
-      this.openPlayerFicha(index);
+      if (!this.mapLayersConfigOpen) {
+        this.openPlayerFicha(index);
+      }
       this.fitSectionToView(index);
     }
   }
@@ -2268,9 +2391,14 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.render();
   }
 
-  setTreeEditorSectionIndex(index: number): void {
-    if (index !== BACKDROP_TREE_SECTION && (index < 0 || index >= this.editableSections.length)) return;
-    this.treeEditorSectionIndex = index;
+  setTreeEditorSectionIndex(target: TreeEditorTarget): void {
+    if (target !== 'park'
+      && target !== TREE_BACKDROP_SECTION
+      && target !== TREE_BASE_PARK_SECTION
+      && (target < 0 || target >= this.editableSections.length)) {
+      return;
+    }
+    this.treeEditorTarget = target;
     this.selectedTreeIndex = null;
     this.treePlacementHint = '';
     if (this.treeEditorMode) {
@@ -2293,7 +2421,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.treePlaceStyleSection = Math.min(2, Math.max(0, Math.floor(section)));
     if (this.selectedTreeIndex !== null) {
       const slot = this.ambientTrees[this.selectedTreeIndex];
-      if (slot && isBackdropTreeSlot(slot)) {
+      if (slot && needsTreeStyleSection(slot.section)) {
         this.updateAmbientTree(this.selectedTreeIndex, { styleSection: this.treePlaceStyleSection });
       }
     } else {
@@ -2306,7 +2434,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (index !== null && this.ambientTrees[index]) {
       const t = this.ambientTrees[index];
       this.treePlaceVariant = t.variant;
-      if (isBackdropTreeSlot(t) && t.styleSection != null) {
+      if (needsTreeStyleSection(t.section) && t.styleSection != null) {
         this.treePlaceStyleSection = t.styleSection;
       }
       this.treePlaceActive = false;
@@ -2328,37 +2456,70 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   private canPlaceTreeAtGeo(geo: GeoPoint): boolean {
-    return this.canPlaceTreeAtGeoForSection(geo, this.treeEditorSectionIndex);
+    return this.canPlaceTreeAtGeoForTarget(geo, this.treeEditorTarget);
+  }
+
+  private canPlaceTreeAtGeoForTarget(geo: GeoPoint, target: TreeEditorTarget): boolean {
+    if (target === 'park') {
+      return canPlaceTreeInParkMode(geo, this.editableSections, PARK_BOUNDARY);
+    }
+    if (target === TREE_BACKDROP_SECTION) {
+      return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY);
+    }
+    if (target === TREE_BASE_PARK_SECTION) {
+      return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY);
+    }
+    const sectionName = findParkSectionAt(geo.lat, geo.lng, this.editableSections);
+    const expected = this.editableSections[target]?.name;
+    return sectionName === expected && isGeoInPark(geo, PARK_BOUNDARY);
   }
 
   private canPlaceTreeAtGeoForSection(geo: GeoPoint, section: number): boolean {
-    if (section === BACKDROP_TREE_SECTION) {
-      return isGeoInBackdropFrame(geo, PARK_BOUNDARY);
+    return this.canPlaceTreeAtGeoForTarget(geo, section);
+  }
+
+  private resolveTreeSectionForPlacement(geo: GeoPoint): number {
+    if (this.treeEditorTarget === 'park') {
+      return resolveTreePlacementForParkMode(geo, this.editableSections, PARK_BOUNDARY)
+        ?? TREE_BASE_PARK_SECTION;
     }
-    const sectionName = findParkSectionAt(geo.lat, geo.lng, this.editableSections);
-    const expected = this.editableSections[section]?.name;
-    return sectionName === expected && isGeoInPark(geo, PARK_BOUNDARY);
+    return this.treeEditorTarget as number;
+  }
+
+  private treePlacementHintForRejectedClick(geo: GeoPoint): string {
+    if (this.treeEditorTarget === TREE_BACKDROP_SECTION) {
+      return 'El click debe caer en el marco gris (fuera del contorno del parque).';
+    }
+    if (this.treeEditorTarget === TREE_BASE_PARK_SECTION) {
+      return 'El click debe caer dentro del contorno del parque (capa base, no el marco gris).';
+    }
+    if (this.treeEditorTarget === 'park') {
+      if (!isPointInPolygon(geo, PARK_BOUNDARY) && !canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY)) {
+        return 'Ahí es el fondo lejano del mapa. Acércate al parque o elige «Fondo mapa» en Zona.';
+      }
+      return 'El click debe caer dentro del parque o en el marco gris cercano.';
+    }
+    return 'El click debe caer dentro de la zona activa.';
   }
 
   addAmbientTreeAtGeo(lat: number, lng: number): void {
     const geo = { lat, lng };
     if (!this.canPlaceTreeAtGeo(geo)) {
-      this.treePlacementHint = this.treeEditorSectionIndex === BACKDROP_TREE_SECTION
-        ? 'Debe quedar fuera del parque, en el marco visible.'
-        : 'El click debe caer dentro de la zona activa.';
+      this.treePlacementHint = this.treePlacementHintForRejectedClick(geo);
       this.emitTreeEditorState();
       this.render();
       return;
     }
+    const section = this.resolveTreeSectionForPlacement(geo);
     const slot: AmbientTreeSlot = {
       lat: Number(lat.toFixed(8)),
       lng: Number(lng.toFixed(8)),
-      section: this.treeEditorSectionIndex,
+      section,
       variant: this.treePlaceVariant,
       seed: Math.random() * 180,
       scale: 0.85 + Math.random() * 0.35,
     };
-    if (this.treeEditorSectionIndex === BACKDROP_TREE_SECTION) {
+    if (needsTreeStyleSection(section)) {
       slot.styleSection = this.treePlaceStyleSection;
     }
     this.ambientTrees = [...this.ambientTrees, slot];
@@ -2400,8 +2561,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return cloneAmbientTreeSlots(this.ambientTrees);
   }
 
-  setAmbientTrees(slots: AmbientTreeSlot[]): void {
-    this.ambientTrees = cloneAmbientTreeSlots(slots);
+  setAmbientTrees(slots: AmbientTreeSlot[], fileVersion = 2): void {
+    this.ambientTrees = migrateAmbientTreeSlots(slots, fileVersion);
     this.syncAmbientTrees();
     this.emitAmbientTreesChanged();
     this.render();
@@ -2438,8 +2599,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     const hitR = 16;
     for (let i = this.ambientTrees.length - 1; i >= 0; i--) {
       const t = this.ambientTrees[i];
-      if (t.section !== this.treeEditorSectionIndex) continue;
-      const screen = this.geoToScreen({ lat: t.lat, lng: t.lng });
+      if (!treeMatchesEditorTarget(t.section, this.treeEditorTarget)) continue;
+      const screen = this.geoToScreenAtParkLayer({ lat: t.lat, lng: t.lng });
       const dx = screen.x - screenX;
       const dy = screen.y - screenY;
       if (dx * dx + dy * dy <= hitR * hitR) return i;
@@ -2450,18 +2611,26 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private drawTreeEditorMarkers(w: number, h: number): void {
     const viewport = this.getWorldViewportBounds(w, h);
     const pad = 48;
+    const lo = this.layerOffsets.sections;
     for (let i = 0; i < this.ambientTrees.length; i++) {
       const t = this.ambientTrees[i];
       const pos = this.geoToCanvas({ lat: t.lat, lng: t.lng });
+      pos.x += lo.x;
+      pos.y += lo.y;
       if (pos.x < viewport.minX - pad || pos.x > viewport.maxX + pad
         || pos.y < viewport.minY - pad || pos.y > viewport.maxY + pad) {
         continue;
       }
-      const inActiveZone = t.section === this.treeEditorSectionIndex;
+      const inActiveZone = treeMatchesEditorTarget(t.section, this.treeEditorTarget);
       const selected = i === this.selectedTreeIndex;
       const dragging = i === this.draggingTreeIndex;
+      const layerColor = t.section === TREE_BACKDROP_SECTION
+        ? '#607d8b'
+        : t.section === TREE_BASE_PARK_SECTION
+          ? '#8d6e63'
+          : (inActiveZone ? '#4caf50' : 'rgba(120,120,120,0.75)');
       this.ctx.save();
-      this.ctx.fillStyle = dragging ? '#ff5722' : (selected ? '#ff9800' : (inActiveZone ? '#4caf50' : 'rgba(120,120,120,0.75)'));
+      this.ctx.fillStyle = dragging ? '#ff5722' : (selected ? '#ff9800' : layerColor);
       this.ctx.strokeStyle = '#fff';
       this.ctx.lineWidth = 1.2 / this.scale;
       const r = (selected ? 5 : 4) / this.scale;
@@ -2695,7 +2864,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
     // Vista jugador: tap en zona — no iniciar pan hasta confirmar que no es drag
     if (e.button === 0 && !this.sectionEditorMode
-        && !this.coordPickerMode && this.mapOptions.showSections) {
+        && !this.coordPickerMode && !this.mapLayersConfigOpen && this.mapOptions.showSections) {
       const geo = this.canvasToGeo({ x, y });
       const hit = this.hitTestSectionAtGeo(geo);
       if (hit >= 0) {
@@ -2750,6 +2919,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       const idx = this.draggingTreeIndex;
       const t = this.ambientTrees[idx];
       if (t) {
+        const geo = this.canvasToGeoAtParkLayer({ x, y });
         const ok = this.moveAmbientTreeToGeo(idx, geo.lat, geo.lng);
         this.treePlacementHint = ok ? '' : 'Posición inválida para esta zona.';
         if (!ok) this.emitTreeEditorState();
@@ -2772,7 +2942,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       let overInteractive = false;
       let cursorType = 'grab';
 
-      for (const marker of this.markers) {
+      if (!this.mapLayersConfigOpen && this.mapOptions.showMarkers) {
+        for (const marker of this.markers) {
           const mp = this.geoToScreen(marker.geo);
           const dx = x - mp.x;
           const dy = y - mp.y;
@@ -2781,6 +2952,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
             cursorType = 'pointer';
             break;
           }
+        }
       }
 
       const container = this.canvasRef.nativeElement.parentElement;
@@ -2916,7 +3088,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
     // ── Colocar árbol ambiental ─────────────────────────────
     if (this.treeEditorMode && this.treePlaceActive && !this.pointerMovedSinceDown) {
-      const geo = this.canvasToGeo({ x, y });
+      const geo = this.canvasToGeoAtParkLayer({ x, y });
       this.addAmbientTreeAtGeo(geo.lat, geo.lng);
       return;
     }
@@ -2978,6 +3150,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       return; // coord picker mode — no other click actions
     }
 
+    if (this.mapLayersConfigOpen) {
+      return; // Capas / suelo: sin copiar coords ni abrir puntos de anclaje
+    }
+
     const geo = this.canvasToGeo({ x, y });
     const coords = `${geo.lat.toFixed(8)}, ${geo.lng.toFixed(8)}`;
 
@@ -3007,11 +3183,36 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   setGroundTilePx(px: number): void {
     const next = clampGroundTilePx(px);
     if (next === this.mapOptions.groundTilePx) return;
+    setManualGroundTilePx(next);
     this.mapOptions.groundTilePx = next;
     this.groundPatternCache.setTilePx(next);
     this.mapBackdropCache.setTilePx(next);
     this.onOptionChange();
     this.emitViewInfo();
+  }
+
+  getGroundSettingsSnapshot(): GroundMapSettings {
+    return exportGroundMapSettings();
+  }
+
+  applyGroundSettings(settings: GroundMapSettings | null | undefined, autoTilePx = true): void {
+    importGroundMapSettings(settings);
+    if (autoTilePx) setManualGroundTilePx(null);
+    if (getManualGroundTilePx() == null) this.syncGroundTileFromSettings();
+    this.invalidateGroundPatterns();
+  }
+
+  resetGroundTileToAuto(): void {
+    setManualGroundTilePx(null);
+    this.syncGroundTileFromSettings();
+    this.invalidateGroundPatterns();
+  }
+
+  private syncGroundTileFromSettings(): void {
+    const px = resolveGroundTilePx();
+    this.mapOptions.groundTilePx = px;
+    this.groundPatternCache.setTilePx(px);
+    this.mapBackdropCache.setTilePx(px);
   }
 
   getGroundStyleSnapshot(): Record<number, ZoneGroundStyle> {
@@ -3028,8 +3229,32 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.invalidateGroundPatterns();
   }
 
+  /** Aplica un mismo estilo de elementos a todas las zonas + base del parque + fondo. */
+  applyGroundStyleAllZones(style: ZoneGroundStyle): void {
+    applyGroundStyleToLayerKeys(GROUND_ZONE_KEYS, style);
+    this.invalidateGroundPatterns();
+  }
+
+  /** Aplica elementos de suelo a zonas + base del parque (no al fondo exterior). */
+  applyGroundStyleParkLayers(style: ZoneGroundStyle): void {
+    applyGroundStyleToLayerKeys(GROUND_PARK_LAYER_KEYS, style);
+    this.invalidateGroundPatterns();
+  }
+
+  clearAllGroundLayers(): void {
+    clearAllGroundLayers();
+    this.invalidateGroundPatterns();
+  }
+
   resetGroundStyleZone(sectionIndex: number): void {
     resetGroundStyleZone(sectionIndex);
+    this.invalidateGroundPatterns();
+  }
+
+  resetGroundStyleParkLayers(): void {
+    for (const key of GROUND_PARK_LAYER_KEYS) {
+      resetGroundStyleZone(key);
+    }
     this.invalidateGroundPatterns();
   }
 
@@ -3195,7 +3420,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   setTreesSize(value: number): void {
-    this.mapOptions.treesSize = Math.min(2.5, Math.max(0.08, value));
+    this.mapOptions.treesSize = Math.min(
+      PARK_MAP_VIS.treesSizeMulMax,
+      Math.max(PARK_MAP_VIS.treesSizeMulMin, value),
+    );
     this.treesEffect.setSizeMul(this.mapOptions.treesSize);
     this.onOptionChange();
   }
@@ -3204,6 +3432,25 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.mapOptions.nightMistIntensity = Math.min(1, Math.max(0, value));
     this.nightMistEffect.setIntensity(this.mapOptions.nightMistIntensity);
     this.onOptionChange();
+  }
+
+  /** Quita decoración colocada: árboles, suelo, POIs a defaults y escena despejada. */
+  clearAllPlacedMapContent(): void {
+    this.setAmbientTrees([]);
+    this.selectedTreeIndex = null;
+    this.treePlaceActive = false;
+    clearAllGroundLayers();
+    this.spatialReferences = cloneSpatialReferences();
+    this.spatialReferencePlaceIndex = -1;
+    this.selectedSpatialReferenceIndex = 0;
+    this.emitSpatialReferencesChanged();
+    const clear = findAmbientScenario('clear');
+    if (clear) {
+      this.applyAmbientScenario(clear, { skipCamera: true });
+    } else {
+      this.clearAmbientScenarioVisuals();
+    }
+    this.invalidateGroundPatterns();
   }
 
   applyAmbientScenario(scenario: AmbientScenario, opts?: { skipCamera?: boolean }): void {
@@ -3757,7 +4004,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         activeScenarioId: this.getActiveAmbientScenarioId(),
       },
       ambientTrees: this.getAmbientTrees(),
-      groundStyle: exportGroundStyleSnapshot(),
+      groundStyle: getGroundStyleOverride() ?? undefined,
+      groundSettings: exportGroundMapSettings(),
     };
   }
 
@@ -3772,6 +4020,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       ambientScene?: AmbientSceneData & { activeScenarioId?: string | null };
       ambientTrees?: AmbientTreeSlot[];
       groundStyle?: Record<number, ZoneGroundStyle>;
+      groundSettings?: GroundMapSettings;
     },
     opts?: { skipLegacySave?: boolean },
   ): void {
@@ -3801,8 +4050,16 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (data.ambientTrees != null) {
       this.setAmbientTrees(data.ambientTrees);
     }
+    if (data.groundSettings != null) {
+      importGroundMapSettings(data.groundSettings);
+    }
     if (data.groundStyle != null) {
       importGroundStyleSnapshot(data.groundStyle);
+    }
+    if (data.groundSettings != null || data.groundStyle != null) {
+      if (getManualGroundTilePx() == null || data.mapState?.groundTilePx == null) {
+        this.syncGroundTileFromSettings();
+      }
       this.groundPatternCache.clear();
       this.mapBackdropCache.clear();
     }

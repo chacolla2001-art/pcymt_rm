@@ -1,27 +1,54 @@
 import type { GeoPoint } from './park-geometry';
 import { isPointInPolygon } from '../utils/park-map.util';
+import {
+  GROUND_PARK_LAYER_KEYS,
+  GROUND_ZONE_KEYS,
+  GROUND_ZONE_LABELS,
+} from '../utils/draw-ground-texture';
 
-/** Árboles colocados fuera del parque, sobre el marco/fondo del mapa. */
-export const BACKDROP_TREE_SECTION = -1;
+/** Mismas capas que el suelo: 0/1/2 zonas, -1 base parque, -2 fondo mapa. */
+export const TREE_BASE_PARK_SECTION = -1;
+export const TREE_BACKDROP_SECTION = -2;
 
-/** Posiciones fijas de árboles decorativos (lat/lng). */
+/** @deprecated alias v2 — usar TREE_BACKDROP_SECTION */
+export const BACKDROP_TREE_SECTION = TREE_BACKDROP_SECTION;
+
+export type TreeEditorTarget = number | 'park';
+
+export { GROUND_ZONE_KEYS as TREE_ZONE_KEYS, GROUND_ZONE_LABELS as TREE_ZONE_LABELS };
+export { GROUND_PARK_LAYER_KEYS as TREE_PARK_LAYER_KEYS };
+
+export function isTreeInParkLayers(section: number): boolean {
+  return (GROUND_PARK_LAYER_KEYS as readonly number[]).includes(section);
+}
+
+export function treeMatchesEditorTarget(section: number, target: TreeEditorTarget): boolean {
+  if (target === 'park') {
+    return isTreeInParkLayers(section) || section === TREE_BACKDROP_SECTION;
+  }
+  return section === target;
+}
+
+export function treeSectionLabel(section: number): string {
+  if (section >= 0 && section <= 2) return GROUND_ZONE_LABELS[section] ?? `Zona ${section}`;
+  return GROUND_ZONE_LABELS[section] ?? `Capa ${section}`;
+}
+
 export interface AmbientTreeSlot {
   lat: number;
   lng: number;
-  /** 0=Altas, 1=Medias, 2=Bajas, -1=fondo del mapa. */
+  /** 0/1/2 ecosistema, -1 base parque, -2 fondo (igual que capas del suelo). */
   section: number;
   variant: 0 | 1 | 2;
   seed: number;
   scale: number;
-  /** Paleta ecosistema cuando section=-1 (0/1/2). */
+  /** Paleta cuando section es -1 o -2. */
   styleSection?: number;
 }
 
 export const TREE_VARIANT_LABELS: ReadonlyArray<string> = ['Silueta A', 'Silueta B', 'Silueta C'];
-
 export const TREE_ECO_LABELS: ReadonlyArray<string> = ['Tierras Altas', 'Tierras Medias', 'Tierras Bajas'];
 
-/** Generados dentro del polígono de cada sección (no solo el bbox del parque). */
 export const AMBIENT_TREE_SLOTS: AmbientTreeSlot[] = [
   { lat: -16.48822279, lng: -68.14600518, section: 0, variant: 2, seed: 4.75, scale: 1.138 },
   { lat: -16.48702826, lng: -68.14591436, section: 0, variant: 2, seed: 11.26, scale: 0.891 },
@@ -56,15 +83,112 @@ export const AMBIENT_TREE_SLOTS: AmbientTreeSlot[] = [
 ];
 
 export function isBackdropTreeSlot(slot: AmbientTreeSlot): boolean {
-  return slot.section === BACKDROP_TREE_SECTION;
+  return slot.section === TREE_BACKDROP_SECTION;
+}
+
+export function isBaseParkTreeSlot(slot: AmbientTreeSlot): boolean {
+  return slot.section === TREE_BASE_PARK_SECTION;
+}
+
+export function needsTreeStyleSection(section: number): boolean {
+  return section === TREE_BASE_PARK_SECTION || section === TREE_BACKDROP_SECTION;
 }
 
 export function paletteSectionForTree(slot: AmbientTreeSlot): number {
-  if (isBackdropTreeSlot(slot)) {
+  if (needsTreeStyleSection(slot.section)) {
     const s = slot.styleSection ?? 1;
     return Math.min(2, Math.max(0, Math.floor(s)));
   }
   return Math.min(2, Math.max(0, slot.section));
+}
+
+/** v2 usaba -1=fondo y -2=base; v3 alinea con capas del suelo. */
+export function migrateTreeSectionFromV2(section: number): number {
+  if (section === -1) return TREE_BACKDROP_SECTION;
+  if (section === -2) return TREE_BASE_PARK_SECTION;
+  return section;
+}
+
+export function migrateAmbientTreeSlots(
+  slots: AmbientTreeSlot[],
+  fileVersion = 3,
+): AmbientTreeSlot[] {
+  if (fileVersion >= 3) {
+    return slots.map((s) => ({ ...s }));
+  }
+  return slots.map((s) => ({
+    ...s,
+    section: migrateTreeSectionFromV2(s.section),
+  }));
+}
+
+/** Dentro del parque: zona 0/1/2 o base (-1). null = fuera del contorno. */
+export function resolveTreePlacementSection(
+  geo: GeoPoint,
+  sections: Array<{ name: string; polygon: GeoPoint[] }>,
+  boundary: GeoPoint[],
+): number | null {
+  if (!boundary.length || !isPointInPolygon(geo, boundary)) return null;
+  for (let i = 0; i < sections.length; i++) {
+    if (isPointInPolygon(geo, sections[i].polygon)) return i;
+  }
+  return TREE_BASE_PARK_SECTION;
+}
+
+/** Fuera del contorno pero en el marco cercano (misma zona visual que el suelo -2). */
+export function isGeoInParkBackdropFrame(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+  paddingDeg = 0.004,
+): boolean {
+  return isGeoInBackdropFrame(geo, boundary, paddingDeg);
+}
+
+/** @deprecated usar isGeoInParkBackdropFrame */
+export function isTreeParkBaseFrame(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+): boolean {
+  return isGeoInParkBackdropFrame(geo, boundary);
+}
+
+/** Click válido en capa base (-1): solo dentro del contorno del parque. */
+export function canPlaceTreeOnBaseParkLayer(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+): boolean {
+  return boundary.length > 0 && isPointInPolygon(geo, boundary);
+}
+
+/** Click válido en fondo (-2): marco exterior inmediato (fuera del contorno). */
+export function canPlaceTreeOnBackdropLayer(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+): boolean {
+  return isGeoInParkBackdropFrame(geo, boundary);
+}
+
+/**
+ * Modo «Todo el parque (sin fondo)»: zonas + base interior + marco (-2).
+ * No incluye el fondo lejano fuera del marco.
+ */
+export function resolveTreePlacementForParkMode(
+  geo: GeoPoint,
+  sections: Array<{ name: string; polygon: GeoPoint[] }>,
+  boundary: GeoPoint[],
+): number | null {
+  const inside = resolveTreePlacementSection(geo, sections, boundary);
+  if (inside !== null) return inside;
+  if (isGeoInParkBackdropFrame(geo, boundary)) return TREE_BACKDROP_SECTION;
+  return null;
+}
+
+export function canPlaceTreeInParkMode(
+  geo: GeoPoint,
+  sections: Array<{ name: string; polygon: GeoPoint[] }>,
+  boundary: GeoPoint[],
+): boolean {
+  return resolveTreePlacementForParkMode(geo, sections, boundary) !== null;
 }
 
 export function isGeoInBackdropFrame(
@@ -97,7 +221,7 @@ export function cloneAmbientTreeSlots(slots: AmbientTreeSlot[]): AmbientTreeSlot
 export function exportAmbientTreesJson(slots: AmbientTreeSlot[]): string {
   return JSON.stringify(
     {
-      version: 2,
+      version: 3,
       source: 'web-admin-manual-edit',
       syncedAt: new Date().toISOString(),
       trees: slots.map((t) => ({

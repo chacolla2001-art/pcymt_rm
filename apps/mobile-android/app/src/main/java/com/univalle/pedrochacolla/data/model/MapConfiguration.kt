@@ -44,7 +44,11 @@ data class MapViewState(
     val showGrid: Boolean = false,
     val showBoundary: Boolean = false,
     val showSections: Boolean = true,
-    val showLabels: Boolean = true
+    val showLabels: Boolean = true,
+    @SerializedName("showGroundTextures")
+    val showGroundTextures: Boolean? = null,
+    @SerializedName("groundTilePx")
+    val groundTilePx: Double? = null,
 )
 
 /**
@@ -80,6 +84,23 @@ data class MapConfigData(
     val stickers: List<StickerLayerData>? = null,
     @SerializedName(value = "model3dPlacements", alternate = ["model_3d_placements"])
     val model3dPlacements: List<Model3DPlacementData>? = null,
+    val version: Int? = null,
+    @SerializedName("themeMode")
+    val themeMode: String? = null,
+    @SerializedName("ambientTrees")
+    val ambientTrees: List<AmbientTreeSlotData>? = null,
+    /** Claves string "0","1","2","-1","-2" (JSON no admite claves numéricas negativas de forma uniforme). */
+    @SerializedName("groundStyle")
+    val groundStyle: Map<String, ZoneGroundStyleData>? = null,
+    @SerializedName("groundSettings")
+    val groundSettings: GroundMapSettingsData? = null,
+    @SerializedName("ambientScene")
+    val ambientScene: AmbientSceneData? = null,
+    val sections: List<ParkSectionRecordData>? = null,
+    @SerializedName("spatialReferences")
+    val spatialReferences: List<SpatialReferenceData>? = null,
+    @SerializedName("layerOffsets")
+    val layerOffsets: LayerOffsetsData? = null,
     // ── Nested map state (web frontend format) ──
     val mapState: MapViewState? = null
 ) {
@@ -99,6 +120,9 @@ data class MapConfigData(
     val effectiveShowSections: Boolean get() = mapState?.showSections ?: showSections
     /** Effective showLabels */
     val effectiveShowLabels: Boolean get() = mapState?.showLabels ?: showLabels
+    /** Textura procedural del suelo (web admin). */
+    val effectiveShowGroundTextures: Boolean get() =
+        mapState?.showGroundTextures == true || !groundStyle.isNullOrEmpty()
 }
 
 /**

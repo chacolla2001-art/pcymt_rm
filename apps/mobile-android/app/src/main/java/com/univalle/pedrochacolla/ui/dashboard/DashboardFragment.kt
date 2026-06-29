@@ -56,6 +56,7 @@ import com.univalle.pedrochacolla.data.model.MapConfigData
 import com.univalle.pedrochacolla.data.model.MapConfiguration
 import com.univalle.pedrochacolla.data.model.PoiPositionSave
 import com.univalle.pedrochacolla.data.repository.MapConfigurationRepository
+import com.univalle.pedrochacolla.utils.map.MapConfigVisuals
 import com.univalle.pedrochacolla.utils.image.ImageUrlHelper
 import com.univalle.pedrochacolla.utils.loading_screen.LoadingDialogFragment
 import com.univalle.pedrochacolla.utils.location.GameReadinessChecker
@@ -271,12 +272,10 @@ class DashboardFragment : Fragment(), SensorEventListener {
             parkMapView.zoomOut()
         }
 
-        // Back navigation
-        view.findViewById<View>(R.id.btn_back_home)?.setOnClickListener {
-            findNavController().popBackStack()
-        }
+        // Back navigation — bottom bar
+        view.findViewById<View>(R.id.btn_back_home)?.visibility = View.GONE
 
-        // Play / Explorar button — carries user to the Explorer mode (ArMapFragment)
+        // Play / Explorar button
         view.findViewById<View>(R.id.btn_play_explorer)?.setOnClickListener {
             findNavController().navigate(R.id.navigation_ar_map)
         }
@@ -301,13 +300,12 @@ class DashboardFragment : Fragment(), SensorEventListener {
         parkMapView.stickerOverlayManager = stickerOverlayManager
 
         val btnTogglePoi = view.findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.btn_toggle_poi)
-        btnTogglePoi.setOnClickListener { showMapScenePanel() }
 
-        // POI click listener — ficha breve
+        // POI click — ficha en bottom sheet
         parkMapView.poiClickListener = object : ParkMapView.OnPoiClickListener {
             override fun onPoiClick(poi: PoiItem) {
-                val msg = poi.summary.ifBlank { poi.name }
-                Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+                PoiInfoBottomSheet.newInstance(poi.name, poi.summary)
+                    .show(childFragmentManager, PoiInfoBottomSheet.TAG)
             }
         }
 
@@ -325,8 +323,9 @@ class DashboardFragment : Fragment(), SensorEventListener {
         parkMapView.isAdminMode = isAdmin
         if (!isAdmin) {
             view.findViewById<View>(R.id.btn_map_layers)?.visibility = View.GONE
+            btnTogglePoi.visibility = View.GONE
         } else {
-            // Admin banner: inform the user they are seeing ALL animals
+            btnTogglePoi.setOnClickListener { showMapScenePanel() }
             val adminBanner = view.findViewById<android.widget.TextView?>(R.id.banner_out_of_bounds)
             if (adminBanner != null) {
                 adminBanner.text = "🔐 Modo Admin — Viendo todos los animales del parque"
@@ -428,10 +427,10 @@ class DashboardFragment : Fragment(), SensorEventListener {
         panel.onSceneChanged = { state ->
             poiOverlayManager.setOverlayVisible(state.showSpatialReferences)
             parkMapView.setRainEffectEnabled(state.showRain)
-            parkMapView.setRainIntensity(state.rainIntensity)
-            parkMapView.setRainSize(state.rainSize)
-            parkMapView.setRainSectionIndex(state.rainSectionIndex)
-            parkMapView.setSpatialAnimSpeed(state.animSpeed)
+            parkMapView.rainIntensity = state.rainIntensity
+            parkMapView.rainSize = state.rainSize
+            parkMapView.rainSectionIndex = state.rainSectionIndex
+            parkMapView.spatialAnimSpeed = state.animSpeed
             parkMapView.notifySceneOptionsChanged()
         }
         panel.show(parentFragmentManager, MapScenePanelFragment.TAG)
@@ -671,19 +670,14 @@ class DashboardFragment : Fragment(), SensorEventListener {
                 result.onSuccess { config ->
                     val data = config.configData
 
-                    // Apply map state (zoom, rotation, etc.)
-                    parkMapView.setMapState(ParkMapView.MapState(
-                        scale    = data.effectiveScale,
-                        rotation = data.effectiveRotation,
-                        offsetX  = data.effectiveOffsetX,
-                        offsetY  = data.effectiveOffsetY,
-                        showGrid     = data.effectiveShowGrid,
-                        showBoundary = false,   // Nunca mostrar límites en vista visitante
-                        showSections = data.effectiveShowSections,
-                        showLabels   = data.effectiveShowLabels
-                    ))
+                    MapConfigVisuals.applyToParkMap(
+                        parkMapView,
+                        data,
+                        if (::poiOverlayManager.isInitialized) poiOverlayManager else null,
+                        requireContext(),
+                    )
 
-                    // Always sync sticker state from server — null or empty list clears the map,
+                    // Always sync sticker state from server
                     // populated list renders the admin's layout. Never rely on local cache.
                     if (::stickerManager.isInitialized) {
                         val stickerLayers = data.stickers ?: emptyList()
@@ -696,15 +690,6 @@ class DashboardFragment : Fragment(), SensorEventListener {
                         }
                         parkMapView.invalidate()
                         timber.log.Timber.d("DashboardFragment: Synced ${stickerLayers.sumOf { it.stickers?.size ?: 0 }} stickers from global config")
-                    }
-
-                    // Apply POI positions if available
-                    if (::poiOverlayManager.isInitialized) {
-                        data.poiPositions?.let { positions ->
-                            poiOverlayManager.loadDynamicPositions(
-                                positions.associate { it.id to Pair(it.lat, it.lng) }
-                            )
-                        }
                     }
 
                     parkMapView.invalidate()
@@ -1188,25 +1173,12 @@ class DashboardFragment : Fragment(), SensorEventListener {
 
         // Apply loaded configuration
         panel.onLoadRequested = { configData ->
-            parkMapView.setMapState(ParkMapView.MapState(
-                scale    = configData.effectiveScale,
-                rotation = configData.effectiveRotation,
-                offsetX  = configData.effectiveOffsetX,
-                offsetY  = configData.effectiveOffsetY,
-                showGrid     = configData.effectiveShowGrid,
-                showBoundary = false,   // Nunca mostrar límites en vista visitante
-                showSections = configData.effectiveShowSections,
-                showLabels   = configData.effectiveShowLabels
-            ))
-
-            if (::poiOverlayManager.isInitialized) {
-                poiOverlayManager.setOverlayVisible(configData.poiVisible)
-                configData.poiPositions?.let { positions ->
-                    poiOverlayManager.loadDynamicPositions(
-                        positions.associate { it.id to Pair(it.lat, it.lng) }
-                    )
-                }
-            }
+            MapConfigVisuals.applyToParkMap(
+                parkMapView,
+                configData,
+                if (::poiOverlayManager.isInitialized) poiOverlayManager else null,
+                requireContext(),
+            )
 
             // Apply stickers from loaded config
             if (::stickerManager.isInitialized) {

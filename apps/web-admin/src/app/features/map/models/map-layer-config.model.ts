@@ -2,6 +2,7 @@ import type { ParkSectionRecord } from '../data/park-geometry';
 import type { SpatialReference } from '../data/spatial-reference';
 import type { AmbientTreeSlot } from '../data/ambient-tree-slots';
 import type { ZoneGroundStyle } from '../utils/draw-ground-texture';
+import type { GroundMapSettings } from '../utils/ground-preset';
 
 /**
  * Map Layer Configuration — Data Models
@@ -37,8 +38,10 @@ export interface MapConfigData {
   spatialReferences?: SpatialReference[];
   ambientScene?: AmbientSceneData;
   ambientTrees?: AmbientTreeSlot[];
-  /** Estilo procedural del suelo por zona (0,1,2,-1,-2). */
+  /** Estilo procedural del suelo por zona (0,1,2,-1,-2). Overrides sobre preset. */
   groundStyle?: Record<number, ZoneGroundStyle>;
+  /** Preset global, escala, LOD del suelo. */
+  groundSettings?: GroundMapSettings;
   themeMode?: 'light' | 'dark';
 }
 

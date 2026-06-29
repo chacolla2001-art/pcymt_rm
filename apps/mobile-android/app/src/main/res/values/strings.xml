@@ -72,6 +72,18 @@
     <string name="onboarding_start">Empezar a explorar</string>
     <string name="onboarding_step_format">%1$d de %2$d</string>
     <string name="out_of_park_banner">Estás fuera de los límites del parque</string>
+    <string name="nav_home">Inicio</string>
+    <string name="nav_map">Mapa</string>
+    <string name="nav_collection">Colección</string>
+    <string name="nav_profile">Perfil</string>
+    <string name="home_explore_cta">Explorar con Juku Go</string>
+    <string name="home_explore_subtitle">Encuentra animales en el parque como en un juego de exploración</string>
+    <string name="home_progress_label">Tu progreso</string>
+    <string name="home_trophies_label">Animales encontrados</string>
+    <string name="collection_subtitle">Toca un animal para verlo en el mapa o abrir la cámara AR</string>
+    <string name="poi_sheet_title">Punto de interés</string>
+    <string name="animal_action_map">Ver en el mapa</string>
+    <string name="animal_action_ar">Abrir cámara AR</string>
 
     <!-- Encuentro — copy educativo post-guardado -->
     <string name="encounter_saved">¡Encuentro guardado!</string>

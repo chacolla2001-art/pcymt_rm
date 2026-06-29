@@ -39,6 +39,7 @@ import com.google.android.material.snackbar.Snackbar
 import com.univalle.pedrochacolla.MainActivity
 import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.data.repository.MapConfigurationRepository
+import com.univalle.pedrochacolla.utils.map.MapConfigVisuals
 import com.univalle.pedrochacolla.ui.dashboard.ParkMapView
 import com.univalle.pedrochacolla.ui.dashboard.PoiItem
 import com.univalle.pedrochacolla.ui.dashboard.PoiOverlayManager
@@ -320,6 +321,13 @@ class ArMapFragment : Fragment(), SensorEventListener {
                 result.onSuccess { config ->
                     val data = config.configData
 
+                    MapConfigVisuals.applyToParkMap(
+                        parkMapView,
+                        data,
+                        if (::poiOverlayManager.isInitialized) poiOverlayManager else null,
+                        requireContext(),
+                    )
+
                     // Sync stickers from web admin
                     if (::stickerManager.isInitialized) {
                         val stickerLayers = data.stickers ?: emptyList()
@@ -333,15 +341,7 @@ class ArMapFragment : Fragment(), SensorEventListener {
                         Timber.d("ArMapFragment: Synced ${stickerLayers.sumOf { it.stickers?.size ?: 0 }} stickers from global config")
                     }
 
-                    // Apply POI positions if available
-                    if (::poiOverlayManager.isInitialized) {
-                        data.poiPositions?.let { positions ->
-                            poiOverlayManager.loadDynamicPositions(
-                                positions.associate { it.id to Pair(it.lat, it.lng) }
-                            )
-                        }
-                        // Auto-show POI overlay in explorer mode
-                        poiOverlayManager.toggleOverlay()
+                    if (::poiOverlayManager.isInitialized && poiOverlayManager.isOverlayVisible) {
                         parkMapView.invalidate()
                     }
                 }

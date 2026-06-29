@@ -72,22 +72,38 @@ especie (ver §5). El color de copa lo da la paleta de zona.
 
 ---
 
-## 4. Suelo — sistema de baldosas (anti-grilla)
+## 4. Suelo — elementos vectoriales dibujados (no texturas raster)
 
-**Problema que resolvemos:** una baldosa pequeña repetida con `createPattern`
-se lee como una grilla desde lejos. Solución de dos capas (ver
-`draw-ground-texture.ts`):
+**Problema histórico (resuelto Jun 2026):** el suelo se pintaba con una baldosa
+rasterizada repetida (`createPattern(..., 'repeat')`). Eso causaba **dos defectos**:
+1. **Borrosidad** — el raster se ampliaba con el zoom del canvas (`ctx.scale`).
+2. **Deriva** — el patrón no estaba anclado a coordenadas del mundo, así que al
+   hacer zoom in/out el suelo "resbalaba" hacia una esquina.
 
-### 4.1 Súper-baldosa (`buildGroundPatternTile`)
-- `unit = clampGroundTilePx(tilePx)` → tamaño de las *features* (grano), constante.
-- `span = unit * repeatFactor(unit)` → el lienzo del patrón abarca **varias
-  celdas** (`repeat` 2–6). Las features se dispersan por todo el `span` con
-  tamaño `unit` ⇒ **el período de repetición es mucho mayor que el grano**.
-- Teselado sin costuras: features cerca de un borde se **clonan** ±span con
-  `wrapped()`.
-- **Sin rejilla isométrica literal** en la baldosa (era el principal culpable del
-  "look de grilla"). El fondo es color sólido + manchas planas (`flatPatch`) +
-  iconos cartoon (hierba, piedra, hoja, flor).
+**Solución actual:** los elementos del suelo (piedras, hierba, paja, hojas, flores,
+guijarros, grietas, arbustos, juncos, pétalos, tierra, parches) se **dibujan como
+vectores directamente en espacio mundo**, igual que los árboles. Resultado: **nítidos
+a cualquier zoom** y **anclados** (no derivan). Jerarquía por capa (en
+`fillPolygonWithGroundTexture`):
+
+1. **Color base sólido** de la zona (`palette.base`) — relleno plano, nítido.
+2. **Variación macro** (`paintMacroVariation`) — manchas grandes de relieve.
+3. **Elementos sembrados** (`scatterGroundElements`) — ver 4.1.
+4. **Tinte de sección** (color de la zona, opacidad baja).
+5. **Ecotono / puente** con la zona vecina (`paintEcotoneBridge`).
+
+### 4.1 Scatter vectorial anclado por celda (`scatterGroundElements`)
+- Cada tipo de elemento se siembra sobre una **grilla absoluta en coordenadas del
+  mundo**: `cell = 8/√(densidad·calidad)` px mundo, una instancia por celda con
+  jitter determinista (seed = hash de `celdaX, celdaY, sección, tipo`).
+- Anclaje absoluto ⇒ **sin deriva** al hacer pan/zoom (la misma celda da siempre la
+  misma posición). Vectorial ⇒ **sin borrosidad**.
+- **Viewport culling**: solo se siembran las celdas dentro del viewport visible
+  (`GroundViewport` que pasa `map-control`), así el coste no crece al alejar.
+- **Presupuesto** (`SCATTER_BUDGET`): si el área visible pide demasiadas celdas, la
+  celda se agranda → acota el nº de dibujos por frame.
+- Tamaño de cada elemento = `unit · (sizeMin…sizeMax)` en px mundo (`unit =
+  resolveGroundTilePx`), reutilizando las primitivas cartoon vía `drawElementWorld`.
 
 ### 4.2 Variación macro (`paintMacroVariation`, dentro de `fillPolygonWithGroundTexture`)
 - Manchas **grandes** (radio decenas–cientos de px) en **coordenadas del mundo**,
@@ -96,46 +112,131 @@ se lee como una grilla desde lejos. Solución de dos capas (ver
   natural** (parches claros/oscuros, leve relieve), no una grilla.
 - Alpha bajo (0.05–0.14) para no tapar el color de zona ni los iconos.
 
-> **Resultado buscado:** de cerca se ven las baldosas cartoon (hierba, piedras);
-> de lejos se ve un suelo con variación orgánica. Si vuelve a verse "cuadriculado",
-> primero **sube `repeatFactor`** y/o **sube la densidad/escala de
-> `paintMacroVariation`**; no añadas líneas de grilla.
+> **Resultado buscado:** de cerca se ven los elementos cartoon nítidos (hierba,
+> piedras); de lejos, suelo con variación orgánica y elementos finos que se ocultan
+> por LOD. Si se ve "vacío", **sube la densidad** de los elementos o la
+> **densidad/escala de `paintMacroVariation`**.
 
 ### 4.3 Configuración del suelo — `GROUND_STYLE` (punto único de ajuste)
 **Todo el aspecto del suelo se controla desde `GROUND_STYLE`** en
 `draw-ground-texture.ts`. Es un `Record<sección, ZoneGroundStyle>` con:
 
 ```ts
+type GroundElementType =
+  | 'patch' | 'stone' | 'grass' | 'leaf' | 'flower' | 'shadow'   // base
+  | 'pebbles' | 'crack' | 'bush' | 'reed' | 'petal' | 'dirt';    // ampliación
+
 interface GroundElementSpec {
-  type: 'patch'|'stone'|'grass'|'leaf'|'flower'|'shadow';
+  type: GroundElementType;
   density: number;   // por área (× span²/64). MÁS BAJO = más espacio plano
   min?: number;      // mínimo absoluto por baldosa
   sizeMin: number;   // tamaño en múltiplos de `unit` (escala a cualquier zoom)
   sizeMax: number;
 }
-interface ZoneGroundStyle { elements: GroundElementSpec[]; macroDensity: number; macroAlpha: number; }
+interface ZoneGroundStyle {
+  elements: GroundElementSpec[];
+  macroDensity: number;
+  macroAlpha: number;
+  edgeBlend?: number;       // px mundo del ecotono (difuminado de borde). 0 = corte duro
+  edgeBlendAlpha?: number;  // intensidad del ecotono (0..1)
+}
 ```
 
-Para **cambiar el aspecto de una zona** solo editas su entrada. Reglas prácticas:
-- **Menos elementos / más plano** → baja `density` (y `min`) del icono.
-- **Iconos más grandes/pequeños** → ajusta `sizeMin/sizeMax` (en unidades de `unit`).
-- **Menos/más variación a distancia** → `macroDensity` / `macroAlpha` (0 = sin macro).
-- **Añadir un icono** → agrega un `GroundElementSpec` al array de la zona.
+### 4.3.1 Tipos de textura disponibles
+| Tipo | Dibujo | Buen uso |
+|---|---|---|
+| `patch` | mancha plana de color | romper uniformidad (todas las zonas) |
+| `grass` | 3 briznas curvas | pradera |
+| `stone` | piedra con luz | árido / orillas |
+| `pebbles` | racimo de guijarros | árido, caminos |
+| `dirt` | granos finos oscuros | suelo terroso |
+| `crack` | grieta de tierra seca | **Altas** (café) |
+| `leaf` | hoja con nervadura | selva |
+| `flower` | flor con centro claro | pradera |
+| `petal` | pétalos caídos | pradera florida |
+| `bush` | arbusto bajo cel-shaded | selva / valle |
+| `reed` | juncos altos | humedal / selva |
+| `shadow` | elipse oscura suave | dosel selvático |
 
-**UI del mapa (admin):** Panel lateral → **Capas** → con *Texturas suelo* activas,
-sección **Estilo suelo por zona** (sliders de densidad + macro). Persiste en sesión
-local y en configuraciones guardadas (`groundStyle` en `MapConfigData`). Los defaults
-de código siguen en `GROUND_STYLE`; la UI escribe overrides vía
-`setGroundStyleOverride()` / `exportGroundStyleSnapshot()`.
+### 4.3.2 Ecotono elaborado — puente entre zonas (`edgeBlend` + `DEFAULT_ECOTONE_BRIDGE`)
+
+**El problema:** cada zona se recorta con `clip()` exacto → Altas (café) choca con Medias (verde).
+
+**La solución** tiene **4 capas** en la franja del borde (`paintEcotoneBridge`):
+
+1. **Fade hacia la zona vecina** — anillos con el **color base de la base parque** (más opaco hacia el borde) → el verde/café se diluye en el puente neutro.
+2. **Lavado de paleta** — `lerpPalette(zona, baseParque, t)` en anillos concéntricos → el color base se mezcla suavemente.
+3. **Relieve cartoon** — acentos de luz en la franja.
+4. **Iconos de puente** — hierba, tierra, guijarros… sembrados a lo largo del perímetro con alpha ∝ distancia al borde; paleta también mezclada.
+
+Como **ambas zonas vecinas** funden hacia la **misma base neutra**, el encuentro café↔verde pasa por un ecotono visible en lugar de una línea.
+
+```ts
+interface EcotoneBridgeStyle {
+  elements: GroundElementSpec[];  // texturas del puente
+  paletteMix: number;             // 0..1 mezcla de color hacia base
+  basePatternMix: number;         // 0..1 patrón de base sobre la franja
+  zoneFade: number;               // 0..1 intensidad del fade de zona
+}
+```
+
+**Preset de referencia** (copiar / aprender): `DEFAULT_ECOTONE_BRIDGE` en `draw-ground-texture.ts`:
+
+| Zona | Texturas del puente | paletteMix |
+|---|---|---|
+| Altas (0) | dirt, pebbles, grass, patch | 0.92 |
+| Medias (1) | grass, dirt, patch, pebbles | 0.88 |
+| Bajas (2) | leaf, grass, dirt, patch | 0.85 |
+| Base (-1) | patch, grass, stone | 0.78 |
+
+Controles UI: `edgeBlend` (ancho px, default 28–34) y `edgeBlendAlpha` (fuerza). El puente usa el preset salvo que `ZoneGroundStyle.bridge` lo sobreescriba.
+
+### 4.3.3 Zoom, nitidez y rendimiento
+
+Al dibujarse como **vectores en espacio mundo** bajo el `ctx.scale` del canvas, los
+elementos **siempre se ven nítidos** (no hay raster que ampliar) y **no derivan** (la
+posición sale de una grilla absoluta del mundo). El coste por frame se controla con
+tres palancas: **viewport culling** (solo se siembra lo visible), **presupuesto de
+celdas** (`SCATTER_BUDGET`) y el dial de **Calidad**. El **Tamaño base** de los
+elementos se ajusta con `groundTilePx` (2–48 px mundo) o en **Auto** (preset + tamaño
++ calidad).
+
+### 4.3.4 Presets, tamaño, calidad y LOD — `utils/ground-preset.ts`
+
+El admin controla el suelo con **un preset + dos diales**, todo en la UI (Panel → **Capas** → *Elementos del suelo* → **Preset suelo**):
+
+- **Preset** (`GroundPresetId`): `performance` (⚡ menos elementos, grano grueso, LOD on), `subtle`, `balanced` (default), `rich`, `carbot`. Cada uno fija `recipeScale`, `baseQuality` y `baseTilePx`.
+- **Tamaño general** (`scalePercent`, 50–200 %): escala **proporcionalmente** densidad y tamaño de elementos, ecotono (`edgeBlend`) y tamaño base Auto.
+- **Calidad** (`qualityPercent`, 25–100 %): reduce **solo el número** de elementos (densidad, scatter del ecotono, macro) para ganar rendimiento; **no cambia el tamaño** de cada elemento. `densidadFinal = tamaño × calidad`.
+- **LOD al alejar** (`lodEnabled` + umbrales `lodFineZoom`/`lodMediumZoom`/`lodEcotoneZoom`): al alejar el zoom, primero desaparece el detalle fino (piedras, guijarros, flores, pétalos, grietas, tierra, juncos), luego el medio (hierba, hojas, arbustos), y el ecotono se simplifica (8→5→3→0 pasos).
+
+Persistencia: `groundSettings` (preset/tamaño/calidad/LOD) y `groundStyle` (overrides finos por zona) en `MapConfigData`. El tamaño base manual (`groundTilePx`) tiene prioridad hasta pulsar **Auto**.
+
+Para **cambiar el aspecto de una zona** editas su lista de elementos en la UI:
+- **Menos elementos / más plano** → baja la **Densidad** del elemento.
+- **Elementos más grandes/pequeños** → ajusta **Tamaño mín** / **Tamaño máx**.
+- **Menos/más variación a distancia** → `macroDensity` / `macroAlpha` (0 = sin macro).
+- **Añadir/quitar un elemento** → **+ elemento** / botón **×**.
+- **Suavizar bordes** → sube `edgeBlend` / `edgeBlendAlpha`.
+- **Igualar todas las zonas** → **⇊ Aplicar a todas las zonas** copia los elementos
+  (y macro/ecotono) de la zona en edición a las 3 zonas + base + fondo.
+
+**UI del mapa (admin):** Panel lateral → **Capas** → con *Elementos del suelo* activos,
+sección **Elementos por zona**: selector de zona + **Difuminado borde** + **Fuerza**
++ por elemento (densidad, tamaño mín/máx, quitar) + **+ elemento** + **⇊ Aplicar a
+todas las zonas** + macro + restaurar.
+Persiste en sesión local y en configuraciones guardadas (`groundStyle` en
+`MapConfigData`). Los defaults de código siguen en `GROUND_STYLE`; la UI escribe
+overrides vía `setGroundStyleOverride()` / `exportGroundStyleSnapshot()`.
 
 **Estado actual por zona** (resumen; la verdad está en el código):
-| Zona | Iconos (density) | Carácter |
-|---|---|---|
-| Altas (0) | patch 0.18 · **stone 0.16** · **grass 0.16** | árido, **mucho plano**, pocas piedras/paja |
-| Medias (1) | patch 0.3 · grass 0.7 · flower 0.22 | pradera densa con florecillas |
-| Bajas (2) | patch 0.34 · shadow 0.3 · leaf 0.42 · stone 0.16 | hojarasca + sombras de dosel |
-| Base parque (-1) | patch 0.26 · grass 0.4 | pradera neutra suave |
-| Fondo (-2) | patch 0.16 · stone 0.07 · grass 0.08 | textura neutra **muy sutil** alrededor del mapa |
+| Zona | Iconos (density) | edgeBlend | Carácter |
+|---|---|---|---|
+| Altas (0) | patch · crack · stone · pebbles · grass | 16 | árido, **mucho plano**, grietas |
+| Medias (1) | patch · grass · flower · petal · bush | 16 | pradera densa con flores |
+| Bajas (2) | patch · shadow · leaf · bush · reed · stone | 18 | hojarasca + sotobosque |
+| Base parque (-1) | patch · grass | 22 | pradera neutra **puente** entre zonas |
+| Fondo (-2) | patch · stone · grass | 0 | textura neutra **muy sutil** |
 
 ---
 
@@ -204,45 +305,48 @@ Color de acento de efectos: amarillo `#FFD628` (rayo), azul `#46A0EB` (gotas),
 
 ## 6.5 Tamaños ideales y escalabilidad
 
-Nada está fijado en píxeles absolutos: **el suelo escala con `unit`** (tamaño de
-baldosa) y **los árboles con `h`** (altura mundo). Por eso aceptan cualquier
+Nada está fijado en píxeles absolutos: **el suelo escala con `unit`** (tamaño base
+del elemento) y **los árboles con `h`** (altura mundo). Por eso aceptan cualquier
 tamaño. Referencias (en `map-park-visual-scale.ts` → `PARK_MAP_VIS`):
 
 | Cosa | Variable | Ideal | Rango válido |
 |---|---|---|---|
-| Baldosa (grano del suelo) | `groundTilePx` | **5 px** | `groundTileMin`=2 … `groundTileMax`=48 |
-| Súper-baldosa (lienzo patrón) | `span = unit * repeatFactor(unit)` | `repeat` 2–6 (≈`150/unit`) | ≤ ~190 px de lado |
-| Icono de suelo | `unit * sizeMin..sizeMax` | piedra ≈0.2·unit, hierba ≈0.3·unit, parche ≈1·unit | cualquiera, definido por zona |
+| Tamaño base del elemento | `groundTilePx` | **5 px** | `groundTileMin`=2 … `groundTileMax`=48 |
+| Separación de scatter | `cell = 8/√(densidad·calidad)` | ~10–25 px mundo | `SCATTER_MIN_CELL`=5 … acotado por presupuesto |
+| Elemento de suelo | `unit * sizeMin..sizeMax` | piedra ≈0.2·unit, hierba ≈0.3·unit, parche ≈1·unit | cualquiera, definido por zona |
 | Mancha macro | `min(w,h) * 0.32 × (0.6..1.7)` | decenas–cientos px (mundo) | escala con el polígono |
 | Árbol (altura) | `treeBaseWorld`=8 · `scale` | **8 px mundo** | mínimo `treeMinWorld`=3.2 |
 | Contorno árbol | `h * outline` | `h * 0.045` | proporcional, nunca fijo |
 | Sombra de árbol | `h * shadowW` | `h * 0.66–0.98` | proporcional |
 
 **Regla de oro para “aceptar cualquier tamaño”:** expresa toda medida como
-fracción de `unit` (suelo) o de `h` (árbol/efecto). Nunca pongas px crudos.
-Si necesitas un grano más fino al alejar, **baja `tilePx`**; el `repeatFactor`
-sube solo para mantener un período de repetición grande (anti-grilla).
+fracción de `unit` (suelo) o de `h` (árbol/efecto). Nunca pongas px crudos. Los
+elementos del suelo se **dibujan como vectores** (nunca raster) para no perder
+nitidez al ampliar.
 
 ---
 
 ## 7. Reglas técnicas (no romper)
 
 1. **Contratos exportados estables.** No cambiar firmas de:
-   `buildGroundPatternTile`, `GroundPatternCache`, `fillPolygonWithGroundTexture`,
-   `MapBackdropCache`, `fillMapRectWithBackdrop`, `groundPaletteForSection`,
+   `fillPolygonWithGroundTexture`, `fillMapRectWithBackdrop`, `GroundPatternCache`
+   (shell de compatibilidad), `MapBackdropCache`, `groundPaletteForSection`,
    `drawSimpleTree`, `treePaletteForSection`, ni las clases de efectos
    (`tick`/`draw`/`setIntensity`/`setSizeMul`/`setContainsPoint`/`clear`).
+   **El suelo ya NO usa patrón raster** (`buildGroundPatternTile`/`createPattern`
+   fueron eliminados): se dibuja con `scatterGroundElements` en espacio mundo.
 2. **Determinismo.** Aleatoriedad SIEMPRE vía `seededRand`. Mismo input ⇒ mismo
    render.
-3. **Teselado.** Todo icono de suelo grande usa `wrapped()` para no cortar en el
-   borde de la súper-baldosa.
-4. **Caché.** Los patrones se cachean por `(sección, tema, tilePx)` en
-   `GroundPatternCache`. Si cambias el tamaño/seed, invalida con `clear()`.
+3. **Suelo vectorial en espacio mundo.** Los elementos se dibujan con
+   `drawElementWorld` / `scatterGroundElements`, anclados a una grilla absoluta del
+   mundo (sin raster, sin deriva). No reintroducir `createPattern`.
+4. **Culling + presupuesto.** `scatterGroundElements` solo siembra el viewport
+   visible y acota celdas con `SCATTER_BUDGET`. Pasar siempre el `GroundViewport`.
 5. **Coordenadas.** Los efectos viven en el **plano del mapa** (`bx,by`) y se
    proyectan con `toScreen`; así rotan/zoom con la vista. El relámpago vive en
    el **viewport** (0..1).
 6. **Performance.** Sin `shadowBlur` en bucles grandes; sin `filter`; preferir
-   relleno plano. Súper-baldosa ≤ ~190 px de lado.
+   relleno plano. Ajustar densidad/calidad/LOD si baja el FPS.
 
 ---
 

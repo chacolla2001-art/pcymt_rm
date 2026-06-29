@@ -153,21 +153,9 @@ class StatsFragment : Fragment() {
     }
 
     private fun setupNavigationButtons() {
-        binding.cardCollection.setOnClickListener {
-            findNavController().navigate(R.id.navigation_collection)
-        }
-        binding.cardMap.setOnClickListener {
-            findNavController().navigate(R.id.navigation_map)
-        }
-        binding.cardProfile.setOnClickListener {
-            findNavController().navigate(R.id.navigation_profile)
-        }
-
-        // Modo Explorador (Pokémon Go style) — disponible para todos los dispositivos
         binding.cardExplorer.setOnClickListener {
             findNavController().navigate(R.id.navigation_ar_map)
         }
-
     }
 
     private fun applyDeviceTierUi() {

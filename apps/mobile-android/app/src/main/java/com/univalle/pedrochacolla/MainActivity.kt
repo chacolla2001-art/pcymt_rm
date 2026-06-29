@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.findNavController
+import androidx.navigation.ui.setupWithNavController
+import com.univalle.pedrochacolla.R
 import com.univalle.pedrochacolla.databinding.ActivityMainBinding
 import com.univalle.pedrochacolla.ui.onboarding.OnboardingActivity
 import com.univalle.pedrochacolla.ui.ar.ArFragment
@@ -45,6 +47,7 @@ class MainActivity : AppCompatActivity() {
 
         InteractionTracker.init(this)
         val navController = findNavController(R.id.nav_host_fragment_activity_main)
+        setupBottomNavigation(navController)
 
         // Centralized AR mode management: only manage immersive mode here
         navController.addOnDestinationChangedListener { _, destination, _ ->
@@ -97,7 +100,20 @@ class MainActivity : AppCompatActivity() {
         finish()
     }
 
-    // Navigation is handled directly via NavController; no BottomNavigationView in game UX.
+    private fun setupBottomNavigation(navController: NavController) {
+        val topLevel = setOf(
+            R.id.navigation_stats,
+            R.id.navigation_map,
+            R.id.navigation_collection,
+            R.id.navigation_profile,
+        )
+        binding.bottomNav.setupWithNavController(navController)
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            binding.bottomNav.visibility =
+                if (destination.id in topLevel) android.view.View.VISIBLE
+                else android.view.View.GONE
+        }
+    }
 
     /**
      * Checks device compatibility before navigating to the AR experience.

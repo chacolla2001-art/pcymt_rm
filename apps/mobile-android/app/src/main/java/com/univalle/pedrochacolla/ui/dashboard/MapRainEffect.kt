@@ -20,10 +20,7 @@ class MapRainEffect {
 
     var intensity = 0.45f
     var sizeMul = 1f
-
-    fun setSizeMul(value: Float) {
-        sizeMul = value.coerceIn(0.08f, 2.5f)
-    }
+        set(value) { field = value.coerceIn(0.08f, 2.5f) }
 
     data class MapPlaneBounds(
         val minX: Float,

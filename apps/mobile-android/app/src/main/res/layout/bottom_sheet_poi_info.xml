@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="@dimen/spacing_lg">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/poi_sheet_title"
+        android:textAppearance="@style/TextAppearance.PCyMT.Label" />
+
+    <TextView
+        android:id="@+id/tvPoiName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_xs"
+        android:textAppearance="@style/TextAppearance.PCyMT.Title"
+        tools:text="Mirador" />
+
+    <TextView
+        android:id="@+id/tvPoiSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/spacing_sm"
+        android:lineSpacingExtra="4dp"
+        android:textAppearance="@style/TextAppearance.PCyMT.Body"
+        tools:text="Vista panorámica del parque." />
+</LinearLayout>
