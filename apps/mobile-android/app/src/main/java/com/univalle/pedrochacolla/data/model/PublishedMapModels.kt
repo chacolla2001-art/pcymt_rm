@@ -207,7 +207,7 @@ data class LayerFrameTransformData(
 data class BaseRingFrameData(
     val x: Float = 0f,
     val y: Float = 0f,
-    val scale: Float = 1f,
+    val scale: Float = 0.9f,
     @SerializedName("rotationDeg")
     val rotationDeg: Float = 0f,
     @SerializedName("innerExpandPx")

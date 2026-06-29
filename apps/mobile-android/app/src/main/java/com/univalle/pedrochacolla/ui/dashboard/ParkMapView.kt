@@ -2463,10 +2463,8 @@ class ParkMapView @JvmOverloads constructor(
     }
 
     private fun getBaseRingPlatePoints(w: Float, h: Float, frames: MapLayerFramesData): List<ScreenPoint> {
-        val plate = frames.mapPlate ?: LayerFrameTransformData()
-        val ring = frames.baseRing
-        val platePts = MapLayerGeometry.mapPlateCanvasPoints(w, h, plate)
-        return MapLayerGeometry.expandPolygonOutward(platePts, ring?.outerExpandPx ?: 0f)
+        val ring = frames.baseRing ?: BaseRingFrameData()
+        return MapLayerGeometry.baseRingPlateCanvasPoints(w, h, ring)
     }
 
     private fun getBaseRingHolePoints(frames: MapLayerFramesData): List<ScreenPoint> {
@@ -2491,6 +2489,10 @@ class ParkMapView @JvmOverloads constructor(
 
         MapGroundRenderer.drawMapBackdrop(
             canvas, w, h, isDarkTheme, scale,
+            publishedGroundStyle, publishedGroundSettings, vp, platePoints,
+        )
+        MapGroundRenderer.drawMapPlateSurface(
+            canvas, isDarkTheme, scale,
             publishedGroundStyle, publishedGroundSettings, vp, platePoints,
         )
 
@@ -2521,8 +2523,18 @@ class ParkMapView @JvmOverloads constructor(
         }
     }
 
-    /** Mismo cuadrado del plano en coordenadas geo (para árboles en capas -1/-2). */
+    /** Cuadrado grande del plano en coordenadas geo (fondo -2). */
     private fun mapPlateGeoPolygon(): List<GeoPoint> {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return emptyList()
+        val frames = MapLayerGeometry.normalize(publishedLayerFrames)
+        val pts = MapLayerGeometry.mapPlateCanvasPoints(w, h, frames.mapPlate!!)
+        return pts.map { canvasToGeo(it.x, it.y) }
+    }
+
+    /** Cuadrado interior del anillo base (-1) en coordenadas geo. */
+    private fun baseRingGeoPolygon(): List<GeoPoint> {
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return emptyList()
@@ -2539,12 +2551,13 @@ class ParkMapView @JvmOverloads constructor(
         val treeVp = MapTreesRenderer.Viewport(vp.minX, vp.minY, vp.maxX, vp.maxY)
         val geoFn: (GeoPoint) -> ScreenPoint = { geoToCanvas(it) }
         val mapPlate = mapPlateGeoPolygon()
+        val ringPlate = baseRingGeoPolygon()
         MapTreesRenderer.drawBackdrop(
             canvas, publishedTrees, geoFn, mapPlate, isDarkTheme, publishedTreesSizeMul, treeVp,
             scale, publishedGroundSettings,
         )
         MapTreesRenderer.drawBasePark(
-            canvas, publishedTrees, geoFn, parkBoundary, mapPlate, isDarkTheme, publishedTreesSizeMul,
+            canvas, publishedTrees, geoFn, parkBoundary, ringPlate, isDarkTheme, publishedTreesSizeMul,
             treeVp, scale, publishedGroundSettings,
         )
     }

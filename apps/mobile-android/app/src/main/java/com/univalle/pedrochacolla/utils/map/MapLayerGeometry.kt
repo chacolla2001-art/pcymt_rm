@@ -25,7 +25,7 @@ object MapLayerGeometry {
 
     fun defaultFrames() = MapLayerFramesData(
         mapPlate = LayerFrameTransformData(),
-        baseRing = BaseRingFrameData(),
+        baseRing = BaseRingFrameData(scale = 0.9f),
         zones = LayerFrameTransformData(),
         markers = LayerFrameTransformData(),
     )
@@ -121,6 +121,28 @@ object MapLayerGeometry {
             ParkMapView.ScreenPoint(cx + dx * shrink, cy + dy * shrink)
         }
     }
+
+    /** Cuadrado exterior del anillo base (-1); marco propio, no el plano grande. */
+    fun baseRingPlateCanvasPoints(
+        w: Float,
+        h: Float,
+        ringFrame: LayerFrameTransformData,
+        outerExpandPx: Float,
+    ): List<ParkMapView.ScreenPoint> {
+        val pts = mapPlateCanvasPoints(w, h, ringFrame)
+        return expandPolygonOutward(pts, outerExpandPx)
+    }
+
+    fun baseRingPlateCanvasPoints(
+        w: Float,
+        h: Float,
+        ring: BaseRingFrameData,
+    ): List<ParkMapView.ScreenPoint> = baseRingPlateCanvasPoints(
+        w,
+        h,
+        LayerFrameTransformData(ring.x, ring.y, ring.scale, ring.rotationDeg),
+        ring.outerExpandPx,
+    )
 
     fun combineOffset(
         dragX: Float,

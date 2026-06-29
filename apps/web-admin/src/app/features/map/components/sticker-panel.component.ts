@@ -317,7 +317,7 @@ export interface MapViewInfo {
           <span class="section-title">Plano del mapa (fondo)</span>
         </div>
         <div class="section-content" *ngIf="openSections.geomMapPlate">
-          <p class="section-hint compact">Cuadrado grande detrás del parque (capa -2 y borde exterior del anillo).</p>
+          <p class="section-hint compact">Cuadrado grande del plano (superficie gris). Fuera de él queda el fondo (-2).</p>
           <ng-container *ngTemplateOutlet="frameSliders; context: { $implicit: localLayerFrames.mapPlate, target: 'mapPlate' }"></ng-container>
         </div>
       </div>
@@ -328,7 +328,7 @@ export interface MapViewInfo {
           <span class="section-title">Base parque (anillo)</span>
         </div>
         <div class="section-content" *ngIf="openSections.geomBaseRing">
-          <p class="section-hint compact">Anillo entre el contorno y el plano. La expansión interior no mueve el contorno visible.</p>
+          <p class="section-hint compact">Cuadrado interior cercano al contorno. El anillo (-1) va entre este marco y el contorno.</p>
           <div class="param-row">
             <label>Exp. interior</label>
             <input type="range" min="0" max="200" step="2"
@@ -383,7 +383,7 @@ export interface MapViewInfo {
             [ngModel]="frame.y" (ngModelChange)="onLayerFrameChange(target, 'y', $event)">
           <span class="param-val">{{ frame.y }}px</span>
         </div>
-        <div class="param-row" *ngIf="target !== 'baseRing'">
+        <div class="param-row">
           <label>Escala</label>
           <input type="range" min="50" max="200" step="1"
             [ngModel]="frameScalePercent(frame)"

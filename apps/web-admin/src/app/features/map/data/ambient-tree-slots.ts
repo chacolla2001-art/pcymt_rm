@@ -135,16 +135,16 @@ export function resolveTreePlacementSection(
 }
 
 /**
- * Base del parque: anillo entre el contorno y el cuadrado grande del plano del mapa.
- * `mapPlate` = esquinas del plano (no el bbox geográfico del parque).
+ * Anillo base (-1): entre el contorno y el cuadrado interior del anillo (baseRing).
+ * `ringOuterPlate` = esquinas del cuadrado interior (no el plano grande).
  */
 export function isGeoInParkBaseFrame(
   geo: GeoPoint,
   boundary: GeoPoint[],
-  mapPlate: GeoPoint[],
+  ringOuterPlate: GeoPoint[],
 ): boolean {
-  if (!boundary.length || mapPlate.length < 3) return false;
-  if (!isGeoInMapPlate(geo, mapPlate)) return false;
+  if (!boundary.length || ringOuterPlate.length < 3) return false;
+  if (!isGeoInMapPlate(geo, ringOuterPlate)) return false;
   if (isPointInPolygon(geo, boundary)) return false;
   return true;
 }
@@ -166,13 +166,13 @@ export function isTreeParkBaseFrame(
   return isGeoInParkBackdropFrame(geo, boundary);
 }
 
-/** Click válido en capa base (-1): anillo entre contorno y plano del mapa. */
+/** Click válido en capa base (-1): anillo entre contorno y cuadrado interior del anillo. */
 export function canPlaceTreeOnBaseParkLayer(
   geo: GeoPoint,
   boundary: GeoPoint[],
-  mapPlate: GeoPoint[],
+  ringOuterPlate: GeoPoint[],
 ): boolean {
-  return isGeoInParkBaseFrame(geo, boundary, mapPlate);
+  return isGeoInParkBaseFrame(geo, boundary, ringOuterPlate);
 }
 
 /** Click válido en fondo (-2): fuera del cuadrado grande del plano. */
@@ -192,11 +192,11 @@ export function resolveTreePlacementForParkMode(
   geo: GeoPoint,
   sections: Array<{ name: string; polygon: GeoPoint[] }>,
   boundary: GeoPoint[],
-  mapPlate: GeoPoint[],
+  ringOuterPlate: GeoPoint[],
 ): number | null {
   const inside = resolveTreePlacementSection(geo, sections, boundary);
   if (inside !== null) return inside;
-  if (isGeoInParkBaseFrame(geo, boundary, mapPlate)) return TREE_BASE_PARK_SECTION;
+  if (isGeoInParkBaseFrame(geo, boundary, ringOuterPlate)) return TREE_BASE_PARK_SECTION;
   return null;
 }
 
@@ -204,9 +204,9 @@ export function canPlaceTreeInParkMode(
   geo: GeoPoint,
   sections: Array<{ name: string; polygon: GeoPoint[] }>,
   boundary: GeoPoint[],
-  mapPlate: GeoPoint[],
+  ringOuterPlate: GeoPoint[],
 ): boolean {
-  return resolveTreePlacementForParkMode(geo, sections, boundary, mapPlate) !== null;
+  return resolveTreePlacementForParkMode(geo, sections, boundary, ringOuterPlate) !== null;
 }
 
 /** @deprecated pasar mapPlate explícito */

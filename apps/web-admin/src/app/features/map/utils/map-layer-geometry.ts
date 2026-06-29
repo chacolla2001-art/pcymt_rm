@@ -18,9 +18,9 @@ export interface BaseRingFrameConfig extends MapLayerFrameTransform {
 }
 
 export interface MapLayerFramesData {
-  /** Cuadrado grande del plano (fondo -2 y borde exterior del anillo). */
+  /** Cuadrado grande del plano: superficie interior y límite exterior del fondo (-2). */
   mapPlate: MapLayerFrameTransform;
-  /** Anillo entre plano y contorno (-1). */
+  /** Cuadrado interior del anillo base (-1), cercano al contorno del parque. */
   baseRing: BaseRingFrameConfig;
   /** Zonas 0/1/2 (además de layerOffsets.sections al arrastrar). */
   zones: MapLayerFrameTransform;
@@ -37,6 +37,7 @@ export const DEFAULT_LAYER_FRAME: MapLayerFrameTransform = {
 
 export const DEFAULT_BASE_RING_FRAME: BaseRingFrameConfig = {
   ...DEFAULT_LAYER_FRAME,
+  scale: 0.9,
   innerExpandPx: 0,
   outerExpandPx: 0,
 };
@@ -158,15 +159,28 @@ export function contractPolygonInward(points: CanvasPoint[], insetPx: number): C
   });
 }
 
-/** Plano del mapa con expansión extra del anillo hacia fuera. */
+/**
+ * Cuadrado exterior del anillo base (-1): marco propio (baseRing) + expansión opcional.
+ * Distinto del plano grande (mapPlate).
+ */
+export function baseRingPlateCanvasPoints(
+  w: number,
+  h: number,
+  ringFrame: MapLayerFrameTransform,
+  outerExpandPx: number,
+): CanvasPoint[] {
+  const pts = mapPlateCanvasPoints(w, h, ringFrame);
+  return expandPolygonOutward(pts, outerExpandPx);
+}
+
+/** @deprecated Usar baseRingPlateCanvasPoints (antes confundía plano grande con anillo). */
 export function mapPlatePointsForBaseRing(
   w: number,
   h: number,
-  plateFrame: MapLayerFrameTransform,
+  ringFrame: MapLayerFrameTransform,
   outerExpandPx: number,
 ): CanvasPoint[] {
-  const pts = mapPlateCanvasPoints(w, h, plateFrame);
-  return expandPolygonOutward(pts, outerExpandPx);
+  return baseRingPlateCanvasPoints(w, h, ringFrame, outerExpandPx);
 }
 
 /** Contorno usado como hueco al recortar el anillo base (-1). */

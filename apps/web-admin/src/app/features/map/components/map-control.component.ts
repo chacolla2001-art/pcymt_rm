@@ -36,6 +36,7 @@ import {
 } from '../data/park-geometry';
 import {
   isPointInPolygon,
+  isGeoInMapPlate,
   findParkSectionAt,
   sectionLabelCentroids,
   toParkSectionsView,
@@ -95,6 +96,7 @@ import {
   fillPolygonWithGroundTexture,
   MapBackdropCache,
   fillMapRectWithBackdrop,
+  fillMapPlateSurface,
   clipParkBaseFrame,
   clipOutsideMapSquare,
   parkInteriorGroundPalette,
@@ -140,7 +142,7 @@ import {
   inverseLayerFramePoint,
   mapPlateCanvasPoints,
   mapPlateGeoPolygon as buildMapPlateGeoPolygon,
-  mapPlatePointsForBaseRing,
+  baseRingPlateCanvasPoints,
   normalizeMapLayerFrames,
   type MapLayerFramesData,
   type MapLayerFrameTransform,
@@ -852,7 +854,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private readonly MARKER_INNER_RADIUS = 4;
   private readonly MARKER_WARNING_RADIUS = 16;
 
-  // Bounds — mismo cuadrado que el marco gris del mapa
+  // Bounds geográficos para proyección (≠ cuadrado grande del plano en canvas)
   private bounds: MapFrameGeoBounds = MAP_FRAME_GEO_BOUNDS;
 
   // Datos
@@ -1552,6 +1554,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       const ringPlatePoints = this.getBaseRingPlatePoints(w, h);
       const vp = this.getGroundViewportForPlate(w, h, platePoints);
       this.drawMapGroundBackdrop(w, h, vp, platePoints);
+      this.drawMapPlateSurface(w, h, vp, platePoints);
       if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('backdrop', lodTier, lodCategories)) {
         this.drawPlacedBackdropTrees(w, h);
       }
@@ -1809,7 +1812,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       },
       isBaseParkTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
         if (!isBaseParkTreeSlot(slot)) return false;
-        return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, this.mapPlateGeoPolygon());
+        return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, this.baseRingGeoPolygon());
       },
       isBackdropTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
         if (!isBackdropTreeSlot(slot)) return false;
@@ -1885,10 +1888,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   private getBaseRingPlatePoints(w: number, h: number): { x: number; y: number }[] {
-    return mapPlatePointsForBaseRing(
+    return baseRingPlateCanvasPoints(
       w,
       h,
-      this.layerFrames.mapPlate,
+      this.layerFrames.baseRing,
       this.layerFrames.baseRing.outerExpandPx,
     );
   }
@@ -1921,8 +1924,35 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.ctx.restore();
   }
 
-  /** Mismo cuadrado en coordenadas geo (para clics y árboles). */
+  /** Superficie del cuadrado grande del plano (interior de mapPlate). */
+  private drawMapPlateSurface(
+    w: number,
+    h: number,
+    viewport: GroundViewport,
+    platePoints: { x: number; y: number }[],
+  ): void {
+    fillMapPlateSurface(
+      this.ctx,
+      platePoints,
+      this.isDarkTheme,
+      this.mapBackdropCache,
+      this.scale,
+      viewport,
+    );
+  }
+
+  /** Cuadrado grande del plano en coordenadas geo (fondo -2 y límite exterior). */
   private mapPlateGeoPolygon(): GeoPoint[] {
+    const canvas = this.canvasRef.nativeElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    const pts = this.getMapPlateCanvasPoints(w, h);
+    return buildMapPlateGeoPolygon(pts, (x, y) => this.mapCanvasPointToGeo(x, y));
+  }
+
+  /** Cuadrado interior del anillo base (-1) en coordenadas geo. */
+  private baseRingGeoPolygon(): GeoPoint[] {
     const canvas = this.canvasRef.nativeElement;
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.width / dpr;
@@ -2707,15 +2737,16 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   private canPlaceTreeAtGeoForTarget(geo: GeoPoint, target: TreeEditorTarget): boolean {
-    const plate = this.mapPlateGeoPolygon();
+    const mapPlate = this.mapPlateGeoPolygon();
+    const ringPlate = this.baseRingGeoPolygon();
     if (target === 'park') {
-      return canPlaceTreeInParkMode(geo, this.editableSections, PARK_BOUNDARY, plate);
+      return canPlaceTreeInParkMode(geo, this.editableSections, PARK_BOUNDARY, ringPlate);
     }
     if (target === TREE_BACKDROP_SECTION) {
-      return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY, plate);
+      return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY, mapPlate);
     }
     if (target === TREE_BASE_PARK_SECTION) {
-      return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, plate);
+      return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, ringPlate);
     }
     const sectionName = findParkSectionAt(geo.lat, geo.lng, this.editableSections);
     const expected = this.editableSections[target]?.name;
@@ -2728,24 +2759,28 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private resolveTreeSectionForPlacement(geo: GeoPoint): number {
     if (this.treeEditorTarget === 'park') {
-      const plate = this.mapPlateGeoPolygon();
-      return resolveTreePlacementForParkMode(geo, this.editableSections, PARK_BOUNDARY, plate)
+      const ringPlate = this.baseRingGeoPolygon();
+      return resolveTreePlacementForParkMode(geo, this.editableSections, PARK_BOUNDARY, ringPlate)
         ?? TREE_BASE_PARK_SECTION;
     }
     return this.treeEditorTarget as number;
   }
 
   private treePlacementHintForRejectedClick(geo: GeoPoint): string {
-    const plate = this.mapPlateGeoPolygon();
+    const mapPlate = this.mapPlateGeoPolygon();
+    const ringPlate = this.baseRingGeoPolygon();
     if (this.treeEditorTarget === TREE_BACKDROP_SECTION) {
       return 'El click debe caer fuera del plano cuadrado del mapa (fondo).';
     }
     if (this.treeEditorTarget === TREE_BASE_PARK_SECTION) {
-      return 'El click debe caer en el anillo base: fuera del contorno y dentro del plano del mapa.';
+      return 'El click debe caer en el anillo base: fuera del contorno y dentro del cuadrado interior del anillo.';
     }
     if (this.treeEditorTarget === 'park') {
-      if (!isPointInPolygon(geo, PARK_BOUNDARY) && !canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, plate)) {
-        return 'Ahí es el fondo fuera del plano. Acércate al mapa o elige «Fondo mapa» en Zona.';
+      if (!isPointInPolygon(geo, PARK_BOUNDARY) && !canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, ringPlate)) {
+        if (!isGeoInMapPlate(geo, mapPlate)) {
+          return 'Ahí es el fondo fuera del plano grande. Acércate al mapa o elige «Fondo mapa» en Zona.';
+        }
+        return 'Ahí es el margen del plano grande (fuera del anillo). Acércate al contorno o al anillo base.';
       }
       return 'El click debe caer en una zona, en el anillo base o dentro del contorno.';
     }

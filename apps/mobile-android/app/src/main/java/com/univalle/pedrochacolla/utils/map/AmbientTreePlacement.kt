@@ -23,16 +23,15 @@ object AmbientTreePlacement {
     }
 
     /**
-     * Base del parque: anillo entre el contorno y el cuadrado grande del plano del mapa.
-     * `mapPlate` = esquinas del plano (no el bbox geográfico del parque).
+     * Anillo base (-1): entre el contorno y el cuadrado interior del anillo (baseRing).
      */
     fun isGeoInParkBaseFrame(
         geo: ParkMapView.GeoPoint,
         boundary: List<ParkMapView.GeoPoint>,
-        mapPlate: List<ParkMapView.GeoPoint>,
+        ringOuterPlate: List<ParkMapView.GeoPoint>,
     ): Boolean {
-        if (boundary.isEmpty() || mapPlate.size < 3) return false
-        if (!ParkMapPlate.isGeoInMapPlate(geo, mapPlate)) return false
+        if (boundary.isEmpty() || ringOuterPlate.size < 3) return false
+        if (!ParkMapPlate.isGeoInMapPlate(geo, ringOuterPlate)) return false
         if (ParkSectionResolver.isPointInPolygon(geo, boundary)) return false
         return true
     }
@@ -40,8 +39,8 @@ object AmbientTreePlacement {
     fun canPlaceTreeOnBaseParkLayer(
         geo: ParkMapView.GeoPoint,
         boundary: List<ParkMapView.GeoPoint>,
-        mapPlate: List<ParkMapView.GeoPoint>,
-    ): Boolean = isGeoInParkBaseFrame(geo, boundary, mapPlate)
+        ringOuterPlate: List<ParkMapView.GeoPoint>,
+    ): Boolean = isGeoInParkBaseFrame(geo, boundary, ringOuterPlate)
 
     /** Fondo (-2): fuera del cuadrado grande del plano. */
     fun canPlaceTreeOnBackdropLayer(

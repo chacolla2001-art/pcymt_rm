@@ -123,6 +123,39 @@ object MapGroundRenderer {
         canvas.restore()
     }
 
+    /** Superficie del cuadrado grande del plano (interior de mapPlate). */
+    fun drawMapPlateSurface(
+        canvas: Canvas,
+        isDark: Boolean,
+        mapScale: Float,
+        groundStyle: Map<Int, ZoneGroundStyleData>,
+        settings: GroundMapSettingsData?,
+        viewport: Viewport,
+        platePoints: List<ParkMapView.ScreenPoint>,
+    ) {
+        if (platePoints.size < 3) return
+        val bounds = polygonBounds(platePoints)
+        val pad = 4f
+        val palette = mapBackdropPalette(isDark)
+        canvas.save()
+        clipInsideMapSquare(canvas, platePoints)
+        fillPaint.color = palette.base
+        canvas.drawRect(
+            bounds.left - pad,
+            bounds.top - pad,
+            bounds.right + pad,
+            bounds.bottom + pad,
+            fillPaint,
+        )
+        val style = groundStyle[-2] ?: emptyZoneStyle()
+        scatterInRect(
+            canvas, palette, style, -2,
+            bounds.left - pad, bounds.top - pad, bounds.right + pad, bounds.bottom + pad,
+            mapScale, settings, viewport,
+        )
+        canvas.restore()
+    }
+
     fun drawPolygonLayer(
         canvas: Canvas,
         points: List<ParkMapView.ScreenPoint>,
@@ -160,6 +193,16 @@ object MapGroundRenderer {
         clipPath.fillType = Path.FillType.EVEN_ODD
         clipPath.addRect(-margin, -margin, margin * 2, margin * 2, Path.Direction.CW)
         appendPolygonReversed(clipPath, squarePoints)
+        canvas.clipPath(clipPath)
+    }
+
+    /** Recorta al interior del cuadrado grande del plano. */
+    fun clipInsideMapSquare(
+        canvas: Canvas,
+        squarePoints: List<ParkMapView.ScreenPoint>,
+    ) {
+        clipPath.reset()
+        appendPolygon(clipPath, squarePoints)
         canvas.clipPath(clipPath)
     }
 

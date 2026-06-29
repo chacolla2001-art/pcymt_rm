@@ -462,12 +462,12 @@ export const GROUND_LAYER_SELECT_OPTIONS: readonly GroundLayerSelectOption[] = [
   {
     value: 'base_park',
     label: 'Base parque (anillo)',
-    hint: 'Anillo gris entre el contorno del parque y el borde del plano cuadrado del mapa.',
+    hint: 'Anillo gris entre el contorno del parque y el cuadrado interior del anillo.',
   },
   {
     value: 'map_backdrop',
     label: 'Fondo mapa (exterior al plano)',
-    hint: 'Fuera del cuadrado grande del plano del mapa.',
+    hint: 'Fuera del cuadrado grande del plano; la superficie interior del plano comparte este estilo.',
   },
 ];
 
@@ -1214,6 +1214,16 @@ export function clipOutsideMapSquare(
   ctx.clip('evenodd');
 }
 
+/** Recorta al interior del cuadrado grande del plano (superficie del plano). */
+export function clipInsideMapSquare(
+  ctx: CanvasRenderingContext2D,
+  squarePoints: { x: number; y: number }[],
+): void {
+  ctx.beginPath();
+  appendPolygonPath(ctx, squarePoints);
+  ctx.clip();
+}
+
 /**
  * @deprecated Huecos entre zonas; la base del parque es el marco cuadrado−contorno.
  */
@@ -1350,4 +1360,43 @@ export function fillMapRectWithBackdrop(
   const unit = resolveGroundTilePx();
   const region = intersectRegion({ minX: x, minY: y, maxX: x + w, maxY: y + h }, viewport);
   scatterGroundElements(ctx, palette, style, -2, unit, lodTier, quality, region);
+}
+
+/** Superficie del cuadrado grande del plano (interior de mapPlate, capa visual del plano). */
+export function fillMapPlateSurface(
+  ctx: CanvasRenderingContext2D,
+  platePoints: { x: number; y: number }[],
+  isDark: boolean,
+  cache: MapBackdropCache,
+  mapScale: number,
+  viewport?: GroundViewport,
+): void {
+  if (platePoints.length < 3) return;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of platePoints) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y);
+    maxY = Math.max(maxY, p.y);
+  }
+  const pad = 4;
+
+  ctx.save();
+  clipInsideMapSquare(ctx, platePoints);
+  fillMapRectWithBackdrop(
+    ctx,
+    minX - pad,
+    minY - pad,
+    maxX - minX + pad * 2,
+    maxY - minY + pad * 2,
+    isDark,
+    cache,
+    mapScale,
+    viewport,
+  );
+  ctx.restore();
 }
