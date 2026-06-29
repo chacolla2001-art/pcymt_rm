@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, AfterViewInit, ViewChild, Inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, AfterViewInit, ViewChild, Inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
@@ -99,16 +99,18 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
           (spatialReferencesChanged)="onSpatialReferencesChanged($event)">
         </app-map-control>
 
-        <app-ground-settings-card
-          [visible]="groundSettingsCardOpen"
-          [isAdmin]="isAdmin"
-          [isDarkTheme]="isDarkTheme"
-          [groundStyle]="groundStyleOpts"
-          [groundSettings]="groundSettingsOpts"
-          [groundTilePx]="currentViewInfo?.groundTilePx ?? 5"
-          (closed)="groundSettingsCardOpen = false"
-          (mapControlEvent)="onMapControlEvent($event)">
-        </app-ground-settings-card>
+        <div class="ground-card-overlay" *ngIf="groundSettingsCardOpen">
+          <app-ground-settings-card
+            [visible]="true"
+            [isAdmin]="isAdmin"
+            [isDarkTheme]="isDarkTheme"
+            [groundStyle]="groundStyleOpts"
+            [groundSettings]="groundSettingsOpts"
+            [groundTilePx]="currentViewInfo?.groundTilePx ?? 5"
+            (closed)="closeGroundSettingsCard()"
+            (mapControlEvent)="onMapControlEvent($event)">
+          </app-ground-settings-card>
+        </div>
       </div>
 
       <!-- Map config panel: always present (hidden behind canvas overlay) -->
@@ -170,6 +172,12 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
     .float-btn--primary {
       font-size: 16px;
       font-weight: 700;
+    }
+    .ground-card-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      pointer-events: none;
     }
   `]
 })
@@ -252,6 +260,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   currentViewInfo: MapViewInfo | null = null;
 
   constructor(
+    private cdr: ChangeDetectorRef,
     private router: Router,
     private mapSession: MapSessionService,
     private themeService: ThemeManagerService,
@@ -381,6 +390,10 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Map control events from sticker panel ─────────────────
 
   onMapControlEvent(event: MapControlEvent): void {
+    if (event.type === 'openGroundSettingsCard') {
+      this.openGroundSettingsCard();
+      return;
+    }
     if (!this.mapControl) return;
     switch (event.type) {
       case 'zoomIn':       this.mapControl.zoomIn(); break;
@@ -393,9 +406,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'disableAllLayers':
         this.mapControl.disableAllMapLayers();
         this.spatialRefsOpts.showSpatialReferences = false;
-        break;
-      case 'openGroundSettingsCard':
-        this.groundSettingsCardOpen = true;
         break;
       case 'groundTilePxChange': this.mapControl.setGroundTilePx(event.value); break;
       case 'groundSettingsChange':
@@ -798,8 +808,19 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  openGroundSettingsCard(): void {
+    this.groundSettingsCardOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  closeGroundSettingsCard(): void {
+    this.groundSettingsCardOpen = false;
+    this.cdr.markForCheck();
+  }
+
   toggleGroundSettingsCard(): void {
     this.groundSettingsCardOpen = !this.groundSettingsCardOpen;
+    this.cdr.markForCheck();
   }
 
   // ── Map config panel events ────────────────────────────────

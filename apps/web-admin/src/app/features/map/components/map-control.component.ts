@@ -92,6 +92,8 @@ import {
   fillPolygonWithGroundTexture,
   MapBackdropCache,
   fillMapRectWithBackdrop,
+  clipParkBaseExcludingZones,
+  paintSectionGroundElements,
   exportGroundStyleSnapshot,
   importGroundStyleSnapshot,
   resetGroundStyleToDefaults,
@@ -1546,6 +1548,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.drawSections(w, h, this.getGroundViewport(w, h, lo));
       this.ctx.restore();
     }
+    if (this.mapOptions.showGroundTextures && PARK_BOUNDARY.length >= 3) {
+      const lo = this.layerOffsets.sections;
+      this.ctx.save();
+      this.ctx.translate(lo.x, lo.y);
+      this.drawParkGroundElements(this.getGroundViewport(w, h, lo));
+      this.ctx.restore();
+    }
     if (this.mapOptions.showBoundary) {
       const lo = this.layerOffsets.boundary;
       this.ctx.save(); this.ctx.translate(lo.x, lo.y);
@@ -1849,7 +1858,53 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.groundPatternCache,
       this.scale,
       viewport,
+      { skipElements: true, skipTint: true, skipEcotone: true },
     );
+  }
+
+  /**
+   * Elementos de la base del parque (-1) encima de las zonas, recortados a caminos
+   * y áreas no cubiertas por polígonos de zona (o todo el parque si zonas OFF).
+   */
+  private drawParkGroundElements(viewport: GroundViewport): void {
+    const parkPoints = PARK_BOUNDARY.map(g => this.geoToCanvas(g));
+    if (parkPoints.length < 3) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of parkPoints) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    const pad = 3;
+    const bbox = {
+      minX: minX - pad,
+      minY: minY - pad,
+      maxX: maxX + pad,
+      maxY: maxY + pad,
+    };
+
+    this.ctx.save();
+    if (this.mapOptions.showSections) {
+      const zoneHoles = this.editableSections
+        .filter((s) => s.polygon.length >= 3)
+        .map((s) => s.polygon.map((g) => this.geoToCanvas(g)));
+      clipParkBaseExcludingZones(this.ctx, parkPoints, zoneHoles);
+    } else {
+      this.ctx.beginPath();
+      this.ctx.moveTo(parkPoints[0].x, parkPoints[0].y);
+      for (let i = 1; i < parkPoints.length; i++) {
+        this.ctx.lineTo(parkPoints[i].x, parkPoints[i].y);
+      }
+      this.ctx.closePath();
+      this.ctx.clip();
+    }
+    paintSectionGroundElements(this.ctx, -1, this.isDarkTheme, bbox, this.scale, viewport);
+    this.ctx.restore();
   }
 
   private drawSections(w: number, h: number, viewport: GroundViewport): void {

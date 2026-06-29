@@ -435,13 +435,13 @@ export interface MapViewInfo {
         </div>
         <div class="section-content" *ngIf="openSections.ground">
           <p class="section-hint compact" *ngIf="!localOpts.showGroundTextures">
-            Activa ON para ver piedras, hierba y variación macro en el mapa.
+            Activa ON para ver piedras, hierba y variación macro en el mapa. Puedes configurar el suelo igualmente.
           </p>
-          <ng-container *ngIf="localOpts.showGroundTextures">
-            <p class="section-hint compact">Tamaño, calidad, elementos por zona y ecotono están en la ficha flotante del mapa.</p>
-            <button type="button" class="tool-btn" style="width:100%"
-              (click)="openGroundSettingsCard()">⚙ Configurar suelo…</button>
-          </ng-container>
+          <p class="section-hint compact" *ngIf="localOpts.showGroundTextures">
+            Tamaño, calidad, elementos por zona y ecotono están en la ficha flotante del mapa.
+          </p>
+          <button type="button" class="tool-btn" style="width:100%"
+            (click)="openGroundSettingsCard(); $event.stopPropagation()">⚙ Configurar suelo…</button>
         </div>
       </div>
 

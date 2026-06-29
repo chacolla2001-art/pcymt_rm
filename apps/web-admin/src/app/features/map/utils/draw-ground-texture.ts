@@ -558,7 +558,9 @@ export function getActiveGroundStyleMap(): Record<number, ZoneGroundStyle> {
 }
 
 export function getGroundStyleOverride(): Record<number, ZoneGroundStyle> | null {
-  return activeGroundStyleOverride ? cloneGroundStyleMap(activeGroundStyleOverride) : null;
+  if (!activeGroundStyleOverride) return null;
+  backfillParkBaseLayerFromZones(activeGroundStyleOverride);
+  return cloneGroundStyleMap(activeGroundStyleOverride);
 }
 
 export function setGroundStyleOverride(style: Record<number, ZoneGroundStyle> | null): void {
@@ -601,6 +603,10 @@ export function applyGroundStyleToLayerKeys(
   for (const key of layerKeys) {
     activeGroundStyleOverride[key] = cloneZoneStyle(layerStyle);
   }
+  const keys = layerKeys as readonly number[];
+  if (keys.includes(0) && keys.includes(1) && keys.includes(2)) {
+    backfillParkBaseLayerFromZones(activeGroundStyleOverride);
+  }
 }
 
 /** Snapshot completo para persistencia / panel UI. */
@@ -632,14 +638,35 @@ function backfillParkBaseLayerFromZones(map: Record<number, ZoneGroundStyle>): v
   map[-1] = cloneZoneStyle(z0);
 }
 
+function parkZonesShareOverrideStyle(): ZoneGroundStyle | null {
+  const o = activeGroundStyleOverride;
+  if (!o) return null;
+  const z0 = o[0];
+  const z1 = o[1];
+  const z2 = o[2];
+  if (!z0 || !z1 || !z2) return null;
+  if (!zoneGroundStylesEqual(z0, z1) || !zoneGroundStylesEqual(z0, z2)) return null;
+  return z0;
+}
+
 function zoneGroundStylesEqual(a: ZoneGroundStyle, b: ZoneGroundStyle): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function styleForSection(sectionIndex: number): ZoneGroundStyle {
   const styles = getActiveGroundStyleMap();
+  const override = activeGroundStyleOverride;
+
+  if (sectionIndex === -1) {
+    if (override && ('-1' in override || Object.prototype.hasOwnProperty.call(override, -1))) {
+      return styles[-1];
+    }
+    const parkSync = parkZonesShareOverrideStyle();
+    if (parkSync) return parkSync;
+    return styles[0] ?? styles[-1] ?? emptyZoneGroundStyle();
+  }
+
   if (styles[sectionIndex]) return styles[sectionIndex];
-  if (sectionIndex === -1) return styles[0] ?? emptyZoneGroundStyle();
   if (sectionIndex === -2) return styles[-2] ?? emptyZoneGroundStyle();
   return styles[1] ?? styles[0] ?? emptyZoneGroundStyle();
 }
@@ -852,8 +879,20 @@ function paintMacroVariation(
 
 function tracePolygon(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
   ctx.beginPath();
+  appendPolygonPath(ctx, points);
+}
+
+function appendPolygonPath(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
+  if (points.length < 3) return;
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.closePath();
+}
+
+function appendPolygonPathReversed(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
+  if (points.length < 3) return;
+  ctx.moveTo(points[points.length - 1].x, points[points.length - 1].y);
+  for (let i = points.length - 2; i >= 0; i--) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
 }
 
@@ -1024,6 +1063,50 @@ function paintEcotoneBridge(
   ctx.restore();
 }
 
+export interface GroundFillOptions {
+  /** Solo color base + macro (los elementos van en pasada aparte). */
+  skipElements?: boolean;
+  /** Sin velo de color de contorno/zona encima de la textura. */
+  skipTint?: boolean;
+  skipEcotone?: boolean;
+}
+
+/**
+ * Recorta al contorno del parque menos los polígonos de zona (caminos y bordes visibles).
+ * Usa regla even-odd: contorno exterior + huecos por zona.
+ */
+export function clipParkBaseExcludingZones(
+  ctx: CanvasRenderingContext2D,
+  parkPoints: { x: number; y: number }[],
+  zonePolygons: { x: number; y: number }[][],
+): void {
+  ctx.beginPath();
+  appendPolygonPath(ctx, parkPoints);
+  for (const hole of zonePolygons) {
+    appendPolygonPathReversed(ctx, hole);
+  }
+  ctx.clip('evenodd');
+}
+
+/** Siembra elementos de suelo dentro del clip actual del contexto. */
+export function paintSectionGroundElements(
+  ctx: CanvasRenderingContext2D,
+  sectionIndex: number,
+  isDark: boolean,
+  bbox: GroundViewport,
+  mapScale: number,
+  viewport?: GroundViewport,
+): void {
+  const style = styleForSection(sectionIndex);
+  if (!style.elements.length) return;
+  const palette = paletteForSection(sectionIndex, isDark);
+  const lodTier = effectiveGroundLodTier(mapScale, activeGroundMapSettings);
+  const quality = groundQualityFactor(activeGroundMapSettings);
+  const unit = resolveGroundTilePx();
+  const region = intersectRegion(bbox, viewport);
+  scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+}
+
 /**
  * Pinta el suelo de un polígono (zona o base del parque):
  *   1) color base sólido (nítido, sin deriva)  2) variación macro de relieve
@@ -1041,6 +1124,7 @@ export function fillPolygonWithGroundTexture(
   _cache: GroundPatternCache,
   mapScale: number = PARK_MAP_VIS.groundRefZoom,
   viewport?: GroundViewport,
+  opts?: GroundFillOptions,
 ): void {
   if (points.length < 3) return;
 
@@ -1076,16 +1160,18 @@ export function fillPolygonWithGroundTexture(
   paintMacroVariation(ctx, palette, minX, minY, maxX, maxY, sectionIndex, style, lodTier);
 
   const region = intersectRegion({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, viewport);
-  scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+  if (!opts?.skipElements) {
+    scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+  }
 
-  if (tintOpacity > 0) {
+  if (!opts?.skipTint && tintOpacity > 0) {
     ctx.fillStyle = tintColor;
     ctx.globalAlpha = tintOpacity;
     ctx.fillRect(minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2);
     ctx.globalAlpha = 1;
   }
 
-  if ((style.edgeBlend ?? 0) > 0 && sectionIndex >= -1) {
+  if (!opts?.skipEcotone && (style.edgeBlend ?? 0) > 0 && sectionIndex >= -1) {
     paintEcotoneBridge(ctx, points, sectionIndex, isDark, style, mapScale);
   }
 
