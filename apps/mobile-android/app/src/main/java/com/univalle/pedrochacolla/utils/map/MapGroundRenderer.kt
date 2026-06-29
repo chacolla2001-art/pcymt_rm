@@ -5,7 +5,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import com.univalle.pedrochacolla.data.model.AmbientTreeSlotData
 import com.univalle.pedrochacolla.data.model.GroundElementSpecData
 import com.univalle.pedrochacolla.data.model.GroundMapSettingsData
 import com.univalle.pedrochacolla.data.model.ZoneGroundStyleData
@@ -14,7 +13,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
 
-/** Suelo procedural simplificado — port parcial de `draw-ground-texture.ts`. */
+/** Suelo procedural simplificado — port de `draw-ground-texture.ts`. */
 object MapGroundRenderer {
     data class Viewport(val minX: Float, val minY: Float, val maxX: Float, val maxY: Float)
 
@@ -23,6 +22,7 @@ object MapGroundRenderer {
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val path = Path()
+    private val clipPath = Path()
     private val rect = RectF()
 
     fun parseGroundStyle(raw: Map<String, ZoneGroundStyleData>?): Map<Int, ZoneGroundStyleData> {
@@ -30,6 +30,7 @@ object MapGroundRenderer {
         return raw.mapNotNull { (k, v) -> k.toIntOrNull()?.let { it to v } }.toMap()
     }
 
+    /** Fondo mapa (-2): solo fuera del plano cuadrado. */
     fun drawMapBackdrop(
         canvas: Canvas,
         w: Float,
@@ -39,13 +40,87 @@ object MapGroundRenderer {
         groundStyle: Map<Int, ZoneGroundStyleData>,
         settings: GroundMapSettingsData?,
         viewport: Viewport,
+        platePoints: List<ParkMapView.ScreenPoint>,
     ) {
         val pad = max(w, h) * 2f
         val palette = mapBackdropPalette(isDark)
+        canvas.save()
+        clipOutsideMapSquare(canvas, platePoints)
         fillPaint.color = palette.base
         canvas.drawRect(-pad, -pad, w + pad, h + pad, fillPaint)
         val style = groundStyle[-2] ?: emptyZoneStyle()
-        scatterInRect(canvas, palette, style, -pad, -pad, w + pad, h + pad, mapScale, settings, viewport)
+        scatterInRect(
+            canvas, palette, style, -2, -pad, -pad, w + pad, h + pad,
+            mapScale, settings, viewport,
+        )
+        canvas.restore()
+    }
+
+    /** Verde interior del contorno (bajo las zonas; no es la capa «Base parque»). */
+    fun drawParkInteriorMatte(
+        canvas: Canvas,
+        boundaryPoints: List<ParkMapView.ScreenPoint>,
+        isDark: Boolean,
+    ) {
+        if (boundaryPoints.size < 3) return
+        val palette = parkInteriorGroundPalette(isDark)
+        buildPolygonPath(boundaryPoints)
+        fillPaint.color = palette.base
+        canvas.drawPath(path, fillPaint)
+    }
+
+    /** Anillo base (-1): plano cuadrado menos contorno del parque. */
+    fun drawParkGroundBase(
+        canvas: Canvas,
+        platePoints: List<ParkMapView.ScreenPoint>,
+        boundaryPoints: List<ParkMapView.ScreenPoint>,
+        isDark: Boolean,
+        mapScale: Float,
+        groundStyle: Map<Int, ZoneGroundStyleData>,
+        settings: GroundMapSettingsData?,
+        viewport: Viewport,
+    ) {
+        if (platePoints.size < 3 || boundaryPoints.size < 3) return
+        canvas.save()
+        clipParkBaseFrame(canvas, platePoints, boundaryPoints)
+        val palette = paletteForSection(-1, isDark)
+        fillPaint.color = palette.base
+        buildPolygonPath(platePoints)
+        canvas.drawPath(path, fillPaint)
+        val bounds = polygonBounds(platePoints)
+        val style = groundStyle[-1] ?: emptyZoneStyle()
+        scatterInRect(
+            canvas, palette, style, -1, bounds.left, bounds.top, bounds.right, bounds.bottom,
+            mapScale, settings, viewport, skipElements = true,
+        )
+        canvas.restore()
+    }
+
+    /** Elementos de la base (-1) en el anillo plano−contorno. */
+    fun drawParkGroundElements(
+        canvas: Canvas,
+        platePoints: List<ParkMapView.ScreenPoint>,
+        boundaryPoints: List<ParkMapView.ScreenPoint>,
+        isDark: Boolean,
+        mapScale: Float,
+        groundStyle: Map<Int, ZoneGroundStyleData>,
+        settings: GroundMapSettingsData?,
+        viewport: Viewport,
+    ) {
+        if (platePoints.size < 3 || boundaryPoints.size < 3) return
+        val style = groundStyle[-1] ?: emptyZoneStyle()
+        if (style.elements.orEmpty().none { it.density > 0.01 }) return
+        val bounds = polygonBounds(platePoints)
+        val pad = 3f
+        canvas.save()
+        clipParkBaseFrame(canvas, platePoints, boundaryPoints)
+        val palette = paletteForSection(-1, isDark)
+        scatterInRect(
+            canvas, palette, style, -1,
+            bounds.left - pad, bounds.top - pad, bounds.right + pad, bounds.bottom + pad,
+            mapScale, settings, viewport,
+        )
+        canvas.restore()
     }
 
     fun drawPolygonLayer(
@@ -59,10 +134,7 @@ object MapGroundRenderer {
         viewport: Viewport,
     ) {
         if (points.size < 3) return
-        path.reset()
-        path.moveTo(points[0].x, points[0].y)
-        for (i in 1 until points.size) path.lineTo(points[i].x, points[i].y)
-        path.close()
+        buildPolygonPath(points)
         val palette = paletteForSection(sectionIndex, isDark)
         canvas.save()
         canvas.clipPath(path)
@@ -70,8 +142,60 @@ object MapGroundRenderer {
         canvas.drawPath(path, fillPaint)
         val bounds = polygonBounds(points)
         val style = groundStyle[sectionIndex] ?: emptyZoneStyle()
-        scatterInRect(canvas, palette, style, bounds.left, bounds.top, bounds.right, bounds.bottom, mapScale, settings, viewport)
+        scatterInRect(
+            canvas, palette, style, sectionIndex,
+            bounds.left, bounds.top, bounds.right, bounds.bottom,
+            mapScale, settings, viewport,
+        )
         canvas.restore()
+    }
+
+    /** Recorta a todo lo que queda fuera del marco cuadrado del mapa (fondo, capa -2). */
+    fun clipOutsideMapSquare(
+        canvas: Canvas,
+        squarePoints: List<ParkMapView.ScreenPoint>,
+        margin: Float = 12000f,
+    ) {
+        clipPath.reset()
+        clipPath.fillType = Path.FillType.EVEN_ODD
+        clipPath.addRect(-margin, -margin, margin * 2, margin * 2, Path.Direction.CW)
+        appendPolygonReversed(clipPath, squarePoints)
+        canvas.clipPath(clipPath)
+    }
+
+    /** Recorta al anillo: cuadrado del mapa menos contorno irregular del parque. */
+    fun clipParkBaseFrame(
+        canvas: Canvas,
+        squarePoints: List<ParkMapView.ScreenPoint>,
+        parkContourPoints: List<ParkMapView.ScreenPoint>,
+    ) {
+        clipPath.reset()
+        clipPath.fillType = Path.FillType.EVEN_ODD
+        appendPolygon(clipPath, squarePoints)
+        appendPolygonReversed(clipPath, parkContourPoints)
+        canvas.clipPath(clipPath)
+    }
+
+    private fun buildPolygonPath(points: List<ParkMapView.ScreenPoint>) {
+        path.reset()
+        path.moveTo(points[0].x, points[0].y)
+        for (i in 1 until points.size) path.lineTo(points[i].x, points[i].y)
+        path.close()
+    }
+
+    private fun appendPolygon(target: Path, points: List<ParkMapView.ScreenPoint>) {
+        if (points.isEmpty()) return
+        target.moveTo(points[0].x, points[0].y)
+        for (i in 1 until points.size) target.lineTo(points[i].x, points[i].y)
+        target.close()
+    }
+
+    private fun appendPolygonReversed(target: Path, points: List<ParkMapView.ScreenPoint>) {
+        if (points.isEmpty()) return
+        val last = points.lastIndex
+        target.moveTo(points[last].x, points[last].y)
+        for (i in last - 1 downTo 0) target.lineTo(points[i].x, points[i].y)
+        target.close()
     }
 
     private fun polygonBounds(points: List<ParkMapView.ScreenPoint>): RectF {
@@ -90,6 +214,8 @@ object MapGroundRenderer {
 
     private fun emptyZoneStyle() = ZoneGroundStyleData(elements = emptyList())
 
+    private fun parkInteriorGroundPalette(isDark: Boolean) = parkBasePalette(isDark)
+
     private fun paletteForSection(sectionIndex: Int, isDark: Boolean): GroundPalette = when (sectionIndex) {
         0 -> if (isDark) GroundPalette(
             Color.parseColor("#5A4A30"), Color.parseColor("#46381F"), Color.parseColor("#6A5C44"),
@@ -105,7 +231,7 @@ object MapGroundRenderer {
             Color.parseColor("#2E8B40"), Color.parseColor("#1F6B30"), Color.parseColor("#8A6A3C"),
             Color.parseColor("#0E3A1A"), Color.parseColor("#5CC85E"),
         )
-        -2 -> mapBackdropPalette(isDark)
+        -2, -1 -> mapBackdropPalette(isDark)
         else -> if (sectionIndex < 0) parkBasePalette(isDark) else if (isDark) GroundPalette(
             Color.parseColor("#3E6A22"), Color.parseColor("#2E5418"), Color.parseColor("#7A8E3A"),
             Color.parseColor("#16300C"), Color.parseColor("#5A8E30"),
@@ -135,6 +261,7 @@ object MapGroundRenderer {
         canvas: Canvas,
         palette: GroundPalette,
         style: ZoneGroundStyleData,
+        sectionIndex: Int,
         left: Float,
         top: Float,
         right: Float,
@@ -142,13 +269,16 @@ object MapGroundRenderer {
         mapScale: Float,
         settings: GroundMapSettingsData?,
         viewport: Viewport,
+        skipElements: Boolean = false,
     ) {
-        val elements = style.elements.orEmpty().filter { (it.density) > 0.01 }
+        if (skipElements) return
+        val elements = style.elements.orEmpty().filter { it.density > 0.01 }
         if (elements.isEmpty()) return
+        val lodTier = MapLod.effectiveGroundLodTier(mapScale, settings)
+        if (lodTier == MapLod.Tier.MINIMAL) return
         val quality = ((settings?.qualityPercent ?: 85.0) / 100.0).coerceIn(0.25, 1.0)
         val scalePct = ((settings?.scalePercent ?: 100.0) / 100.0).coerceIn(0.5, 2.0)
         val unit = resolveTilePx(settings).toFloat() * scalePct.toFloat()
-        if (mapScale < 0.35f && settings?.lodEnabled != false) return
         val region = intersect(left, top, right, bottom, viewport)
         if (region.width() <= 0f || region.height() <= 0f) return
         val cell = max(5f, unit * 1.2f)
@@ -158,9 +288,10 @@ object MapGroundRenderer {
             var cx = region.left + (row % 2) * cell * 0.5f
             while (cx <= region.right) {
                 for (el in elements) {
+                    if (!MapLod.elementVisibleAtLod(el.type, lodTier)) continue
                     val budget = (el.density * quality * 0.35).toInt().coerceAtLeast(0)
                     if (budget == 0) continue
-                    val seed = (cx * 12.9898f + cy * 78.233f + el.type.hashCode()).toLong()
+                    val seed = (cx * 12.9898f + cy * 78.233f + el.type.hashCode() + sectionIndex).toLong()
                     val rand = Random(seed)
                     if (rand.nextDouble() > el.density * quality) continue
                     val size = unit * (el.sizeMin + rand.nextDouble() * (el.sizeMax - el.sizeMin)).toFloat()
@@ -218,13 +349,12 @@ object MapGroundRenderer {
 
     private fun resolveTilePx(settings: GroundMapSettingsData?): Int {
         val preset = settings?.presetId ?: "balanced"
-        val base = when (preset) {
+        return when (preset) {
             "performance" -> 8
             "subtle" -> 6
             "rich", "carbot" -> 4
             else -> 5
         }
-        return base
     }
 
     private fun intersect(l: Float, t: Float, r: Float, b: Float, vp: Viewport): RectF {

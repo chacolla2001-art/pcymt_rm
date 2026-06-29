@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, AfterViewInit, ViewChild, Inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, AfterViewInit, ViewChild, Inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
@@ -14,12 +14,13 @@ import { GroundSettingsCardComponent } from '../components/ground-settings-card.
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
 import { MapSessionService } from '../services/map-session.service';
 import { MapConfigData, MAP_CONFIG_VERSION } from '../models/map-layer-config.model';
+import { GROUND_STYLE_LAYER_ENCODING_VERSION } from '../utils/draw-ground-texture';
 import type { ZoneGroundStyle } from '../utils/draw-ground-texture';
 import type { GroundMapSettings } from '../utils/ground-preset';
+import type { MapLayerFramesData } from '../utils/map-layer-geometry';
 import type { ParkSectionRecord } from '../data/park-geometry';
 import type { SpatialReference } from '../data/spatial-reference';
 import type { AmbientTreeSlot, TreeEditorTarget } from '../data/ambient-tree-slots';
-import { findAmbientScenario } from '../data/ambient-scenarios';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
@@ -64,6 +65,7 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
         [sceneOpts]="sceneOpts"
         [spatialRefsOpts]="spatialRefsOpts"
         [groundSettings]="groundSettingsOpts"
+        [layerFrames]="layerFramesOpts"
         [sessionSavedAt]="sessionSavedAt"
         (mapControlEvent)="onMapControlEvent($event)"
         (panelToggled)="onPanelToggled()"
@@ -99,16 +101,18 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
           (spatialReferencesChanged)="onSpatialReferencesChanged($event)">
         </app-map-control>
 
-        <app-ground-settings-card
-          [visible]="groundSettingsCardOpen"
-          [isAdmin]="isAdmin"
-          [isDarkTheme]="isDarkTheme"
-          [groundStyle]="groundStyleOpts"
-          [groundSettings]="groundSettingsOpts"
-          [groundTilePx]="currentViewInfo?.groundTilePx ?? 5"
-          (closed)="groundSettingsCardOpen = false"
-          (mapControlEvent)="onMapControlEvent($event)">
-        </app-ground-settings-card>
+        <div class="ground-card-overlay" *ngIf="groundSettingsCardOpen">
+          <app-ground-settings-card
+            [visible]="true"
+            [isAdmin]="isAdmin"
+            [isDarkTheme]="isDarkTheme"
+            [groundStyle]="groundStyleOpts"
+            [groundSettings]="groundSettingsOpts"
+            [groundTilePx]="currentViewInfo?.groundTilePx ?? 5"
+            (closed)="closeGroundSettingsCard()"
+            (mapControlEvent)="onMapControlEvent($event)">
+          </app-ground-settings-card>
+        </div>
       </div>
 
       <!-- Map config panel: always present (hidden behind canvas overlay) -->
@@ -170,6 +174,12 @@ import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
     .float-btn--primary {
       font-size: 16px;
       font-weight: 700;
+    }
+    .ground-card-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 30;
+      pointer-events: none;
     }
   `]
 })
@@ -241,6 +251,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   sessionSavedAt: string | null = null;
   groundStyleOpts: Record<number, ZoneGroundStyle> = {};
   groundSettingsOpts: GroundMapSettings | null = null;
+  layerFramesOpts: MapLayerFramesData | null = null;
   groundSettingsCardOpen = false;
 
   private readonly isBrowser: boolean;
@@ -252,6 +263,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   currentViewInfo: MapViewInfo | null = null;
 
   constructor(
+    private cdr: ChangeDetectorRef,
     private router: Router,
     private mapSession: MapSessionService,
     private themeService: ThemeManagerService,
@@ -312,6 +324,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       version: MAP_CONFIG_VERSION,
       mapState: map.mapState,
       layerOffsets: map.layerOffsets,
+      layerFrames: map.layerFrames,
       activeMovableLayer: map.activeMovableLayer,
       sections: map.sections,
       spatialReferences: map.spatialReferences,
@@ -319,6 +332,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       ambientTrees: map.ambientTrees,
       groundStyle: map.groundStyle,
       groundSettings: map.groundSettings,
+      groundStyleLayerVersion: GROUND_STYLE_LAYER_ENCODING_VERSION,
       themeMode: this.themeService.isDarkMode() ? 'dark' : 'light',
     };
   }
@@ -331,15 +345,10 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       this.themeService.setThemeMode(configData.themeMode);
     }
 
-    const scenarioId = configData.ambientScene?.activeScenarioId;
-    if (scenarioId) {
-      const scenario = findAmbientScenario(scenarioId);
-      if (scenario?.theme) this.themeService.setThemeMode(scenario.theme);
-    }
-
     this.mapControl.applyMapPersistedState({
       mapState: configData.mapState,
       layerOffsets: configData.layerOffsets,
+      layerFrames: configData.layerFrames,
       activeMovableLayer: configData.activeMovableLayer,
       sections: configData.sections,
       spatialReferences: configData.spatialReferences,
@@ -347,13 +356,9 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       ambientTrees: configData.ambientTrees,
       groundStyle: configData.groundStyle,
       groundSettings: configData.groundSettings,
+      version: configData.version,
+      groundStyleLayerVersion: configData.groundStyleLayerVersion,
     }, { skipLegacySave: true });
-
-    if (scenarioId) {
-      const scenario = findAmbientScenario(scenarioId);
-      if (scenario?.theme) this.themeService.setThemeMode(scenario.theme);
-      this.mapControl.applyAmbientScenarioTint(scenarioId);
-    }
 
     this.editableSections = this.mapControl.getEditableSections();
     this.ambientTrees = this.mapControl.getAmbientTrees();
@@ -381,6 +386,10 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Map control events from sticker panel ─────────────────
 
   onMapControlEvent(event: MapControlEvent): void {
+    if (event.type === 'openGroundSettingsCard') {
+      this.openGroundSettingsCard();
+      return;
+    }
     if (!this.mapControl) return;
     switch (event.type) {
       case 'zoomIn':       this.mapControl.zoomIn(); break;
@@ -394,14 +403,21 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
         this.mapControl.disableAllMapLayers();
         this.spatialRefsOpts.showSpatialReferences = false;
         break;
-      case 'openGroundSettingsCard':
-        this.groundSettingsCardOpen = true;
-        break;
       case 'groundTilePxChange': this.mapControl.setGroundTilePx(event.value); break;
       case 'groundSettingsChange':
         this.mapControl.applyGroundSettings(event.settings);
         this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
         this.groundSettingsOpts = this.mapControl.getGroundSettingsSnapshot();
+        this.scheduleSessionSave();
+        break;
+      case 'layerFramesChange':
+        this.mapControl.patchLayerFrames(event.frames);
+        this.layerFramesOpts = this.mapControl.getLayerFramesSnapshot();
+        this.scheduleSessionSave();
+        break;
+      case 'resetLayerFrames':
+        this.mapControl.resetLayerFrames();
+        this.layerFramesOpts = this.mapControl.getLayerFramesSnapshot();
         this.scheduleSessionSave();
         break;
       case 'groundAutoTilePx':
@@ -551,15 +567,6 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
         this.mapControl.setMapSceneOption('showSpatialReferences', event.value);
         this.syncSceneStateFromMap();
         break;
-      case 'applyAmbientScenario': {
-        const scenario = findAmbientScenario(event.scenarioId);
-        if (!scenario) break;
-        if (scenario.theme) this.themeService.setThemeMode(scenario.theme);
-        this.mapControl.applyAmbientScenario(scenario);
-        this.syncSceneStateFromMap();
-        this.sceneOpts.activeScenarioId = scenario.id;
-        break;
-      }
       case 'clearAllPlacedContent':
         this.mapControl.clearAllPlacedMapContent();
         this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
@@ -756,6 +763,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.treePlacementHint = this.mapControl.treePlacementHint;
     this.groundStyleOpts = this.mapControl.getGroundStyleSnapshot();
     this.groundSettingsOpts = this.mapControl.getGroundSettingsSnapshot();
+    this.layerFramesOpts = this.mapControl.getLayerFramesSnapshot();
   }
 
   onAmbientTreesChanged(trees: AmbientTreeSlot[]): void {
@@ -798,8 +806,19 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  openGroundSettingsCard(): void {
+    this.groundSettingsCardOpen = true;
+    this.cdr.markForCheck();
+  }
+
+  closeGroundSettingsCard(): void {
+    this.groundSettingsCardOpen = false;
+    this.cdr.markForCheck();
+  }
+
   toggleGroundSettingsCard(): void {
     this.groundSettingsCardOpen = !this.groundSettingsCardOpen;
+    this.cdr.markForCheck();
   }
 
   // ── Map config panel events ────────────────────────────────

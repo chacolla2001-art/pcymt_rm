@@ -101,6 +101,8 @@ data class MapConfigData(
     val spatialReferences: List<SpatialReferenceData>? = null,
     @SerializedName("layerOffsets")
     val layerOffsets: LayerOffsetsData? = null,
+    @SerializedName("layerFrames")
+    val layerFrames: MapLayerFramesData? = null,
     // ── Nested map state (web frontend format) ──
     val mapState: MapViewState? = null
 ) {

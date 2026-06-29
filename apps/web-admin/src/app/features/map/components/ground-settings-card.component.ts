@@ -1,6 +1,6 @@
 import {
   Component, EventEmitter, Input, OnChanges, Output, SimpleChanges,
-  ChangeDetectionStrategy, ChangeDetectorRef,
+  ChangeDetectionStrategy, ChangeDetectorRef, ElementRef, ViewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -8,10 +8,16 @@ import { PARK_MAP_VIS, groundElementSizeFrac } from '../utils/map-park-visual-sc
 import {
   GROUND_ELEMENT_LABELS,
   GROUND_ELEMENT_TYPES,
-  GROUND_PARK_LAYER_KEYS,
-  GROUND_ZONE_KEYS,
+  GROUND_BASE_PARK_SECTION,
+  GROUND_MAP_BACKDROP_SECTION,
+  GROUND_LAYER_SELECT_OPTIONS,
   GROUND_ZONE_LABELS,
+  emptyZoneGroundStyle,
+  groundLayerSelectValueForTarget,
+  groundLayerSectionIndex,
+  parseGroundLayerSelectValue,
   type GroundElementType,
+  type GroundStyleEditTarget,
   type ZoneGroundStyle,
 } from '../utils/draw-ground-texture';
 import {
@@ -26,19 +32,23 @@ import type { MapControlEvent } from './sticker-panel.component';
   imports: [CommonModule, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="ground-card-backdrop" *ngIf="visible" (mousedown)="onBackdropClick($event)"></div>
     <div class="ground-settings-card"
       *ngIf="visible"
       [class.light-theme]="!isDarkTheme"
-      [style.transform]="'translate(' + posX + 'px,' + posY + 'px)'"
+      [style.left.px]="16 + posX"
+      [style.top.px]="56 + posY"
       (mousedown)="$event.stopPropagation()"
       (click)="$event.stopPropagation()">
-      <div class="ground-card-header" (mousedown)="onDragStart($event)">
+      <div class="ground-card-header ground-card-drag-handle"
+        (pointerdown)="onHeaderPointerDown($event)"
+        (pointermove)="onHeaderPointerMove($event)"
+        (pointerup)="onHeaderPointerUp($event)"
+        (pointercancel)="onHeaderPointerUp($event)">
         <span class="ground-card-title">Configuración del suelo</span>
         <button type="button" class="ground-card-close" (click)="close()" title="Cerrar">✕</button>
       </div>
 
-      <div class="ground-card-body">
+      <div class="ground-card-body" #cardBody (mousedown)="$event.stopPropagation()">
         <div class="param-row">
           <label title="Tamaño base de los elementos dibujados (piedras, hierba…)">Tamaño base</label>
           <input type="range" [min]="groundTileMin" [max]="groundTileMax" step="0.25"
@@ -76,16 +86,19 @@ import type { MapControlEvent } from './sticker-panel.component';
               [ngModel]="groundStyleEditSelectValue"
               (ngModelChange)="onGroundStyleTargetChange($event)">
               <option value="park">Todo el parque (sin fondo)</option>
-              <option *ngFor="let z of groundZoneKeys" [value]="z">{{ groundZoneLabels[z] }}</option>
+              <option *ngFor="let opt of groundLayerSelectOptions" [value]="opt.value">{{ opt.label }}</option>
             </select>
           </div>
           <p class="section-hint" *ngIf="groundStyleEditTarget === 'park'">
-            Aplica a las 3 zonas y a la base del parque. No afecta al fondo exterior.
+            Aplica a las 3 zonas y al anillo base (entre contorno y plano del mapa). No afecta al fondo fuera del plano.
           </p>
-          <p class="section-hint" *ngIf="groundStyleEditTarget === -1">
-            Capa bajo las zonas: solo se ve en caminos y bordes no cubiertos por Tierras Altas/Medias/Bajas.
+          <p class="section-hint" *ngIf="groundStyleEditTarget === baseParkSection">
+            {{ baseParkLayerHint }}
           </p>
-          <ng-container *ngIf="groundStyleEditZone as zone">
+          <p class="section-hint" *ngIf="groundStyleEditTarget === mapBackdropSection">
+            {{ mapBackdropLayerHint }}
+          </p>
+          <ng-container *ngIf="editZone as zone">
             <p class="section-hint">Ecotono — suaviza el salto con las zonas vecinas.</p>
             <div class="param-row">
               <label>Difuminado borde</label>
@@ -102,7 +115,7 @@ import type { MapControlEvent } from './sticker-panel.component';
               <span class="param-val">{{ groundEdgeAlphaPercent(zone) }}%</span>
             </div>
             <div class="sub-divider"></div>
-            <div class="ground-el-block" *ngFor="let el of zone.elements; let i = index">
+            <div class="ground-el-block" *ngFor="let el of zone.elements; let i = index; trackBy: trackElement">
               <div class="param-row">
                 <label class="el-label">{{ groundElementLabel(el.type) }}</label>
                 <button type="button" class="el-remove-btn" title="Quitar elemento"
@@ -167,13 +180,11 @@ import type { MapControlEvent } from './sticker-panel.component';
     </div>
   `,
   styles: [`
-    :host { display: contents; }
-
-    .ground-card-backdrop {
+    :host {
       position: absolute;
       inset: 0;
-      z-index: 18;
-      background: transparent;
+      z-index: 1;
+      pointer-events: none;
     }
 
     .ground-settings-card {
@@ -187,7 +198,7 @@ import type { MapControlEvent } from './sticker-panel.component';
       position: absolute;
       top: 56px;
       left: 16px;
-      z-index: 20;
+      z-index: 2;
       width: min(360px, calc(100% - 32px));
       max-height: calc(100% - 72px);
       display: flex;
@@ -220,6 +231,7 @@ import type { MapControlEvent } from './sticker-panel.component';
       cursor: grab;
       user-select: none;
       flex-shrink: 0;
+      touch-action: none;
     }
     .ground-card-header:active { cursor: grabbing; }
 
@@ -273,6 +285,7 @@ import type { MapControlEvent } from './sticker-panel.component';
       flex: 1;
       accent-color: var(--card-accent);
       height: 4px;
+      touch-action: none;
     }
     .param-val {
       width: 40px;
@@ -367,8 +380,13 @@ export class GroundSettingsCardComponent implements OnChanges {
   @Output() closed = new EventEmitter<void>();
   @Output() mapControlEvent = new EventEmitter<MapControlEvent>();
 
+  @ViewChild('cardBody') cardBody?: ElementRef<HTMLElement>;
+
   localGroundTilePx: number = PARK_MAP_VIS.groundTilePx;
   localGroundSettings: GroundMapSettings = { ...DEFAULT_GROUND_MAP_SETTINGS };
+  /** Copia local — evita que cada cambio del mapa reinicie scroll y sliders. */
+  editZone: ZoneGroundStyle | null = null;
+  private editZoneSourceKey = '';
 
   readonly groundTileMin = PARK_MAP_VIS.groundTileMin;
   readonly groundTileMax = PARK_MAP_VIS.groundTileMax;
@@ -376,10 +394,14 @@ export class GroundSettingsCardComponent implements OnChanges {
   readonly groundElementSizePctMax = PARK_MAP_VIS.groundElementSizePctMax;
   readonly groundScalePercentMin = PARK_MAP_VIS.groundScalePercentMin;
   readonly groundScalePercentMax = PARK_MAP_VIS.groundScalePercentMax;
-  readonly groundZoneKeys = GROUND_ZONE_KEYS;
   readonly groundZoneLabels = GROUND_ZONE_LABELS;
+  readonly groundLayerSelectOptions = GROUND_LAYER_SELECT_OPTIONS;
+  readonly baseParkSection = GROUND_BASE_PARK_SECTION;
+  readonly mapBackdropSection = GROUND_MAP_BACKDROP_SECTION;
+  readonly baseParkLayerHint = GROUND_LAYER_SELECT_OPTIONS.find((o) => o.value === 'base_park')?.hint ?? '';
+  readonly mapBackdropLayerHint = GROUND_LAYER_SELECT_OPTIONS.find((o) => o.value === 'map_backdrop')?.hint ?? '';
   readonly groundElementTypes = GROUND_ELEMENT_TYPES;
-  groundStyleEditTarget: number | 'park' = 'park';
+  groundStyleEditTarget: GroundStyleEditTarget = 'park';
   groundAddType: GroundElementType = 'stone';
 
   posX = 0;
@@ -389,8 +411,7 @@ export class GroundSettingsCardComponent implements OnChanges {
   private dragStartY = 0;
   private dragOriginX = 0;
   private dragOriginY = 0;
-  private boundMove: ((e: MouseEvent) => void) | null = null;
-  private boundUp: (() => void) | null = null;
+  private dragPointerId: number | null = null;
 
   constructor(private cdr: ChangeDetectorRef) {}
 
@@ -401,46 +422,57 @@ export class GroundSettingsCardComponent implements OnChanges {
     if (changes['groundTilePx']) {
       this.localGroundTilePx = this.groundTilePx ?? PARK_MAP_VIS.groundTilePx;
     }
-    if (changes['groundStyle']) {
-      this.cdr.markForCheck();
+    if (changes['visible']?.currentValue === true) {
+      this.syncEditZoneFromInput(true);
+    }
+    if (changes['groundStyle'] && !changes['groundStyle'].firstChange && this.pendingExternalSync) {
+      this.syncEditZoneFromInput(true);
+      this.pendingExternalSync = false;
     }
   }
+
+  private pendingExternalSync = false;
 
   close(): void {
     this.closed.emit();
   }
 
-  onBackdropClick(event: MouseEvent): void {
-    if (event.target === event.currentTarget) this.close();
+  trackElement(index: number, el: { type: string }): string {
+    return `${index}-${el.type}`;
   }
 
-  onDragStart(event: MouseEvent): void {
+  onHeaderPointerDown(event: PointerEvent): void {
+    if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('.ground-card-close')) return;
     event.preventDefault();
+    event.stopPropagation();
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
     this.dragging = true;
+    this.dragPointerId = event.pointerId;
     this.dragStartX = event.clientX;
     this.dragStartY = event.clientY;
     this.dragOriginX = this.posX;
     this.dragOriginY = this.posY;
-    this.boundMove = (e: MouseEvent) => this.onDragMove(e);
-    this.boundUp = () => this.onDragEnd();
-    document.addEventListener('mousemove', this.boundMove);
-    document.addEventListener('mouseup', this.boundUp);
   }
 
-  private onDragMove(event: MouseEvent): void {
-    if (!this.dragging) return;
+  onHeaderPointerMove(event: PointerEvent): void {
+    if (!this.dragging || this.dragPointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
     this.posX = this.dragOriginX + (event.clientX - this.dragStartX);
     this.posY = this.dragOriginY + (event.clientY - this.dragStartY);
     this.cdr.markForCheck();
   }
 
-  private onDragEnd(): void {
+  onHeaderPointerUp(event: PointerEvent): void {
+    if (this.dragPointerId !== event.pointerId) return;
+    const handle = event.currentTarget as HTMLElement;
+    if (handle.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
     this.dragging = false;
-    if (this.boundMove) document.removeEventListener('mousemove', this.boundMove);
-    if (this.boundUp) document.removeEventListener('mouseup', this.boundUp);
-    this.boundMove = null;
-    this.boundUp = null;
+    this.dragPointerId = null;
   }
 
   onGroundTilePxChange(px: number): void {
@@ -467,12 +499,32 @@ export class GroundSettingsCardComponent implements OnChanges {
   }
 
   get groundStyleEditSelectValue(): string {
-    return this.groundStyleEditTarget === 'park' ? 'park' : String(this.groundStyleEditTarget);
+    return groundLayerSelectValueForTarget(this.groundStyleEditTarget);
   }
 
   onGroundStyleTargetChange(raw: string): void {
-    this.groundStyleEditTarget = raw === 'park' ? 'park' : Number(raw);
+    this.groundStyleEditTarget = parseGroundLayerSelectValue(raw);
+    this.syncEditZoneFromInput(true);
     this.cdr.markForCheck();
+  }
+
+  private syncEditZoneFromInput(force = false): void {
+    const key = this.groundStyleEditSelectValue;
+    if (!force && key === this.editZoneSourceKey && this.editZone) return;
+    this.editZoneSourceKey = key;
+    const source = this.groundStyleEditZone;
+    this.editZone = source ? this.cloneZone(source) : { elements: [], macroDensity: 1, macroAlpha: 1 };
+  }
+
+  private cloneZone(z: ZoneGroundStyle): ZoneGroundStyle {
+    return {
+      macroDensity: z.macroDensity,
+      macroAlpha: z.macroAlpha,
+      edgeBlend: z.edgeBlend,
+      edgeBlendAlpha: z.edgeBlendAlpha,
+      bridge: z.bridge ? { ...z.bridge, elements: z.bridge.elements.map((e) => ({ ...e })) } : undefined,
+      elements: z.elements.map((e) => ({ ...e })),
+    };
   }
 
   get groundStyleEditZone(): ZoneGroundStyle | null {
@@ -483,11 +535,18 @@ export class GroundSettingsCardComponent implements OnChanges {
   }
 
   private resolveGroundStyleLayer(key: number): ZoneGroundStyle | null {
-    return this.groundStyle[key] ?? this.groundStyle[0] ?? this.groundStyle[1] ?? null;
+    const direct = this.groundStyle[key];
+    if (direct) return direct;
+    if (key === GROUND_BASE_PARK_SECTION || key === GROUND_MAP_BACKDROP_SECTION) {
+      return { ...emptyZoneGroundStyle() };
+    }
+    return this.groundStyle[0] ?? this.groundStyle[1] ?? null;
   }
 
   private resolveParkGroundEditTemplate(): ZoneGroundStyle | null {
-    for (const key of GROUND_PARK_LAYER_KEYS) {
+    const base = this.groundStyle[GROUND_BASE_PARK_SECTION];
+    if (base?.elements?.length) return base;
+    for (const key of [0, 1, 2] as const) {
       const z = this.groundStyle[key];
       if (z?.elements?.length) return z;
     }
@@ -529,7 +588,7 @@ export class GroundSettingsCardComponent implements OnChanges {
   onGroundElementDensityChange(elIndex: number, percent: number): void {
     const zone = this.patchedGroundZone();
     zone.elements[elIndex].density = Math.min(1.2, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundElementSizeMinChange(elIndex: number, percent: number): void {
@@ -538,7 +597,7 @@ export class GroundSettingsCardComponent implements OnChanges {
     if (!el) return;
     el.sizeMin = groundElementSizeFrac(Number(percent));
     if (el.sizeMax < el.sizeMin) el.sizeMax = el.sizeMin;
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundElementSizeMaxChange(elIndex: number, percent: number): void {
@@ -547,54 +606,57 @@ export class GroundSettingsCardComponent implements OnChanges {
     if (!el) return;
     el.sizeMax = groundElementSizeFrac(Number(percent));
     if (el.sizeMin > el.sizeMax) el.sizeMin = el.sizeMax;
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundEdgeBlendChange(px: number): void {
     const zone = this.patchedGroundZone();
     zone.edgeBlend = Math.min(48, Math.max(0, Number(px) || 0));
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundEdgeAlphaChange(percent: number): void {
     const zone = this.patchedGroundZone();
     zone.edgeBlendAlpha = Math.min(1, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   addGroundElement(): void {
     const zone = this.patchedGroundZone();
     zone.elements.push({ type: this.groundAddType, density: 0.15, min: 0, sizeMin: 0.2, sizeMax: 0.4 });
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   removeGroundElement(elIndex: number): void {
     const zone = this.patchedGroundZone();
     zone.elements.splice(elIndex, 1);
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundMacroDensityChange(percent: number): void {
     const zone = this.patchedGroundZone();
     zone.macroDensity = Math.min(2, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   onGroundMacroAlphaChange(percent: number): void {
     const zone = this.patchedGroundZone();
     zone.macroAlpha = Math.min(1, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
+    this.applyLocalZone(zone);
   }
 
   applyGroundStyleToAllZones(): void {
+    this.pendingExternalSync = true;
     this.mapControlEvent.emit({ type: 'groundStyleApplyAll', style: this.patchedGroundZone() });
   }
 
   clearAllGroundLayers(): void {
+    this.pendingExternalSync = true;
     this.mapControlEvent.emit({ type: 'groundStyleClearAll' });
   }
 
   resetGroundStyleZone(): void {
+    this.pendingExternalSync = true;
     if (this.groundStyleEditTarget === 'park') {
       this.mapControlEvent.emit({ type: 'groundStyleResetParkLayers' });
       return;
@@ -603,20 +665,26 @@ export class GroundSettingsCardComponent implements OnChanges {
   }
 
   resetGroundStyleAll(): void {
+    this.pendingExternalSync = true;
     this.mapControlEvent.emit({ type: 'groundStyleResetAll' });
   }
 
+  private applyLocalZone(zone: ZoneGroundStyle): void {
+    const scrollTop = this.cardBody?.nativeElement.scrollTop ?? 0;
+    this.editZone = zone;
+    this.emitGroundStyleZone(zone);
+    this.cdr.markForCheck();
+    queueMicrotask(() => {
+      if (this.cardBody?.nativeElement) {
+        this.cardBody.nativeElement.scrollTop = scrollTop;
+      }
+    });
+  }
+
   private patchedGroundZone(): ZoneGroundStyle {
-    const z = this.groundStyleEditZone;
+    const z = this.editZone;
     if (!z) return { elements: [], macroDensity: 1, macroAlpha: 1 };
-    return {
-      macroDensity: z.macroDensity,
-      macroAlpha: z.macroAlpha,
-      edgeBlend: z.edgeBlend,
-      edgeBlendAlpha: z.edgeBlendAlpha,
-      bridge: z.bridge ? { ...z.bridge, elements: z.bridge.elements.map((e) => ({ ...e })) } : undefined,
-      elements: z.elements.map((e) => ({ ...e })),
-    };
+    return this.cloneZone(z);
   }
 
   private emitGroundStyleZone(zone: ZoneGroundStyle): void {
@@ -626,7 +694,7 @@ export class GroundSettingsCardComponent implements OnChanges {
     }
     this.mapControlEvent.emit({
       type: 'groundStyleZoneChange',
-      sectionIndex: this.groundStyleEditTarget,
+      sectionIndex: groundLayerSectionIndex(this.groundStyleEditTarget),
       style: zone,
     });
   }

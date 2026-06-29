@@ -3,6 +3,7 @@ import type { SpatialReference } from '../data/spatial-reference';
 import type { AmbientTreeSlot } from '../data/ambient-tree-slots';
 import type { ZoneGroundStyle } from '../utils/draw-ground-texture';
 import type { GroundMapSettings } from '../utils/ground-preset';
+import type { MapLayerFramesData } from '../utils/map-layer-geometry';
 
 /**
  * Map Layer Configuration — Data Models
@@ -33,6 +34,8 @@ export interface MapConfigData {
   mapState: MapViewState;
   /** v2 — offsets per movable layer */
   layerOffsets?: LayerOffsetsData;
+  /** Escala, rotación y expansión del plano / anillo / zonas / marcadores. */
+  layerFrames?: MapLayerFramesData;
   activeMovableLayer?: 'canvas' | 'boundary' | 'sections' | 'markers';
   sections?: ParkSectionRecord[];
   spatialReferences?: SpatialReference[];
@@ -40,6 +43,8 @@ export interface MapConfigData {
   ambientTrees?: AmbientTreeSlot[];
   /** Estilo procedural del suelo por zona (0,1,2,-1,-2). Overrides sobre preset. */
   groundStyle?: Record<number, ZoneGroundStyle>;
+  /** 3 = -1 base interior, -2 fondo exterior (v2 estaba invertido). */
+  groundStyleLayerVersion?: number;
   /** Preset global, escala, LOD del suelo. */
   groundSettings?: GroundMapSettings;
   themeMode?: 'light' | 'dark';

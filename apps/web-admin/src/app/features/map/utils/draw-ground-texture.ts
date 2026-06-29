@@ -417,16 +417,111 @@ export const GROUND_ELEMENT_TYPES: GroundElementType[] = [
 
 export const GROUND_ZONE_KEYS = [0, 1, 2, -1, -2] as const;
 
+/**
+ * Marco del parque: fuera del contorno irregular pero dentro del plano cuadrado del mapa
+ * (el cuadrado grande gris que ya existía). v3 = -1.
+ */
+export const GROUND_BASE_PARK_SECTION = -1;
+
+/** Fondo: fuera del plano cuadrado del mapa. v3 = -2. */
+export const GROUND_MAP_BACKDROP_SECTION = -2;
+
 /** Capas interiores del parque (zonas + base); sin el fondo exterior (-2). */
-export const GROUND_PARK_LAYER_KEYS = [0, 1, 2, -1] as const;
+export const GROUND_PARK_LAYER_KEYS = [0, 1, 2, GROUND_BASE_PARK_SECTION] as const;
 
 export const GROUND_ZONE_LABELS: Record<number, string> = {
   0: 'Tierras Altas',
   1: 'Tierras Medias',
   2: 'Tierras Bajas',
-  [-1]: 'Base parque',
-  [-2]: 'Fondo mapa',
+  [GROUND_BASE_PARK_SECTION]: 'Base parque',
+  [GROUND_MAP_BACKDROP_SECTION]: 'Fondo mapa',
 };
+
+/** Codificación v3 de capas de suelo (v2 intercambiaba -1/-2 con árboles). */
+export const GROUND_STYLE_LAYER_ENCODING_VERSION = 3;
+
+export type GroundStyleEditTarget =
+  | 'park'
+  | 0 | 1 | 2
+  | typeof GROUND_BASE_PARK_SECTION
+  | typeof GROUND_MAP_BACKDROP_SECTION;
+
+export type GroundLayerSelectValue = 'park' | '0' | '1' | '2' | 'base_park' | 'map_backdrop';
+
+export interface GroundLayerSelectOption {
+  value: GroundLayerSelectValue;
+  label: string;
+  hint?: string;
+}
+
+/** Opciones del selector — IDs de texto para no confundir -1/-2 en HTML. */
+export const GROUND_LAYER_SELECT_OPTIONS: readonly GroundLayerSelectOption[] = [
+  { value: '0', label: GROUND_ZONE_LABELS[0] },
+  { value: '1', label: GROUND_ZONE_LABELS[1] },
+  { value: '2', label: GROUND_ZONE_LABELS[2] },
+  {
+    value: 'base_park',
+    label: 'Base parque (anillo)',
+    hint: 'Anillo gris entre el contorno del parque y el borde del plano cuadrado del mapa.',
+  },
+  {
+    value: 'map_backdrop',
+    label: 'Fondo mapa (exterior al plano)',
+    hint: 'Fuera del cuadrado grande del plano del mapa.',
+  },
+];
+
+export function parseGroundLayerSelectValue(raw: string): GroundStyleEditTarget {
+  switch (raw) {
+    case 'park': return 'park';
+    case 'base_park': return GROUND_BASE_PARK_SECTION;
+    case 'map_backdrop': return GROUND_MAP_BACKDROP_SECTION;
+    default: {
+      const n = Number(raw);
+      if (n === 0 || n === 1 || n === 2) return n;
+      return 'park';
+    }
+  }
+}
+
+export function groundLayerSelectValueForTarget(target: GroundStyleEditTarget): GroundLayerSelectValue {
+  if (target === 'park') return 'park';
+  if (target === GROUND_BASE_PARK_SECTION) return 'base_park';
+  if (target === GROUND_MAP_BACKDROP_SECTION) return 'map_backdrop';
+  return String(target) as '0' | '1' | '2';
+}
+
+export function groundLayerSectionIndex(target: GroundStyleEditTarget): number {
+  if (target === 'park') return GROUND_BASE_PARK_SECTION;
+  return target;
+}
+
+/**
+ * v2 (árboles y suelo antiguos): -1 = fondo gris, -2 = base verde interior.
+ * v3: -1 = base parque, -2 = fondo mapa.
+ */
+export function migrateGroundStyleMapFromV2(
+  map: Record<number, ZoneGroundStyle>,
+): Record<number, ZoneGroundStyle> {
+  const legacyFondo = map[GROUND_BASE_PARK_SECTION];
+  const legacyBase = map[GROUND_MAP_BACKDROP_SECTION];
+  const out: Record<number, ZoneGroundStyle> = {};
+  for (const [k, v] of Object.entries(map)) {
+    const idx = Number(k);
+    if (idx === GROUND_BASE_PARK_SECTION || idx === GROUND_MAP_BACKDROP_SECTION) continue;
+    out[idx] = cloneZoneStyle(v);
+  }
+  if (legacyBase != null) out[GROUND_BASE_PARK_SECTION] = cloneZoneStyle(legacyBase);
+  if (legacyFondo != null) out[GROUND_MAP_BACKDROP_SECTION] = cloneZoneStyle(legacyFondo);
+  return out;
+}
+
+export function needsGroundStyleLayerMigration(layerVersion?: number, configVersion?: number): boolean {
+  if (layerVersion != null && layerVersion >= GROUND_STYLE_LAYER_ENCODING_VERSION) return false;
+  if (layerVersion != null && layerVersion < GROUND_STYLE_LAYER_ENCODING_VERSION) return true;
+  if (configVersion == null || configVersion < GROUND_STYLE_LAYER_ENCODING_VERSION) return true;
+  return false;
+}
 
 /** Estilo de suelo sin elementos, macro ni ecotono (solo color base de la paleta). */
 export function emptyZoneGroundStyle(): ZoneGroundStyle {
@@ -558,7 +653,9 @@ export function getActiveGroundStyleMap(): Record<number, ZoneGroundStyle> {
 }
 
 export function getGroundStyleOverride(): Record<number, ZoneGroundStyle> | null {
-  return activeGroundStyleOverride ? cloneGroundStyleMap(activeGroundStyleOverride) : null;
+  if (!activeGroundStyleOverride) return null;
+  backfillParkBaseLayerFromZones(activeGroundStyleOverride);
+  return cloneGroundStyleMap(activeGroundStyleOverride);
 }
 
 export function setGroundStyleOverride(style: Record<number, ZoneGroundStyle> | null): void {
@@ -601,6 +698,10 @@ export function applyGroundStyleToLayerKeys(
   for (const key of layerKeys) {
     activeGroundStyleOverride[key] = cloneZoneStyle(layerStyle);
   }
+  const keys = layerKeys as readonly number[];
+  if (keys.includes(0) && keys.includes(1) && keys.includes(2)) {
+    backfillParkBaseLayerFromZones(activeGroundStyleOverride);
+  }
 }
 
 /** Snapshot completo para persistencia / panel UI. */
@@ -611,25 +712,40 @@ export function exportGroundStyleSnapshot(): Record<number, ZoneGroundStyle> {
 /** Restaura desde snapshot guardado (null = defaults de código). */
 export function importGroundStyleSnapshot(
   snapshot: Record<number | string, ZoneGroundStyle> | null | undefined,
+  opts?: { configVersion?: number; groundStyleLayerVersion?: number },
 ): void {
   if (!snapshot || Object.keys(snapshot).length === 0) {
     resetGroundStyleToDefaults();
     return;
   }
-  const normalized = normalizeGroundStyleMapKeys(snapshot);
+  let normalized = normalizeGroundStyleMapKeys(snapshot);
+  if (needsGroundStyleLayerMigration(opts?.groundStyleLayerVersion, opts?.configVersion)) {
+    normalized = migrateGroundStyleMapFromV2(normalized);
+  }
   backfillParkBaseLayerFromZones(normalized);
   setGroundStyleOverride(normalized);
 }
 
 /** Configs antiguas guardaban 0/1/2 pero no -1; alinear base si las zonas coinciden. */
 function backfillParkBaseLayerFromZones(map: Record<number, ZoneGroundStyle>): void {
-  if (map[-1] != null) return;
+  if (map[GROUND_BASE_PARK_SECTION] != null) return;
   const z0 = map[0];
   const z1 = map[1];
   const z2 = map[2];
   if (!z0 || !z1 || !z2) return;
   if (!zoneGroundStylesEqual(z0, z1) || !zoneGroundStylesEqual(z0, z2)) return;
-  map[-1] = cloneZoneStyle(z0);
+  map[GROUND_BASE_PARK_SECTION] = cloneZoneStyle(z0);
+}
+
+function parkZonesShareOverrideStyle(): ZoneGroundStyle | null {
+  const o = activeGroundStyleOverride;
+  if (!o) return null;
+  const z0 = o[0];
+  const z1 = o[1];
+  const z2 = o[2];
+  if (!z0 || !z1 || !z2) return null;
+  if (!zoneGroundStylesEqual(z0, z1) || !zoneGroundStylesEqual(z0, z2)) return null;
+  return z0;
 }
 
 function zoneGroundStylesEqual(a: ZoneGroundStyle, b: ZoneGroundStyle): boolean {
@@ -638,10 +754,32 @@ function zoneGroundStylesEqual(a: ZoneGroundStyle, b: ZoneGroundStyle): boolean 
 
 function styleForSection(sectionIndex: number): ZoneGroundStyle {
   const styles = getActiveGroundStyleMap();
+  const override = activeGroundStyleOverride;
+
+  if (sectionIndex === GROUND_BASE_PARK_SECTION) {
+    if (override && hasGroundOverrideForSection(GROUND_BASE_PARK_SECTION)) {
+      return styles[GROUND_BASE_PARK_SECTION];
+    }
+    const parkSync = parkZonesShareOverrideStyle();
+    if (parkSync) return parkSync;
+    return styles[0] ?? styles[GROUND_BASE_PARK_SECTION] ?? emptyZoneGroundStyle();
+  }
+
+  if (sectionIndex === GROUND_MAP_BACKDROP_SECTION) {
+    if (override && hasGroundOverrideForSection(GROUND_MAP_BACKDROP_SECTION)) {
+      return styles[GROUND_MAP_BACKDROP_SECTION];
+    }
+    return styles[GROUND_MAP_BACKDROP_SECTION] ?? emptyZoneGroundStyle();
+  }
+
   if (styles[sectionIndex]) return styles[sectionIndex];
-  if (sectionIndex === -1) return styles[0] ?? emptyZoneGroundStyle();
-  if (sectionIndex === -2) return styles[-2] ?? emptyZoneGroundStyle();
   return styles[1] ?? styles[0] ?? emptyZoneGroundStyle();
+}
+
+function hasGroundOverrideForSection(sectionIndex: number): boolean {
+  if (!activeGroundStyleOverride) return false;
+  return Object.prototype.hasOwnProperty.call(activeGroundStyleOverride, sectionIndex)
+    || Object.prototype.hasOwnProperty.call(activeGroundStyleOverride, String(sectionIndex));
 }
 
 function drawGroundElementAt(
@@ -675,9 +813,14 @@ function drawGroundElementAt(
 }
 
 function paletteForSection(sectionIndex: number, isDark: boolean): GroundTexturePalette {
-  if (sectionIndex === -2) return mapBackdropPalette(isDark);
-  if (sectionIndex < 0) return parkBasePalette(isDark);
+  if (sectionIndex === GROUND_MAP_BACKDROP_SECTION) return mapBackdropPalette(isDark);
+  if (sectionIndex === GROUND_BASE_PARK_SECTION) return mapBackdropPalette(isDark);
   return groundPaletteForSection(sectionIndex, isDark);
+}
+
+/** Paleta del interior del contorno (verde bajo las zonas; no es la capa «Base parque»). */
+export function parkInteriorGroundPalette(isDark: boolean): GroundTexturePalette {
+  return parkBasePalette(isDark);
 }
 
 /**
@@ -852,8 +995,20 @@ function paintMacroVariation(
 
 function tracePolygon(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
   ctx.beginPath();
+  appendPolygonPath(ctx, points);
+}
+
+function appendPolygonPath(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
+  if (points.length < 3) return;
   ctx.moveTo(points[0].x, points[0].y);
   for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.closePath();
+}
+
+function appendPolygonPathReversed(ctx: CanvasRenderingContext2D, points: { x: number; y: number }[]): void {
+  if (points.length < 3) return;
+  ctx.moveTo(points[points.length - 1].x, points[points.length - 1].y);
+  for (let i = points.length - 2; i >= 0; i--) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath();
 }
 
@@ -1024,6 +1179,76 @@ function paintEcotoneBridge(
   ctx.restore();
 }
 
+export interface GroundFillOptions {
+  /** Solo color base + macro (los elementos van en pasada aparte). */
+  skipElements?: boolean;
+  /** Sin velo de color de contorno/zona encima de la textura. */
+  skipTint?: boolean;
+  skipEcotone?: boolean;
+}
+
+/**
+ * Recorta a la base del parque: cuadrado del mapa menos el contorno irregular (anillo).
+ * Regla even-odd: rectángulo exterior + hueco = polígono del parque.
+ */
+export function clipParkBaseFrame(
+  ctx: CanvasRenderingContext2D,
+  squarePoints: { x: number; y: number }[],
+  parkContourPoints: { x: number; y: number }[],
+): void {
+  ctx.beginPath();
+  appendPolygonPath(ctx, squarePoints);
+  appendPolygonPathReversed(ctx, parkContourPoints);
+  ctx.clip('evenodd');
+}
+
+/** Recorta a todo lo que queda fuera del marco cuadrado del mapa (fondo, capa -2). */
+export function clipOutsideMapSquare(
+  ctx: CanvasRenderingContext2D,
+  squarePoints: { x: number; y: number }[],
+  margin = 12000,
+): void {
+  ctx.beginPath();
+  ctx.rect(-margin, -margin, margin * 2, margin * 2);
+  appendPolygonPathReversed(ctx, squarePoints);
+  ctx.clip('evenodd');
+}
+
+/**
+ * @deprecated Huecos entre zonas; la base del parque es el marco cuadrado−contorno.
+ */
+export function clipParkBaseExcludingZones(
+  ctx: CanvasRenderingContext2D,
+  parkPoints: { x: number; y: number }[],
+  zonePolygons: { x: number; y: number }[][],
+): void {
+  ctx.beginPath();
+  appendPolygonPath(ctx, parkPoints);
+  for (const hole of zonePolygons) {
+    appendPolygonPathReversed(ctx, hole);
+  }
+  ctx.clip('evenodd');
+}
+
+/** Siembra elementos de suelo dentro del clip actual del contexto. */
+export function paintSectionGroundElements(
+  ctx: CanvasRenderingContext2D,
+  sectionIndex: number,
+  isDark: boolean,
+  bbox: GroundViewport,
+  mapScale: number,
+  viewport?: GroundViewport,
+): void {
+  const style = styleForSection(sectionIndex);
+  if (!style.elements.length) return;
+  const palette = paletteForSection(sectionIndex, isDark);
+  const lodTier = effectiveGroundLodTier(mapScale, activeGroundMapSettings);
+  const quality = groundQualityFactor(activeGroundMapSettings);
+  const unit = resolveGroundTilePx();
+  const region = intersectRegion(bbox, viewport);
+  scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+}
+
 /**
  * Pinta el suelo de un polígono (zona o base del parque):
  *   1) color base sólido (nítido, sin deriva)  2) variación macro de relieve
@@ -1041,6 +1266,7 @@ export function fillPolygonWithGroundTexture(
   _cache: GroundPatternCache,
   mapScale: number = PARK_MAP_VIS.groundRefZoom,
   viewport?: GroundViewport,
+  opts?: GroundFillOptions,
 ): void {
   if (points.length < 3) return;
 
@@ -1076,16 +1302,18 @@ export function fillPolygonWithGroundTexture(
   paintMacroVariation(ctx, palette, minX, minY, maxX, maxY, sectionIndex, style, lodTier);
 
   const region = intersectRegion({ minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad }, viewport);
-  scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+  if (!opts?.skipElements) {
+    scatterGroundElements(ctx, palette, style, sectionIndex, unit, lodTier, quality, region);
+  }
 
-  if (tintOpacity > 0) {
+  if (!opts?.skipTint && tintOpacity > 0) {
     ctx.fillStyle = tintColor;
     ctx.globalAlpha = tintOpacity;
     ctx.fillRect(minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2);
     ctx.globalAlpha = 1;
   }
 
-  if ((style.edgeBlend ?? 0) > 0 && sectionIndex >= -1) {
+  if (!opts?.skipEcotone && (style.edgeBlend ?? 0) > 0 && sectionIndex >= -1) {
     paintEcotoneBridge(ctx, points, sectionIndex, isDark, style, mapScale);
   }
 

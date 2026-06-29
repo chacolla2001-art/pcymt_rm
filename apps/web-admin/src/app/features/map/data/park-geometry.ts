@@ -71,6 +71,46 @@ export const PARK_BOUNDS = boundaryFile.boundingBox ?? {
   maxLng: -68.1446378,
 };
 
+/** Margen para proyección geo→canvas (no define capas de suelo). */
+export const MAP_FRAME_PADDING_DEG = 0.0002;
+
+export interface MapFrameGeoBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+/**
+ * Rectángulo geográfico para centrar/proyectar el mapa (no es el cuadrado grande del plano).
+ */
+export function mapFrameGeoBounds(
+  boundary: GeoPoint[] = PARK_BOUNDARY,
+  paddingDeg = MAP_FRAME_PADDING_DEG,
+): MapFrameGeoBounds {
+  const lats = boundary.map((p) => p.lat);
+  const lngs = boundary.map((p) => p.lng);
+  return {
+    minLat: Math.min(...lats) - paddingDeg,
+    maxLat: Math.max(...lats) + paddingDeg,
+    minLng: Math.min(...lngs) - paddingDeg,
+    maxLng: Math.max(...lngs) + paddingDeg,
+  };
+}
+
+/** Rectángulo de proyección del visor (≠ plano cuadrado del suelo). */
+export const MAP_FRAME_GEO_BOUNDS = mapFrameGeoBounds();
+
+export function isGeoInMapFrame(
+  geo: GeoPoint,
+  frame: MapFrameGeoBounds = MAP_FRAME_GEO_BOUNDS,
+): boolean {
+  return geo.lat >= frame.minLat
+    && geo.lat <= frame.maxLat
+    && geo.lng >= frame.minLng
+    && geo.lng <= frame.maxLng;
+}
+
 /** Secciones completas (metadatos + polígono) — shared/data/park-sections.json */
 export const PARK_SECTION_RECORDS: ParkSectionRecord[] = sectionsFile.sections;
 

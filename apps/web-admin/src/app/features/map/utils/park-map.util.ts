@@ -20,6 +20,11 @@ export function isInsidePark(point: GeoPoint): boolean {
   return isPointInPolygon(point, PARK_BOUNDARY);
 }
 
+/** Dentro del plano cuadrado del mapa (esquinas en geo). */
+export function isGeoInMapPlate(geo: GeoPoint, plateCorners: GeoPoint[]): boolean {
+  return plateCorners.length >= 3 && isPointInPolygon(geo, plateCorners);
+}
+
 export function sectionLabelCentroids(
   sections: Array<{ name: string; polygon: GeoPoint[] }> = PARK_SECTIONS,
 ): Array<{ name: string; geo: GeoPoint }> {

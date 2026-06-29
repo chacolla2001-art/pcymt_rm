@@ -7,7 +7,6 @@ import com.univalle.pedrochacolla.ui.dashboard.ParkMapView
 object AmbientTreePlacement {
     const val TREE_BASE_PARK_SECTION = -1
     const val TREE_BACKDROP_SECTION = -2
-    private const val FRAME_PADDING_DEG = 0.004
 
     fun isBackdropTree(slot: AmbientTreeSlotData): Boolean =
         slot.section == TREE_BACKDROP_SECTION
@@ -23,37 +22,32 @@ object AmbientTreePlacement {
         return slot.section.coerceIn(0, 2)
     }
 
+    /**
+     * Base del parque: anillo entre el contorno y el cuadrado grande del plano del mapa.
+     * `mapPlate` = esquinas del plano (no el bbox geográfico del parque).
+     */
+    fun isGeoInParkBaseFrame(
+        geo: ParkMapView.GeoPoint,
+        boundary: List<ParkMapView.GeoPoint>,
+        mapPlate: List<ParkMapView.GeoPoint>,
+    ): Boolean {
+        if (boundary.isEmpty() || mapPlate.size < 3) return false
+        if (!ParkMapPlate.isGeoInMapPlate(geo, mapPlate)) return false
+        if (ParkSectionResolver.isPointInPolygon(geo, boundary)) return false
+        return true
+    }
+
     fun canPlaceTreeOnBaseParkLayer(
         geo: ParkMapView.GeoPoint,
         boundary: List<ParkMapView.GeoPoint>,
-    ): Boolean = boundary.isNotEmpty() && ParkSectionResolver.isPointInPolygon(geo, boundary)
+        mapPlate: List<ParkMapView.GeoPoint>,
+    ): Boolean = isGeoInParkBaseFrame(geo, boundary, mapPlate)
 
+    /** Fondo (-2): fuera del cuadrado grande del plano. */
     fun canPlaceTreeOnBackdropLayer(
         geo: ParkMapView.GeoPoint,
-        boundary: List<ParkMapView.GeoPoint>,
-    ): Boolean = isGeoInBackdropFrame(geo, boundary)
-
-    fun isGeoInBackdropFrame(
-        geo: ParkMapView.GeoPoint,
-        boundary: List<ParkMapView.GeoPoint>,
-    ): Boolean {
-        if (boundary.isEmpty()) return false
-        if (ParkSectionResolver.isPointInPolygon(geo, boundary)) return false
-        var minLat = Double.POSITIVE_INFINITY
-        var maxLat = Double.NEGATIVE_INFINITY
-        var minLng = Double.POSITIVE_INFINITY
-        var maxLng = Double.NEGATIVE_INFINITY
-        for (p in boundary) {
-            minLat = minOf(minLat, p.lat)
-            maxLat = maxOf(maxLat, p.lat)
-            minLng = minOf(minLng, p.lng)
-            maxLng = maxOf(maxLng, p.lng)
-        }
-        return geo.lat >= minLat - FRAME_PADDING_DEG
-            && geo.lat <= maxLat + FRAME_PADDING_DEG
-            && geo.lng >= minLng - FRAME_PADDING_DEG
-            && geo.lng <= maxLng + FRAME_PADDING_DEG
-    }
+        mapPlate: List<ParkMapView.GeoPoint>,
+    ): Boolean = mapPlate.size >= 3 && !ParkMapPlate.isGeoInMapPlate(geo, mapPlate)
 
     fun isParkZoneTreeVisible(
         slot: AmbientTreeSlotData,

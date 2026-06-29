@@ -2,6 +2,7 @@ package com.univalle.pedrochacolla.utils.map
 
 import android.content.Context
 import com.univalle.pedrochacolla.data.model.MapConfigData
+import com.univalle.pedrochacolla.data.model.MapLayerFramesData
 import com.univalle.pedrochacolla.ui.dashboard.ParkMapView
 import com.univalle.pedrochacolla.ui.dashboard.PoiOverlayManager
 
@@ -32,10 +33,33 @@ object MapConfigVisuals {
         )
         view.applyPublishedSections(data.sections)
         view.applyPublishedLayerOffsets(data.layerOffsets)
+        applyPublishedLayerFrames(view, data)
         data.ambientScene?.let { view.applyPublishedAmbientScene(it) }
 
         if (poiOverlay != null && context != null) {
             applySpatialReferences(poiOverlay, data, context)
+        }
+    }
+
+    private fun applyPublishedLayerFrames(view: ParkMapView, data: MapConfigData) {
+        if (data.layerFrames != null) {
+            view.applyPublishedLayerFrames(data.layerFrames)
+            return
+        }
+        val sections = data.layerOffsets?.sections
+        if (sections != null) {
+            view.applyPublishedLayerFrames(
+                MapLayerFramesData(
+                    mapPlate = com.univalle.pedrochacolla.data.model.LayerFrameTransformData(
+                        x = sections.x.toFloat(),
+                        y = sections.y.toFloat(),
+                    ),
+                    zones = com.univalle.pedrochacolla.data.model.LayerFrameTransformData(
+                        x = sections.x.toFloat(),
+                        y = sections.y.toFloat(),
+                    ),
+                ),
+            )
         }
     }
 

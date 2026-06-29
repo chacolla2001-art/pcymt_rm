@@ -21,7 +21,6 @@ import type { ParkSectionRecord } from '../data/park-geometry';
 import type { SpatialReference } from '../data/spatial-reference';
 import { spatialReferenceFrameUrls, spatialReferenceHasMapImage, spatialReferenceSummary } from '../data/spatial-reference';
 import { resolveSectionFillOpacities } from '../utils/section-color.util';
-import { AMBIENT_SCENARIOS } from '../data/ambient-scenarios';
 import { PARK_MAP_VIS } from '../utils/map-park-visual-scale';
 import {
   GROUND_ZONE_KEYS,
@@ -33,6 +32,12 @@ import {
   type GroundMapSettings,
 } from '../utils/ground-preset';
 import { DEFAULT_MAP_LOD_CATEGORIES, type MapLodCategories } from '../utils/map-lod';
+import {
+  cloneMapLayerFrames,
+  DEFAULT_MAP_LAYER_FRAMES,
+  type MapLayerFrameTransform,
+  type MapLayerFramesData,
+} from '../utils/map-layer-geometry';
 
 /** Event fired by the panel to control the map from outside */
 export type MapControlEvent =
@@ -47,6 +52,8 @@ export type MapControlEvent =
   | { type: 'groundTilePxChange'; value: number }
   | { type: 'groundAutoTilePx' }
   | { type: 'groundSettingsChange'; settings: GroundMapSettings }
+  | { type: 'layerFramesChange'; frames: Partial<MapLayerFramesData> }
+  | { type: 'resetLayerFrames' }
   | { type: 'groundStyleZoneChange'; sectionIndex: number; style: ZoneGroundStyle }
   | { type: 'groundStyleApplyAll'; style: ZoneGroundStyle }
   | { type: 'groundStyleApplyParkLayers'; style: ZoneGroundStyle }
@@ -93,7 +100,6 @@ export type MapControlEvent =
   | { type: 'ambientWindStrengthChange'; value: number }
   | { type: 'effectWindDirectionChange'; effect: AmbientEffectWindKey; deg: number }
   | { type: 'rainSectionChange'; sectionIndex: number }
-  | { type: 'applyAmbientScenario'; scenarioId: string }
   | { type: 'clearAllPlacedContent' }
   | { type: 'toggleTreeEditor' }
   | { type: 'setTreeEditorSection'; index: number | 'park' }
@@ -300,6 +306,99 @@ export interface MapViewInfo {
         </div>
       </div>
 
+      <div class="panel-group-label">Geometría de capas</div>
+      <p class="section-hint compact panel-group-hint">
+        Ajusta tamaño, posición y rotación del plano, anillo base, zonas y marcadores. El contorno del parque se edita aparte.
+      </p>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('geomMapPlate')">
+          <span class="section-chevron" [class.open]="openSections.geomMapPlate">▸</span>
+          <span class="section-title">Plano del mapa (fondo)</span>
+        </div>
+        <div class="section-content" *ngIf="openSections.geomMapPlate">
+          <p class="section-hint compact">Cuadrado grande detrás del parque (capa -2 y borde exterior del anillo).</p>
+          <ng-container *ngTemplateOutlet="frameSliders; context: { $implicit: localLayerFrames.mapPlate, target: 'mapPlate' }"></ng-container>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('geomBaseRing')">
+          <span class="section-chevron" [class.open]="openSections.geomBaseRing">▸</span>
+          <span class="section-title">Base parque (anillo)</span>
+        </div>
+        <div class="section-content" *ngIf="openSections.geomBaseRing">
+          <p class="section-hint compact">Anillo entre el contorno y el plano. La expansión interior no mueve el contorno visible.</p>
+          <div class="param-row">
+            <label>Exp. interior</label>
+            <input type="range" min="0" max="200" step="2"
+              [ngModel]="localLayerFrames.baseRing.innerExpandPx"
+              (ngModelChange)="onBaseRingExpandChange('innerExpandPx', $event)">
+            <span class="param-val">{{ localLayerFrames.baseRing.innerExpandPx }}px</span>
+          </div>
+          <div class="param-row">
+            <label>Exp. exterior</label>
+            <input type="range" min="0" max="200" step="2"
+              [ngModel]="localLayerFrames.baseRing.outerExpandPx"
+              (ngModelChange)="onBaseRingExpandChange('outerExpandPx', $event)">
+            <span class="param-val">{{ localLayerFrames.baseRing.outerExpandPx }}px</span>
+          </div>
+          <ng-container *ngTemplateOutlet="frameSliders; context: { $implicit: localLayerFrames.baseRing, target: 'baseRing' }"></ng-container>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('geomZones')">
+          <span class="section-chevron" [class.open]="openSections.geomZones">▸</span>
+          <span class="section-title">Zonas (ecosistemas)</span>
+        </div>
+        <div class="section-content" *ngIf="openSections.geomZones">
+          <p class="section-hint compact">Transformación adicional a las zonas 0/1/2 (suma al arrastre de capa).</p>
+          <ng-container *ngTemplateOutlet="frameSliders; context: { $implicit: localLayerFrames.zones, target: 'zones' }"></ng-container>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('geomMarkers')">
+          <span class="section-chevron" [class.open]="openSections.geomMarkers">▸</span>
+          <span class="section-title">Marcadores</span>
+        </div>
+        <div class="section-content" *ngIf="openSections.geomMarkers">
+          <ng-container *ngTemplateOutlet="frameSliders; context: { $implicit: localLayerFrames.markers, target: 'markers' }"></ng-container>
+        </div>
+      </div>
+
+      <button type="button" class="tool-btn full-width" (click)="resetLayerFrames()">↺ Restablecer geometría</button>
+
+      <ng-template #frameSliders let-frame let-target="target">
+        <div class="param-row">
+          <label>Offset X</label>
+          <input type="range" min="-200" max="200" step="1"
+            [ngModel]="frame.x" (ngModelChange)="onLayerFrameChange(target, 'x', $event)">
+          <span class="param-val">{{ frame.x }}px</span>
+        </div>
+        <div class="param-row">
+          <label>Offset Y</label>
+          <input type="range" min="-200" max="200" step="1"
+            [ngModel]="frame.y" (ngModelChange)="onLayerFrameChange(target, 'y', $event)">
+          <span class="param-val">{{ frame.y }}px</span>
+        </div>
+        <div class="param-row" *ngIf="target !== 'baseRing'">
+          <label>Escala</label>
+          <input type="range" min="50" max="200" step="1"
+            [ngModel]="frameScalePercent(frame)"
+            (ngModelChange)="onLayerFrameChange(target, 'scale', $event / 100)">
+          <span class="param-val">{{ frameScalePercent(frame) }}%</span>
+        </div>
+        <div class="param-row">
+          <label>Rotación</label>
+          <input type="range" min="-45" max="45" step="1"
+            [ngModel]="frame.rotationDeg"
+            (ngModelChange)="onLayerFrameChange(target, 'rotationDeg', $event)">
+          <span class="param-val">{{ frame.rotationDeg }}°</span>
+        </div>
+      </ng-template>
+
       <div class="section">
         <div class="section-header" (click)="toggleSection('layerSpatialRefs')">
           <span class="section-chevron" [class.open]="openSections.layerSpatialRefs">▸</span>
@@ -435,13 +534,13 @@ export interface MapViewInfo {
         </div>
         <div class="section-content" *ngIf="openSections.ground">
           <p class="section-hint compact" *ngIf="!localOpts.showGroundTextures">
-            Activa ON para ver piedras, hierba y variación macro en el mapa.
+            Activa ON para ver piedras, hierba y variación macro en el mapa. Puedes configurar el suelo igualmente.
           </p>
-          <ng-container *ngIf="localOpts.showGroundTextures">
-            <p class="section-hint compact">Tamaño, calidad, elementos por zona y ecotono están en la ficha flotante del mapa.</p>
-            <button type="button" class="tool-btn" style="width:100%"
-              (click)="openGroundSettingsCard()">⚙ Configurar suelo…</button>
-          </ng-container>
+          <p class="section-hint compact" *ngIf="localOpts.showGroundTextures">
+            Tamaño, calidad, elementos por zona y ecotono están en la ficha flotante del mapa.
+          </p>
+          <button type="button" class="tool-btn" style="width:100%"
+            (click)="openGroundSettingsCard(); $event.stopPropagation()">⚙ Configurar suelo…</button>
         </div>
       </div>
 
@@ -456,23 +555,39 @@ export interface MapViewInfo {
       <div class="section section-editor-block" *ngIf="isAdmin">
         <div class="section-header" (click)="toggleSection('scene')">
           <span class="section-chevron" [class.open]="openSections.scene">▸</span>
-          <span class="section-title">Escena ambiental</span>
+          <span class="section-title">Efectos ambientales</span>
         </div>
         <div class="section-content scrollable" *ngIf="openSections.scene">
           <p class="section-hint">Efectos en el plano del mapa (rotan con la vista).</p>
 
+          <p class="ambient-subtitle">Viento global</p>
+          <p class="section-hint compact">G en cada efecto = hereda esta orientación.</p>
+          <div class="param-row column">
+            <div class="wind-compass-grid">
+              <button type="button" class="wind-dir-btn" *ngFor="let w of windPresets"
+                [class.active]="sceneOpts.ambientWindDeg === w.deg"
+                (click)="onAmbientWindDirection(w.deg)">{{ w.label }}</button>
+            </div>
+          </div>
           <div class="param-row">
-            <label>Escena</label>
+            <label>Fuerza viento</label>
+            <input type="range" min="0" max="100" step="1" [ngModel]="sceneOpts.ambientWindStrengthPercent"
+              (ngModelChange)="onAmbientWindStrengthChange($event)">
+            <span class="param-val">{{ sceneOpts.ambientWindStrengthPercent }}%</span>
+          </div>
+
+          <div class="param-row">
+            <label>Zona ambiental</label>
             <select class="el-select ground-zone-select"
-              [ngModel]="ambientScenarioSelectValue"
-              (ngModelChange)="onAmbientScenarioSelect($event)">
-              <option value="">Personalizada</option>
-              <option *ngFor="let sc of ambientScenarios" [value]="sc.id">
-                {{ sc.emoji }} {{ sc.label }}
-              </option>
+              [ngModel]="ambientRainSectionSelectValue"
+              (ngModelChange)="onAmbientRainSectionSelect($event)">
+              <option value="-1">Todo el parque</option>
+              <option *ngFor="let s of editableSections; let i = index" [value]="i">{{ s.name }}</option>
             </select>
           </div>
-          <p class="section-hint compact" *ngIf="activeScenarioDescription">{{ activeScenarioDescription }}</p>
+          <p class="section-hint compact">Limita lluvia, niebla, partículas, hojas y sombras a una sección.</p>
+
+          <div class="sub-divider"></div>
 
           <div class="param-row">
             <label>Lluvia en el mapa</label>
@@ -619,35 +734,6 @@ export interface MapViewInfo {
             <span class="param-val">{{ sceneOpts.nightMistIntensityPercent }}%</span>
           </div>
 
-          <div class="sub-divider"></div>
-          <p class="ambient-subtitle">Viento global</p>
-          <p class="section-hint compact">G en cada efecto = hereda esta orientación.</p>
-          <div class="param-row column">
-            <div class="wind-compass-grid">
-              <button type="button" class="wind-dir-btn" *ngFor="let w of windPresets"
-                [class.active]="sceneOpts.ambientWindDeg === w.deg"
-                (click)="onAmbientWindDirection(w.deg)">{{ w.label }}</button>
-            </div>
-          </div>
-          <div class="param-row">
-            <label>Fuerza viento</label>
-            <input type="range" min="0" max="100" step="1" [ngModel]="sceneOpts.ambientWindStrengthPercent"
-              (ngModelChange)="onAmbientWindStrengthChange($event)">
-            <span class="param-val">{{ sceneOpts.ambientWindStrengthPercent }}%</span>
-          </div>
-
-          <div class="sub-divider"></div>
-          <div class="param-row">
-            <label>Zona ambiental</label>
-            <select class="el-select ground-zone-select"
-              [ngModel]="ambientRainSectionSelectValue"
-              (ngModelChange)="onAmbientRainSectionSelect($event)">
-              <option value="-1">Todo el parque</option>
-              <option *ngFor="let s of editableSections; let i = index" [value]="i">{{ s.name }}</option>
-            </select>
-          </div>
-          <p class="section-hint compact">Limita lluvia, niebla, partículas, hojas y sombras a una sección.</p>
-
           <ng-template #effectWindRow let-effect="effect" let-windDeg="windDeg">
             <div class="param-row column effect-wind-row">
               <label>Orientación</label>
@@ -689,13 +775,13 @@ export interface MapViewInfo {
               </select>
             </div>
             <p class="section-hint compact" *ngIf="treeEditorTarget === 'park'">
-              Igual que en Suelo: dentro del contorno → zonas o base (-1, verde). Marco gris cercano → fondo (-2). Sin el fondo lejano.
+              Dentro del contorno → zonas. Anillo entre contorno y plano → base (-1). Fuera del plano → fondo (-2).
             </p>
             <p class="section-hint compact" *ngIf="treeEditorTarget === treeBaseParkSection">
-              Solo dentro del contorno: caminos y bordes bajo las zonas (capa -1, verde).
+              Anillo base: fuera del contorno y dentro del cuadrado grande del plano (capa -1).
             </p>
             <p class="section-hint compact" *ngIf="treeEditorTarget === treeBackdropSection">
-              Marco gris fuera del contorno (capa -2). Misma zona que «Fondo mapa» en Suelo.
+              Fuera del cuadrado grande del plano (capa -2).
             </p>
             <p class="section-hint compact" *ngIf="isTreeEcoZoneTarget(treeEditorTarget)">
               Solo dentro del polígono de la zona seleccionada.
@@ -753,19 +839,23 @@ export interface MapViewInfo {
               <span>Lista en zona ({{ treesInSelectedZone.length }})</span>
             </div>
             <div class="vertex-list" *ngIf="treesInSelectedZone.length; else noTreesInZone">
-              <div class="vertex-item tree-list-item" *ngFor="let item of treesInSelectedZone"
-                [class.selected]="item.index === selectedTreeIndex"
-                (click)="onSelectAmbientTree(item.index)">
-                <span class="vertex-index">#{{ item.index + 1 }}</span>
-                <div class="vertex-coords">
-                  <span class="spatial-ref-coords">{{ item.tree.lat | number:'1.5-5' }}, {{ item.tree.lng | number:'1.5-5' }}</span>
-                  <span class="tree-meta">{{ treeSectionLabel(item.tree.section) }} · {{ treeVariantLabels[item.tree.variant] }} · {{ item.tree.scale | number:'1.2-2' }}×</span>
-                </div>
-                <button type="button" class="mini-btn danger" (click)="removeAmbientTree(item.index); $event.stopPropagation()" title="Eliminar">✕</button>
+              <div class="tree-list-row" *ngFor="let item of treesInSelectedZone">
+                <button type="button" class="vertex-item tree-list-item"
+                  [class.selected]="item.index === selectedTreeIndex"
+                  (click)="onSelectAmbientTree(item.index)"
+                  [attr.title]="'Ir al árbol #' + (item.index + 1)">
+                  <span class="vertex-index">#{{ item.index + 1 }}</span>
+                  <div class="vertex-coords">
+                    <span class="spatial-ref-coords">{{ item.tree.lat | number:'1.5-5' }}, {{ item.tree.lng | number:'1.5-5' }}</span>
+                    <span class="tree-meta">{{ treeSectionLabel(item.tree.section) }} · {{ treeVariantLabels[item.tree.variant] }} · {{ item.tree.scale | number:'1.2-2' }}×</span>
+                  </div>
+                  <span class="tree-go-icon" aria-hidden="true">⌖</span>
+                </button>
+                <button type="button" class="mini-btn danger" (click)="removeAmbientTree(item.index)" title="Eliminar">✕</button>
               </div>
             </div>
             <ng-template #noTreesInZone>
-              <p class="section-hint compact">Sin árboles aquí. Con «Colocando…» activo, haz click en el mapa. Click en un marcador para editarlo.</p>
+              <p class="section-hint compact">Sin árboles aquí. Con «Colocando…» activo, haz click en el mapa. Pulsa un registro de la lista para ir al árbol.</p>
             </ng-template>
           </ng-container>
         </div>
@@ -1498,12 +1588,36 @@ export interface MapViewInfo {
     .section-hint.warn {
       color: #e65100;
     }
+    .tree-list-row {
+      display: flex;
+      gap: 4px;
+      align-items: stretch;
+    }
+    .tree-list-row .tree-list-item {
+      flex: 1;
+      min-width: 0;
+    }
+    button.vertex-item.tree-list-item {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+    }
     .tree-list-item {
       cursor: pointer;
     }
     .tree-list-item.selected {
       outline: 1px solid var(--sp-accent);
       border-radius: 6px;
+    }
+    .tree-go-icon {
+      margin-left: auto;
+      font-size: 13px;
+      opacity: 0.5;
+      flex-shrink: 0;
+      align-self: center;
+      padding-left: 4px;
     }
     .tree-meta {
       display: block;
@@ -2074,6 +2188,7 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   @Input() activeSpatialRefIndex = 0;
   @Input() sessionSavedAt: string | null = null;
   @Input() groundSettings: GroundMapSettings | null = null;
+  @Input() layerFrames: MapLayerFramesData | null = null;
   @Input() sceneOpts = {
     activeScenarioId: null as string | null,
     showRainEffect: false,
@@ -2115,7 +2230,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   readonly spatialRefSummary = spatialReferenceSummary;
   readonly spatialRefFrameUrls = spatialReferenceFrameUrls;
   readonly spatialReferenceHasMapImage = spatialReferenceHasMapImage;
-  readonly ambientScenarios = AMBIENT_SCENARIOS;
 
   @Output() mapControlEvent = new EventEmitter<MapControlEvent>();
   @Output() panelToggled = new EventEmitter<boolean>();
@@ -2140,6 +2254,7 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   /** Marker dot size (px) */
   localMarkerSize = 10;
   localGroundSettings: GroundMapSettings = { ...DEFAULT_GROUND_MAP_SETTINGS };
+  localLayerFrames: MapLayerFramesData = cloneMapLayerFrames(DEFAULT_MAP_LAYER_FRAMES);
   readonly treesSizePctMin = PARK_MAP_VIS.treesSizePctMin;
   readonly treesSizePctMax = PARK_MAP_VIS.treesSizePctMax;
   readonly treeSlotScalePctMin = PARK_MAP_VIS.treeSlotScalePctMin;
@@ -2154,6 +2269,10 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     layerSections: false,
     layerMarkers: false,
     layerSpatialRefs: false,
+    geomMapPlate: false,
+    geomBaseRing: false,
+    geomZones: false,
+    geomMarkers: false,
     ground: false,
     sectionEditor: false,
     treeEditor: false,
@@ -2197,6 +2316,10 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
         ...this.groundSettings,
         lodCategories: { ...DEFAULT_MAP_LOD_CATEGORIES, ...this.groundSettings.lodCategories },
       };
+      this.cdr.markForCheck();
+    }
+    if (changes['layerFrames'] && this.layerFrames) {
+      this.localLayerFrames = cloneMapLayerFrames(this.layerFrames);
       this.cdr.markForCheck();
     }
     if (changes['sceneOpts']) {
@@ -2353,26 +2476,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
 
   get activeSpatialRef(): SpatialReference | null {
     return this.spatialReferences[this.activeSpatialRefIndex] ?? null;
-  }
-
-  get ambientScenarioSelectValue(): string {
-    return this.sceneOpts.activeScenarioId ?? '';
-  }
-
-  get activeScenarioDescription(): string | null {
-    const id = this.sceneOpts.activeScenarioId;
-    if (!id) return null;
-    return this.ambientScenarios.find((s) => s.id === id)?.description ?? null;
-  }
-
-  onAmbientScenarioSelect(raw: string): void {
-    if (!raw) return;
-    this.applyAmbientScenario(raw);
-  }
-
-  applyAmbientScenario(id: string): void {
-    this.mapControlEvent.emit({ type: 'applyAmbientScenario', scenarioId: id });
-    this.cdr.markForCheck();
   }
 
   clearAllPlacedContent(): void {
@@ -2800,6 +2903,39 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   onMarkerSizeChange(size: number): void {
     this.localMarkerSize = size;
     this.mapControlEvent.emit({ type: 'markerSize', value: size } as MapControlEvent);
+  }
+
+  frameScalePercent(frame: MapLayerFrameTransform): number {
+    return Math.round((frame.scale ?? 1) * 100);
+  }
+
+  onLayerFrameChange(
+    target: 'mapPlate' | 'baseRing' | 'zones' | 'markers',
+    field: keyof MapLayerFrameTransform,
+    value: number,
+  ): void {
+    const patch: Partial<MapLayerFramesData> = {
+      [target]: { ...this.localLayerFrames[target], [field]: value },
+    };
+    this.localLayerFrames = {
+      ...this.localLayerFrames,
+      [target]: { ...this.localLayerFrames[target], [field]: value },
+    };
+    this.mapControlEvent.emit({ type: 'layerFramesChange', frames: patch });
+    this.cdr.markForCheck();
+  }
+
+  onBaseRingExpandChange(field: 'innerExpandPx' | 'outerExpandPx', value: number): void {
+    const baseRing = { ...this.localLayerFrames.baseRing, [field]: value };
+    this.localLayerFrames = { ...this.localLayerFrames, baseRing };
+    this.mapControlEvent.emit({ type: 'layerFramesChange', frames: { baseRing } });
+    this.cdr.markForCheck();
+  }
+
+  resetLayerFrames(): void {
+    this.localLayerFrames = cloneMapLayerFrames(DEFAULT_MAP_LAYER_FRAMES);
+    this.mapControlEvent.emit({ type: 'resetLayerFrames' });
+    this.cdr.markForCheck();
   }
 
   onGroundLodToggle(): void {

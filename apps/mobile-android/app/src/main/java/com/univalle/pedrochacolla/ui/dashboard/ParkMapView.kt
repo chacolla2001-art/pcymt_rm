@@ -14,7 +14,11 @@ import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import com.univalle.pedrochacolla.utils.map.ParkSectionResolver
 import com.univalle.pedrochacolla.utils.map.MapGroundRenderer
+import com.univalle.pedrochacolla.utils.map.MapLod
 import com.univalle.pedrochacolla.utils.map.MapTreesRenderer
+import com.univalle.pedrochacolla.utils.map.MapLayerGeometry
+import com.univalle.pedrochacolla.data.model.MapLayerFramesData
+import com.univalle.pedrochacolla.data.model.LayerFrameTransformData
 import com.univalle.pedrochacolla.utils.map.AmbientScenarioTints
 import com.univalle.pedrochacolla.utils.map.AmbientTickOptions
 import com.univalle.pedrochacolla.utils.map.AmbientWind
@@ -207,6 +211,7 @@ class ParkMapView @JvmOverloads constructor(
     private var publishedTrees: List<AmbientTreeSlotData> = emptyList()
     private var publishedGroundStyle: Map<Int, ZoneGroundStyleData> = emptyMap()
     private var publishedGroundSettings: GroundMapSettingsData? = null
+    private var publishedLayerFrames: MapLayerFramesData = MapLayerGeometry.defaultFrames()
     private var publishedTreesSizeMul = 1f
 
     private data class LayerOffset(val x: Float = 0f, val y: Float = 0f)
@@ -993,22 +998,29 @@ class ParkMapView @JvmOverloads constructor(
         canvas.scale(scale, scale)
         canvas.translate(-width / 2f, -height / 2f)
 
-        val groundVp = getPublishedGroundViewport(width.toFloat(), height.toFloat())
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val frames = MapLayerGeometry.normalize(publishedLayerFrames)
+        val platePoints = MapLayerGeometry.mapPlateCanvasPoints(w, h, frames.mapPlate!!)
+        val groundVp = getPublishedGroundViewportForPlate(platePoints)
         if (showGroundTextures) {
-            canvas.save()
-            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
-            drawPublishedGround(canvas, width.toFloat(), height.toFloat(), groundVp)
+            drawPublishedGround(canvas, w, h, groundVp, frames)
             if (showPublishedTrees) {
-                drawPublishedBackdropAndBaseTrees(canvas, groundVp)
+                drawPublishedBackdropAndBaseTrees(canvas, groundVp, frames)
             }
-            canvas.restore()
         }
 
         // Dibujar capas (el orden importa)
         if (showGrid) drawGrid(canvas)
         if (showSections) {
+            val zonesFrame = MapLayerGeometry.combineOffset(
+                layerOffsetSections.x, layerOffsetSections.y, frames.zones!!,
+            )
             canvas.save()
-            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
+            MapLayerGeometry.applyLayerFrameTransform(canvas, w, h, zonesFrame)
+            if (showGroundTextures) {
+                drawPublishedZoneGround(canvas, groundVp)
+            }
             drawSections(canvas)
             canvas.restore()
         }
@@ -1018,14 +1030,22 @@ class ParkMapView @JvmOverloads constructor(
             drawBoundary(canvas)
             canvas.restore()
         }
-        canvas.save()
-        canvas.translate(layerOffsetMarkers.x, layerOffsetMarkers.y)
-        drawMarkerDots(canvas)
-        canvas.restore()
+        if (MapLod.markersVisibleAtLod(scale, publishedGroundSettings)) {
+            val markersFrame = MapLayerGeometry.combineOffset(
+                layerOffsetMarkers.x, layerOffsetMarkers.y, frames.markers!!,
+            )
+            canvas.save()
+            MapLayerGeometry.applyLayerFrameTransform(canvas, w, h, markersFrame)
+            drawMarkerDots(canvas)
+            canvas.restore()
+        }
 
         if (showPublishedTrees) {
+            val zonesFrame = MapLayerGeometry.combineOffset(
+                layerOffsetSections.x, layerOffsetSections.y, frames.zones!!,
+            )
             canvas.save()
-            canvas.translate(layerOffsetSections.x, layerOffsetSections.y)
+            MapLayerGeometry.applyLayerFrameTransform(canvas, w, h, zonesFrame)
             drawPublishedZoneTrees(canvas, groundVp)
             canvas.restore()
         }
@@ -1033,15 +1053,23 @@ class ParkMapView @JvmOverloads constructor(
         canvas.restore()
 
         // Dibujar labels sin rotación
-        if (showSectionLabels && showSections) drawSectionLabels(canvas)
-        if (showLabels) drawMarkerLabels(canvas)
+        if (showSectionLabels && showSections
+            && MapLod.sectionLabelsVisibleAtLod(scale, publishedGroundSettings)
+        ) {
+            drawSectionLabels(canvas)
+        }
+        if (showLabels && MapLod.markerLabelsVisibleAtLod(scale, publishedGroundSettings)) {
+            drawMarkerLabels(canvas)
+        }
         if (showMapLegend) drawMapLegend(canvas)
         if (showScaleBar) drawScale(canvas)
 
         // Capa ambiental (bajo referencias espaciales)
         drawAmbientEffects(canvas)
 
-        poiOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, spatialRefsPhase)
+        if (MapLod.spatialRefsVisibleAtLod(scale, publishedGroundSettings)) {
+            poiOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, spatialRefsPhase)
+        }
 
         // Draw sticker overlay (only non-tree stickers follow map rotation)
         stickerOverlayManager?.drawOverlay(canvas, ::geoToScreenPublic, scale, rotation)
@@ -1126,40 +1154,63 @@ class ParkMapView @JvmOverloads constructor(
 
     private fun drawAmbientEffects(canvas: Canvas) {
         if (!hasActiveAmbientEffects() && scenarioTint == null) return
+        val lodMul = MapLod.ambientLodIntensityMul(scale, publishedGroundSettings)
+        if (lodMul <= 0f && scenarioTint == null) return
         val clipPath = buildAmbientClipPath()
         val toScreen = { bx: Float, by: Float -> baseCanvasToScreen(bx, by) }
         val w = width.toFloat()
         val h = height.toFloat()
-        if (showCloudShadows) {
-            mapCloudShadowEffect.intensity = cloudShadowIntensity
+        if (showCloudShadows && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.CLOUD_SHADOWS, scale, publishedGroundSettings,
+            )
+        ) {
+            mapCloudShadowEffect.intensity = cloudShadowIntensity * lodMul
             mapCloudShadowEffect.sizeMul = cloudShadowSize
             mapCloudShadowEffect.draw(canvas, clipPath, toScreen, scale)
         }
-        if (showFogEffect) {
-            mapFogEffect.intensity = fogIntensity
+        if (showFogEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.FOG, scale, publishedGroundSettings,
+            )
+        ) {
+            mapFogEffect.intensity = fogIntensity * lodMul
             mapFogEffect.sizeMul = fogSize
             mapFogEffect.draw(canvas, clipPath, toScreen, scale)
         }
-        if (showNightMistEffect) {
-            mapNightMistEffect.intensity = nightMistIntensity
+        if (showNightMistEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.NIGHT_MIST, scale, publishedGroundSettings,
+            )
+        ) {
+            mapNightMistEffect.intensity = nightMistIntensity * lodMul
             mapNightMistEffect.draw(canvas, clipPath, toScreen, scale, isDarkTheme, w, h)
         }
-        if (showRainEffect) {
-            mapRainEffect.intensity = rainIntensity
+        if (showRainEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.RAIN, scale, publishedGroundSettings,
+            )
+        ) {
+            mapRainEffect.intensity = rainIntensity * lodMul
             mapRainEffect.sizeMul = rainSize
             mapRainEffect.draw(canvas, clipPath, toScreen, scale)
         }
-        if (showMotesEffect) {
-            mapMotesEffect.intensity = motesIntensity
+        if (showMotesEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.MOTES, scale, publishedGroundSettings,
+            )
+        ) {
+            mapMotesEffect.intensity = motesIntensity * lodMul
             mapMotesEffect.sizeMul = motesSize
             mapMotesEffect.draw(canvas, clipPath, toScreen, scale)
         }
-        if (showLeavesEffect) {
-            mapLeavesEffect.intensity = leavesIntensity
+        if (showLeavesEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.LEAVES, scale, publishedGroundSettings,
+            )
+        ) {
+            mapLeavesEffect.intensity = leavesIntensity * lodMul
             mapLeavesEffect.sizeMul = leavesSize
             mapLeavesEffect.draw(canvas, clipPath, toScreen, scale)
         }
-        if (showLightningEffect) {
+        if (showLightningEffect && MapLod.ambientEffectVisibleAtLod(
+                MapLod.AmbientEffectKind.LIGHTNING, scale, publishedGroundSettings,
+            )
+        ) {
             mapLightningEffect.draw(canvas, clipPath, w, h)
         }
         drawScenarioTint(canvas, clipPath, w, h)
@@ -2301,6 +2352,11 @@ class ParkMapView @JvmOverloads constructor(
         invalidate()
     }
 
+    fun applyPublishedLayerFrames(frames: MapLayerFramesData?) {
+        publishedLayerFrames = MapLayerGeometry.normalize(frames)
+        invalidate()
+    }
+
     /** Escena ambiental publicada (efectos + escenario + viento). */
     fun applyPublishedAmbientScene(scene: AmbientSceneData) {
         scenarioTint = AmbientScenarioTints.tintForScenario(scene.activeScenarioId)
@@ -2386,18 +2442,75 @@ class ParkMapView @JvmOverloads constructor(
         return MapGroundRenderer.Viewport(minX, minY, maxX, maxY)
     }
 
-    private fun drawPublishedGround(canvas: Canvas, w: Float, h: Float, vp: MapGroundRenderer.Viewport) {
+    private fun getPublishedGroundViewportForPlate(
+        platePoints: List<ScreenPoint>,
+    ): MapGroundRenderer.Viewport {
+        val pad = 80f
+        var minX = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        var minY = Float.POSITIVE_INFINITY
+        var maxY = Float.NEGATIVE_INFINITY
+        for (p in platePoints) {
+            minX = minOf(minX, p.x)
+            maxX = maxOf(maxX, p.x)
+            minY = minOf(minY, p.y)
+            maxY = maxOf(maxY, p.y)
+        }
+        if (!minX.isFinite()) {
+            return getPublishedGroundViewport(width.toFloat(), height.toFloat())
+        }
+        return MapGroundRenderer.Viewport(minX - pad, minY - pad, maxX + pad, maxY + pad)
+    }
+
+    private fun getBaseRingPlatePoints(w: Float, h: Float, frames: MapLayerFramesData): List<ScreenPoint> {
+        val plate = frames.mapPlate ?: LayerFrameTransformData()
+        val ring = frames.baseRing
+        val platePts = MapLayerGeometry.mapPlateCanvasPoints(w, h, plate)
+        return MapLayerGeometry.expandPolygonOutward(platePts, ring?.outerExpandPx ?: 0f)
+    }
+
+    private fun getBaseRingHolePoints(frames: MapLayerFramesData): List<ScreenPoint> {
+        val boundaryPts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+        return MapLayerGeometry.contractPolygonInward(
+            boundaryPts,
+            frames.baseRing?.innerExpandPx ?: 0f,
+        )
+    }
+
+    private fun drawPublishedGround(
+        canvas: Canvas,
+        w: Float,
+        h: Float,
+        vp: MapGroundRenderer.Viewport,
+        frames: MapLayerFramesData,
+    ) {
+        val platePoints = MapLayerGeometry.mapPlateCanvasPoints(w, h, frames.mapPlate!!)
+        val ringPlatePoints = getBaseRingPlatePoints(w, h, frames)
+        val boundaryPts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+        val holePts = getBaseRingHolePoints(frames)
+
         MapGroundRenderer.drawMapBackdrop(
             canvas, w, h, isDarkTheme, scale,
-            publishedGroundStyle, publishedGroundSettings, vp,
+            publishedGroundStyle, publishedGroundSettings, vp, platePoints,
         )
-        val boundaryPts = parkBoundary.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
+
         if (boundaryPts.size >= 3) {
-            MapGroundRenderer.drawPolygonLayer(
-                canvas, boundaryPts, -1, isDarkTheme, scale,
+            MapGroundRenderer.drawParkInteriorMatte(canvas, boundaryPts, isDarkTheme)
+            MapGroundRenderer.drawParkGroundBase(
+                canvas, ringPlatePoints, holePts, isDarkTheme, scale,
                 publishedGroundStyle, publishedGroundSettings, vp,
             )
         }
+
+        if (boundaryPts.size >= 3) {
+            MapGroundRenderer.drawParkGroundElements(
+                canvas, ringPlatePoints, holePts, isDarkTheme, scale,
+                publishedGroundStyle, publishedGroundSettings, vp,
+            )
+        }
+    }
+
+    private fun drawPublishedZoneGround(canvas: Canvas, vp: MapGroundRenderer.Viewport) {
         for ((index, section) in parkSections.withIndex()) {
             if (section.polygon.size < 3) continue
             val pts = section.polygon.map { geoToCanvas(GeoPoint(it.lat, it.lng)) }
@@ -2408,14 +2521,31 @@ class ParkMapView @JvmOverloads constructor(
         }
     }
 
-    private fun drawPublishedBackdropAndBaseTrees(canvas: Canvas, vp: MapGroundRenderer.Viewport) {
+    /** Mismo cuadrado del plano en coordenadas geo (para árboles en capas -1/-2). */
+    private fun mapPlateGeoPolygon(): List<GeoPoint> {
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return emptyList()
+        val frames = MapLayerGeometry.normalize(publishedLayerFrames)
+        val pts = getBaseRingPlatePoints(w, h, frames)
+        return pts.map { canvasToGeo(it.x, it.y) }
+    }
+
+    private fun drawPublishedBackdropAndBaseTrees(
+        canvas: Canvas,
+        vp: MapGroundRenderer.Viewport,
+        frames: MapLayerFramesData,
+    ) {
         val treeVp = MapTreesRenderer.Viewport(vp.minX, vp.minY, vp.maxX, vp.maxY)
         val geoFn: (GeoPoint) -> ScreenPoint = { geoToCanvas(it) }
+        val mapPlate = mapPlateGeoPolygon()
         MapTreesRenderer.drawBackdrop(
-            canvas, publishedTrees, geoFn, parkBoundary, isDarkTheme, publishedTreesSizeMul, treeVp,
+            canvas, publishedTrees, geoFn, mapPlate, isDarkTheme, publishedTreesSizeMul, treeVp,
+            scale, publishedGroundSettings,
         )
         MapTreesRenderer.drawBasePark(
-            canvas, publishedTrees, geoFn, parkBoundary, isDarkTheme, publishedTreesSizeMul, treeVp,
+            canvas, publishedTrees, geoFn, parkBoundary, mapPlate, isDarkTheme, publishedTreesSizeMul,
+            treeVp, scale, publishedGroundSettings,
         )
     }
 
@@ -2431,6 +2561,8 @@ class ParkMapView @JvmOverloads constructor(
             isDarkTheme,
             publishedTreesSizeMul,
             treeVp,
+            scale,
+            publishedGroundSettings,
         )
     }
 }

@@ -14,18 +14,25 @@ import {
 
 describe('ambient-tree-slots', () => {
   const boundary = [
+    { lat: 2, lng: 2 },
+    { lat: 2, lng: 8 },
+    { lat: 8, lng: 8 },
+    { lat: 8, lng: 2 },
+  ];
+  /** Plano grande del mapa (más grande que el contorno). */
+  const mapPlate = [
     { lat: 0, lng: 0 },
     { lat: 0, lng: 10 },
     { lat: 10, lng: 10 },
     { lat: 10, lng: 0 },
   ];
   const sections = [
-    { name: 'A', polygon: [{ lat: 1, lng: 1 }, { lat: 1, lng: 4 }, { lat: 4, lng: 4 }, { lat: 4, lng: 1 }] },
+    { name: 'A', polygon: [{ lat: 3, lng: 3 }, { lat: 3, lng: 5 }, { lat: 5, lng: 5 }, { lat: 5, lng: 3 }] },
   ];
 
-  it('resolveTreePlacementSection picks zone or base (-1) inside park', () => {
-    expect(resolveTreePlacementSection({ lat: 2, lng: 2 }, sections, boundary)).toBe(0);
-    expect(resolveTreePlacementSection({ lat: 8, lng: 8 }, sections, boundary)).toBe(TREE_BASE_PARK_SECTION);
+  it('resolveTreePlacementSection picks zone inside contour; gaps return null', () => {
+    expect(resolveTreePlacementSection({ lat: 4, lng: 4 }, sections, boundary)).toBe(0);
+    expect(resolveTreePlacementSection({ lat: 7, lng: 7 }, sections, boundary)).toBeNull();
     expect(resolveTreePlacementSection({ lat: 20, lng: 20 }, sections, boundary)).toBeNull();
   });
 
@@ -40,19 +47,22 @@ describe('ambient-tree-slots', () => {
     expect(treeSectionLabel(TREE_BACKDROP_SECTION)).toBe('Fondo mapa');
   });
 
-  it('base (-1) is inside contour; fondo (-2) is the outer frame', () => {
-    const inside = { lat: 8, lng: 8 };
-    const frame = { lat: 9.5, lng: 9.5 };
-    expect(canPlaceTreeOnBaseParkLayer(inside, boundary)).toBeTrue();
-    expect(canPlaceTreeOnBaseParkLayer(frame, boundary)).toBeFalse();
-    expect(canPlaceTreeOnBackdropLayer(frame, boundary)).toBeTrue();
-    expect(canPlaceTreeOnBackdropLayer(inside, boundary)).toBeFalse();
+  it('base (-1) is the ring; fondo (-2) is outside the map plate', () => {
+    const inside = { lat: 7, lng: 7 };
+    const frame = { lat: 1, lng: 5 };
+    const outside = { lat: 11, lng: 5 };
+    expect(canPlaceTreeOnBaseParkLayer(inside, boundary, mapPlate)).toBeFalse();
+    expect(canPlaceTreeOnBaseParkLayer(frame, boundary, mapPlate)).toBeTrue();
+    expect(canPlaceTreeOnBackdropLayer(outside, boundary, mapPlate)).toBeTrue();
+    expect(canPlaceTreeOnBackdropLayer(frame, boundary, mapPlate)).toBeFalse();
   });
 
-  it('park mode accepts frame as fondo (-2), not base', () => {
-    const frame = { lat: 9.5, lng: 9.5 };
-    expect(canPlaceTreeInParkMode(frame, sections, boundary)).toBeTrue();
-    expect(resolveTreePlacementForParkMode(frame, sections, boundary)).toBe(TREE_BACKDROP_SECTION);
+  it('park mode accepts frame as base (-1), not interior gaps', () => {
+    const frame = { lat: 1, lng: 5 };
+    const gap = { lat: 7, lng: 7 };
+    expect(canPlaceTreeInParkMode(frame, sections, boundary, mapPlate)).toBeTrue();
+    expect(resolveTreePlacementForParkMode(frame, sections, boundary, mapPlate)).toBe(TREE_BASE_PARK_SECTION);
+    expect(canPlaceTreeInParkMode(gap, sections, boundary, mapPlate)).toBeFalse();
   });
 
   it('migrates v2 section encoding to ground-aligned v3', () => {

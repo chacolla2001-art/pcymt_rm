@@ -47,7 +47,8 @@ export interface AmbientScenario {
   scene: AmbientSceneSettings;
 }
 
-const baseOff: AmbientSceneSettings = {
+/** Efectos ambientales apagados (sin preset de escena). */
+export const AMBIENT_SCENE_CLEARED: AmbientSceneSettings = {
   showRainEffect: false,
   rainIntensity: 0.45,
   rainSize: 1,
@@ -73,6 +74,8 @@ const baseOff: AmbientSceneSettings = {
   ambientWindDeg: 245,
   ambientWindStrength: 0.45,
 };
+
+const baseOff: AmbientSceneSettings = { ...AMBIENT_SCENE_CLEARED };
 
 /** Escenarios listos para apreciar cada efecto ambiental en el mapa web. */
 export const AMBIENT_SCENARIOS: AmbientScenario[] = [

@@ -14,13 +14,22 @@ class AmbientTreePlacementTest {
         ParkMapView.GeoPoint(10.0, 0.0),
     )
 
+    private val mapPlate = listOf(
+        ParkMapView.GeoPoint(-1.0, -1.0),
+        ParkMapView.GeoPoint(-1.0, 11.0),
+        ParkMapView.GeoPoint(11.0, 11.0),
+        ParkMapView.GeoPoint(11.0, -1.0),
+    )
+
     @Test
-    fun baseInside_contour_fondoOnFrame() {
+    fun baseInRing_fondoOutsidePlate() {
         val inside = ParkMapView.GeoPoint(5.0, 5.0)
-        val frame = ParkMapView.GeoPoint(9.5, 9.5)
-        assertTrue(AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(inside, boundary))
-        assertFalse(AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(frame, boundary))
-        assertTrue(AmbientTreePlacement.canPlaceTreeOnBackdropLayer(frame, boundary))
+        val ring = ParkMapView.GeoPoint(10.5, 5.0)
+        val outside = ParkMapView.GeoPoint(12.0, 5.0)
+        assertFalse(AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(inside, boundary, mapPlate))
+        assertTrue(AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(ring, boundary, mapPlate))
+        assertTrue(AmbientTreePlacement.canPlaceTreeOnBackdropLayer(outside, mapPlate))
+        assertFalse(AmbientTreePlacement.canPlaceTreeOnBackdropLayer(ring, mapPlate))
     }
 
     @Test

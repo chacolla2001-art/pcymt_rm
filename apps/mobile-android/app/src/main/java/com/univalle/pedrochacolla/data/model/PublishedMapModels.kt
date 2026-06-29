@@ -195,3 +195,32 @@ data class LayerOffsetsData(
     val sections: OffsetXYData? = null,
     val markers: OffsetXYData? = null,
 )
+
+data class LayerFrameTransformData(
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val scale: Float = 1f,
+    @SerializedName("rotationDeg")
+    val rotationDeg: Float = 0f,
+)
+
+data class BaseRingFrameData(
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val scale: Float = 1f,
+    @SerializedName("rotationDeg")
+    val rotationDeg: Float = 0f,
+    @SerializedName("innerExpandPx")
+    val innerExpandPx: Float = 0f,
+    @SerializedName("outerExpandPx")
+    val outerExpandPx: Float = 0f,
+)
+
+data class MapLayerFramesData(
+    @SerializedName("mapPlate")
+    val mapPlate: LayerFrameTransformData? = null,
+    @SerializedName("baseRing")
+    val baseRing: BaseRingFrameData? = null,
+    val zones: LayerFrameTransformData? = null,
+    val markers: LayerFrameTransformData? = null,
+)

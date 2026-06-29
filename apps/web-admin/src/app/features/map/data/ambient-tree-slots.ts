@@ -1,5 +1,5 @@
 import type { GeoPoint } from './park-geometry';
-import { isPointInPolygon } from '../utils/park-map.util';
+import { isPointInPolygon, isGeoInMapPlate } from '../utils/park-map.util';
 import {
   GROUND_PARK_LAYER_KEYS,
   GROUND_ZONE_KEYS,
@@ -102,7 +102,6 @@ export function paletteSectionForTree(slot: AmbientTreeSlot): number {
   return Math.min(2, Math.max(0, slot.section));
 }
 
-/** v2 usaba -1=fondo y -2=base; v3 alinea con capas del suelo. */
 export function migrateTreeSectionFromV2(section: number): number {
   if (section === -1) return TREE_BACKDROP_SECTION;
   if (section === -2) return TREE_BASE_PARK_SECTION;
@@ -122,7 +121,7 @@ export function migrateAmbientTreeSlots(
   }));
 }
 
-/** Dentro del parque: zona 0/1/2 o base (-1). null = fuera del contorno. */
+/** Dentro del parque: zona 0/1/2. null = fuera del contorno o hueco sin zona. */
 export function resolveTreePlacementSection(
   geo: GeoPoint,
   sections: Array<{ name: string; polygon: GeoPoint[] }>,
@@ -132,16 +131,31 @@ export function resolveTreePlacementSection(
   for (let i = 0; i < sections.length; i++) {
     if (isPointInPolygon(geo, sections[i].polygon)) return i;
   }
-  return TREE_BASE_PARK_SECTION;
+  return null;
 }
 
-/** Fuera del contorno pero en el marco cercano (misma zona visual que el suelo -2). */
+/**
+ * Base del parque: anillo entre el contorno y el cuadrado grande del plano del mapa.
+ * `mapPlate` = esquinas del plano (no el bbox geográfico del parque).
+ */
+export function isGeoInParkBaseFrame(
+  geo: GeoPoint,
+  boundary: GeoPoint[],
+  mapPlate: GeoPoint[],
+): boolean {
+  if (!boundary.length || mapPlate.length < 3) return false;
+  if (!isGeoInMapPlate(geo, mapPlate)) return false;
+  if (isPointInPolygon(geo, boundary)) return false;
+  return true;
+}
+
+/** @deprecated usar isGeoInParkBaseFrame con mapPlate */
 export function isGeoInParkBackdropFrame(
   geo: GeoPoint,
   boundary: GeoPoint[],
-  paddingDeg = 0.004,
+  _paddingDeg = 0.004,
 ): boolean {
-  return isGeoInBackdropFrame(geo, boundary, paddingDeg);
+  return false;
 }
 
 /** @deprecated usar isGeoInParkBackdropFrame */
@@ -152,34 +166,37 @@ export function isTreeParkBaseFrame(
   return isGeoInParkBackdropFrame(geo, boundary);
 }
 
-/** Click válido en capa base (-1): solo dentro del contorno del parque. */
+/** Click válido en capa base (-1): anillo entre contorno y plano del mapa. */
 export function canPlaceTreeOnBaseParkLayer(
   geo: GeoPoint,
   boundary: GeoPoint[],
+  mapPlate: GeoPoint[],
 ): boolean {
-  return boundary.length > 0 && isPointInPolygon(geo, boundary);
+  return isGeoInParkBaseFrame(geo, boundary, mapPlate);
 }
 
-/** Click válido en fondo (-2): marco exterior inmediato (fuera del contorno). */
+/** Click válido en fondo (-2): fuera del cuadrado grande del plano. */
 export function canPlaceTreeOnBackdropLayer(
   geo: GeoPoint,
-  boundary: GeoPoint[],
+  _boundary: GeoPoint[],
+  mapPlate: GeoPoint[],
 ): boolean {
-  return isGeoInParkBackdropFrame(geo, boundary);
+  return mapPlate.length >= 3 && !isGeoInMapPlate(geo, mapPlate);
 }
 
 /**
- * Modo «Todo el parque (sin fondo)»: zonas + base interior + marco (-2).
- * No incluye el fondo lejano fuera del marco.
+ * Modo «Todo el parque (sin fondo)»: zonas + anillo base (-1).
+ * No incluye el fondo fuera del plano del mapa.
  */
 export function resolveTreePlacementForParkMode(
   geo: GeoPoint,
   sections: Array<{ name: string; polygon: GeoPoint[] }>,
   boundary: GeoPoint[],
+  mapPlate: GeoPoint[],
 ): number | null {
   const inside = resolveTreePlacementSection(geo, sections, boundary);
   if (inside !== null) return inside;
-  if (isGeoInParkBackdropFrame(geo, boundary)) return TREE_BACKDROP_SECTION;
+  if (isGeoInParkBaseFrame(geo, boundary, mapPlate)) return TREE_BASE_PARK_SECTION;
   return null;
 }
 
@@ -187,31 +204,18 @@ export function canPlaceTreeInParkMode(
   geo: GeoPoint,
   sections: Array<{ name: string; polygon: GeoPoint[] }>,
   boundary: GeoPoint[],
+  mapPlate: GeoPoint[],
 ): boolean {
-  return resolveTreePlacementForParkMode(geo, sections, boundary) !== null;
+  return resolveTreePlacementForParkMode(geo, sections, boundary, mapPlate) !== null;
 }
 
+/** @deprecated pasar mapPlate explícito */
 export function isGeoInBackdropFrame(
   geo: GeoPoint,
   boundary: GeoPoint[],
-  paddingDeg = 0.004,
+  _paddingDeg = 0.004,
 ): boolean {
-  if (!boundary.length) return false;
-  if (isPointInPolygon(geo, boundary)) return false;
-  let minLat = Infinity;
-  let maxLat = -Infinity;
-  let minLng = Infinity;
-  let maxLng = -Infinity;
-  for (const p of boundary) {
-    minLat = Math.min(minLat, p.lat);
-    maxLat = Math.max(maxLat, p.lat);
-    minLng = Math.min(minLng, p.lng);
-    maxLng = Math.max(maxLng, p.lng);
-  }
-  return geo.lat >= minLat - paddingDeg
-    && geo.lat <= maxLat + paddingDeg
-    && geo.lng >= minLng - paddingDeg
-    && geo.lng <= maxLng + paddingDeg;
+  return isGeoInParkBackdropFrame(geo, boundary);
 }
 
 export function cloneAmbientTreeSlots(slots: AmbientTreeSlot[]): AmbientTreeSlot[] {

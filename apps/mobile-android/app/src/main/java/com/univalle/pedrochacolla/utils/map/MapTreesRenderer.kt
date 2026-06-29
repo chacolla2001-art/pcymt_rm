@@ -2,6 +2,7 @@ package com.univalle.pedrochacolla.utils.map
 
 import android.graphics.Canvas
 import com.univalle.pedrochacolla.data.model.AmbientTreeSlotData
+import com.univalle.pedrochacolla.data.model.GroundMapSettingsData
 import com.univalle.pedrochacolla.ui.dashboard.ParkMapView
 
 /** Dibuja árboles publicados por capa (port de `map-trees-effect.ts`). */
@@ -12,11 +13,14 @@ object MapTreesRenderer {
         canvas: Canvas,
         slots: List<AmbientTreeSlotData>,
         geoToCanvas: (ParkMapView.GeoPoint) -> ParkMapView.ScreenPoint,
-        boundary: List<ParkMapView.GeoPoint>,
+        mapPlate: List<ParkMapView.GeoPoint>,
         isDark: Boolean,
         sizeMul: Float,
         viewport: Viewport,
+        mapScale: Float,
+        groundSettings: GroundMapSettingsData?,
     ) {
+        if (!MapLod.treesLayerVisibleAtLod(MapLod.TreeLayer.BACKDROP, mapScale, groundSettings)) return
         drawPool(
             canvas,
             slots.filter { AmbientTreePlacement.isBackdropTree(it) },
@@ -24,8 +28,8 @@ object MapTreesRenderer {
             isDark,
             sizeMul,
             viewport,
-        ) { slot, geo ->
-            AmbientTreePlacement.canPlaceTreeOnBackdropLayer(geo, boundary)
+        ) { _, geo ->
+            AmbientTreePlacement.canPlaceTreeOnBackdropLayer(geo, mapPlate)
         }
     }
 
@@ -34,10 +38,14 @@ object MapTreesRenderer {
         slots: List<AmbientTreeSlotData>,
         geoToCanvas: (ParkMapView.GeoPoint) -> ParkMapView.ScreenPoint,
         boundary: List<ParkMapView.GeoPoint>,
+        mapPlate: List<ParkMapView.GeoPoint>,
         isDark: Boolean,
         sizeMul: Float,
         viewport: Viewport,
+        mapScale: Float,
+        groundSettings: GroundMapSettingsData?,
     ) {
+        if (!MapLod.treesLayerVisibleAtLod(MapLod.TreeLayer.BASE_PARK, mapScale, groundSettings)) return
         drawPool(
             canvas,
             slots.filter { AmbientTreePlacement.isBaseParkTree(it) },
@@ -45,8 +53,8 @@ object MapTreesRenderer {
             isDark,
             sizeMul,
             viewport,
-        ) { slot, geo ->
-            AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(geo, boundary)
+        ) { _, geo ->
+            AmbientTreePlacement.canPlaceTreeOnBaseParkLayer(geo, boundary, mapPlate)
         }
     }
 
@@ -59,7 +67,10 @@ object MapTreesRenderer {
         isDark: Boolean,
         sizeMul: Float,
         viewport: Viewport,
+        mapScale: Float,
+        groundSettings: GroundMapSettingsData?,
     ) {
+        if (!MapLod.treesLayerVisibleAtLod(MapLod.TreeLayer.ZONE, mapScale, groundSettings)) return
         drawPool(
             canvas,
             slots.filter { !AmbientTreePlacement.isBackdropTree(it) && !AmbientTreePlacement.isBaseParkTree(it) },

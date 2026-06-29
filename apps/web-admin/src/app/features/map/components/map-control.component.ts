@@ -26,6 +26,9 @@ import { finalize } from 'rxjs/operators';
 import {
   PARK_BOUNDARY,
   PARK_CENTER,
+  MAP_FRAME_GEO_BOUNDS,
+  mapFrameGeoBounds,
+  type MapFrameGeoBounds,
   cloneParkSectionRecords,
   type GeoPoint as SharedGeoPoint,
   type ParkSection as SharedParkSection,
@@ -85,13 +88,17 @@ import { MapLightningEffect } from '../utils/map-lightning-effect';
 import { MapNightMistEffect } from '../utils/map-night-mist-effect';
 import { SpatialReferenceLayer } from '../utils/spatial-reference-layer';
 import type { AmbientScenario, AmbientScenarioTint } from '../data/ambient-scenarios';
-import { findAmbientScenario } from '../data/ambient-scenarios';
+import { AMBIENT_SCENE_CLEARED, findAmbientScenario } from '../data/ambient-scenarios';
 import { clampGroundTilePx, PARK_MAP_VIS, parkGroundTintOpacity } from '../utils/map-park-visual-scale';
 import {
   GroundPatternCache,
   fillPolygonWithGroundTexture,
   MapBackdropCache,
   fillMapRectWithBackdrop,
+  clipParkBaseFrame,
+  clipOutsideMapSquare,
+  parkInteriorGroundPalette,
+  paintSectionGroundElements,
   exportGroundStyleSnapshot,
   importGroundStyleSnapshot,
   resetGroundStyleToDefaults,
@@ -121,7 +128,23 @@ import {
   sectionLabelsVisibleAtLod,
   spatialRefsVisibleAtLod,
   treesLayerVisibleAtLod,
+  type TreeLodLayer,
 } from '../utils/map-lod';
+import {
+  applyLayerFrameTransform,
+  baseRingHoleContour,
+  cloneMapLayerFrames,
+  combineLayerOffset,
+  DEFAULT_MAP_LAYER_FRAMES,
+  forwardLayerFramePoint,
+  inverseLayerFramePoint,
+  mapPlateCanvasPoints,
+  mapPlateGeoPolygon as buildMapPlateGeoPolygon,
+  mapPlatePointsForBaseRing,
+  normalizeMapLayerFrames,
+  type MapLayerFramesData,
+  type MapLayerFrameTransform,
+} from '../utils/map-layer-geometry';
 
 type GeoPoint = SharedGeoPoint;
 type ParkSection = SharedParkSection;
@@ -829,8 +852,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   private readonly MARKER_INNER_RADIUS = 4;
   private readonly MARKER_WARNING_RADIUS = 16;
 
-  // Bounds
-  private bounds = this.calculateBounds(PARK_BOUNDARY, 0.0002);
+  // Bounds — mismo cuadrado que el marco gris del mapa
+  private bounds: MapFrameGeoBounds = MAP_FRAME_GEO_BOUNDS;
 
   // Datos
   private markers: Marker[] = [];
@@ -995,6 +1018,9 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     sections: { x: 0, y: 0 },
     markers:  { x: 0, y: 0 },
   };
+
+  /** Escala, rotación y expansión del plano, anillo base, zonas y marcadores. */
+  layerFrames: MapLayerFramesData = cloneMapLayerFrames(DEFAULT_MAP_LAYER_FRAMES);
 
   /** Saved transform snapshot for locked boundary */
   // lockedBoundaryTransform removed — lock now only prevents layer editing, not panning
@@ -1331,15 +1357,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.clusters = [];
   }
 
-  private calculateBounds(polygon: GeoPoint[], padding: number) {
-    const lats = polygon.map(p => p.lat);
-    const lngs = polygon.map(p => p.lng);
-    return {
-      minLat: Math.min(...lats) - padding,
-      maxLat: Math.max(...lats) + padding,
-      minLng: Math.min(...lngs) - padding,
-      maxLng: Math.max(...lngs) + padding
-    };
+  private calculateBounds(polygon: GeoPoint[], padding: number): MapFrameGeoBounds {
+    return mapFrameGeoBounds(polygon, padding);
   }
 
   // === CONVERSIONES ===
@@ -1371,14 +1390,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private geoToScreenAtParkLayer(geo: GeoPoint): CanvasPoint {
     const base = this.geoToCanvas(geo);
-    const lo = this.layerOffsets.sections;
     const canvas = this.canvasRef.nativeElement;
     const w = canvas.width / (window.devicePixelRatio || 1);
     const h = canvas.height / (window.devicePixelRatio || 1);
+    const zones = combineLayerOffset(this.layerOffsets.sections, this.layerFrames.zones);
+    const layered = forwardLayerFramePoint(w, h, zones, base.x, base.y);
     const cx = w / 2;
     const cy = h / 2;
-    let x = base.x + lo.x - cx;
-    let y = base.y + lo.y - cy;
+    let x = layered.x - cx;
+    let y = layered.y - cy;
     x *= this.scale;
     y *= this.scale;
     const cos = Math.cos(this.rotation);
@@ -1452,11 +1472,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     };
   }
 
-  /** Geo alineado con capas del parque (compensa layerOffsets al colocar o arrastrar). */
+  /** Geo alineado con capas del parque (compensa marcos al colocar o arrastrar). */
   private canvasToGeoAtParkLayer(canvas: CanvasPoint): GeoPoint {
     const map = this.screenToMap(canvas.x, canvas.y);
-    const lo = this.layerOffsets.sections;
-    return this.mapCanvasPointToGeo(map.x - lo.x, map.y - lo.y);
+    const canvasEl = this.canvasRef.nativeElement;
+    const w = canvasEl.width / (window.devicePixelRatio || 1);
+    const h = canvasEl.height / (window.devicePixelRatio || 1);
+    const zones = combineLayerOffset(this.layerOffsets.sections, this.layerFrames.zones);
+    const unlayered = inverseLayerFramePoint(w, h, zones, map.x, map.y);
+    return this.mapCanvasPointToGeo(unlayered.x, unlayered.y);
   }
 
   private canvasToGeo(canvas: CanvasPoint): GeoPoint {
@@ -1524,27 +1548,33 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
     // Ground layers in map space: backdrop → park base → sections (zones)
     if (this.mapOptions.showGroundTextures) {
-      const lo = this.layerOffsets.sections;
-      const vp = this.getGroundViewport(w, h, lo);
-      this.ctx.save();
-      this.ctx.translate(lo.x, lo.y);
-      this.drawMapGroundBackdrop(w, h, vp);
+      const platePoints = this.getMapPlateCanvasPoints(w, h);
+      const ringPlatePoints = this.getBaseRingPlatePoints(w, h);
+      const vp = this.getGroundViewportForPlate(w, h, platePoints);
+      this.drawMapGroundBackdrop(w, h, vp, platePoints);
       if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('backdrop', lodTier, lodCategories)) {
         this.drawPlacedBackdropTrees(w, h);
       }
       if (PARK_BOUNDARY.length >= 3) {
-        this.drawParkGroundBase(vp);
+        this.drawParkInteriorMatte();
+        this.drawParkGroundBase(vp, ringPlatePoints);
       }
       if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('basePark', lodTier, lodCategories)) {
         this.drawPlacedBaseParkTrees(w, h);
       }
-      this.ctx.restore();
     }
     if (this.mapOptions.showSections) {
-      const lo = this.layerOffsets.sections;
-      this.ctx.save(); this.ctx.translate(lo.x, lo.y);
-      this.drawSections(w, h, this.getGroundViewport(w, h, lo));
+      const zonesFrame = combineLayerOffset(this.layerOffsets.sections, this.layerFrames.zones);
+      this.ctx.save();
+      applyLayerFrameTransform(this.ctx, w, h, zonesFrame);
+      this.drawSections(w, h, this.getGroundViewport(w, h, zonesFrame));
       this.ctx.restore();
+    }
+    if (this.mapOptions.showGroundTextures && PARK_BOUNDARY.length >= 3) {
+      const ringPlatePoints = this.getBaseRingPlatePoints(w, h);
+      const platePoints = this.getMapPlateCanvasPoints(w, h);
+      const vp = this.getGroundViewportForPlate(w, h, platePoints);
+      this.drawParkGroundElements(vp, ringPlatePoints);
     }
     if (this.mapOptions.showBoundary) {
       const lo = this.layerOffsets.boundary;
@@ -1553,14 +1583,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.restore();
     }
     if (this.mapOptions.showMarkers && markersVisibleAtLod(lodTier, lodCategories)) {
-      const lo = this.layerOffsets.markers;
-      this.ctx.save(); this.ctx.translate(lo.x, lo.y);
+      const markersFrame = combineLayerOffset(this.layerOffsets.markers, this.layerFrames.markers);
+      this.ctx.save();
+      applyLayerFrameTransform(this.ctx, w, h, markersFrame);
       this.drawMarkerDots(w, h);
       this.ctx.restore();
     }
 
     if (this.treeEditorMode) {
-      this.drawTreeEditorMarkers(w, h);
+      this.drawTreeEditorMarkers(w, h, lodTier, lodCategories);
     }
     if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('zone', lodTier, lodCategories)) {
       this.treesEffect.drawWorld(this.ctx, this.buildTreesDrawOptions(w, h));
@@ -1778,11 +1809,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       },
       isBaseParkTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
         if (!isBaseParkTreeSlot(slot)) return false;
-        return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY);
+        return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, this.mapPlateGeoPolygon());
       },
       isBackdropTreeVisible: (slot: AmbientTreeSlot, geo: GeoPoint) => {
         if (!isBackdropTreeSlot(slot)) return false;
-        return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY);
+        return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY, this.mapPlateGeoPolygon());
       },
       viewport: this.getWorldViewportBounds(w, h),
       isDark: this.isDarkTheme,
@@ -1794,13 +1825,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   get treeEditorBannerText(): string {
     if (this.treePlaceActive) {
       if (this.treeEditorTarget === TREE_BACKDROP_SECTION) {
-        return 'Colocar en el fondo del mapa (gris, fuera del contorno).';
+        return 'Colocar en el fondo: fuera del cuadrado grande del plano.';
       }
       if (this.treeEditorTarget === 'park') {
-        return 'Dentro del contorno → zona o base (-1). Marco gris cercano → fondo (-2).';
+        return 'Dentro del contorno → zonas. Anillo en el plano → base (-1). Fuera del plano → fondo (-2).';
       }
       if (this.treeEditorTarget === TREE_BASE_PARK_SECTION) {
-        return 'Colocar en la base del parque (dentro del contorno, bajo las zonas).';
+        return 'Colocar en el anillo base: fuera del contorno, dentro del plano del mapa.';
       }
       return 'Colocar en la zona seleccionada.';
     }
@@ -1822,8 +1853,60 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     };
   }
 
-  private drawMapGroundBackdrop(w: number, h: number, viewport: GroundViewport): void {
+  private getGroundViewportForPlate(
+    w: number,
+    h: number,
+    platePoints: { x: number; y: number }[],
+  ): GroundViewport {
+    const m = 60;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of platePoints) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    if (!Number.isFinite(minX)) {
+      return this.getGroundViewport(w, h, { x: 0, y: 0 });
+    }
+    return {
+      minX: minX - m,
+      minY: minY - m,
+      maxX: maxX + m,
+      maxY: maxY + m,
+    };
+  }
+
+  private getMapPlateCanvasPoints(w: number, h: number): { x: number; y: number }[] {
+    return mapPlateCanvasPoints(w, h, this.layerFrames.mapPlate);
+  }
+
+  private getBaseRingPlatePoints(w: number, h: number): { x: number; y: number }[] {
+    return mapPlatePointsForBaseRing(
+      w,
+      h,
+      this.layerFrames.mapPlate,
+      this.layerFrames.baseRing.outerExpandPx,
+    );
+  }
+
+  private getBaseRingHolePoints(): { x: number; y: number }[] {
+    const boundaryPts = PARK_BOUNDARY.map((g) => this.geoToCanvas(g));
+    return baseRingHoleContour(boundaryPts, this.layerFrames.baseRing.innerExpandPx);
+  }
+
+  private drawMapGroundBackdrop(
+    w: number,
+    h: number,
+    viewport: GroundViewport,
+    platePoints: { x: number; y: number }[],
+  ): void {
     const pad = Math.max(w, h) * 2;
+    this.ctx.save();
+    clipOutsideMapSquare(this.ctx, platePoints);
     fillMapRectWithBackdrop(
       this.ctx,
       -pad,
@@ -1835,21 +1918,83 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.scale,
       viewport,
     );
+    this.ctx.restore();
   }
 
-  private drawParkGroundBase(viewport: GroundViewport): void {
+  /** Mismo cuadrado en coordenadas geo (para clics y árboles). */
+  private mapPlateGeoPolygon(): GeoPoint[] {
+    const canvas = this.canvasRef.nativeElement;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    const pts = this.getBaseRingPlatePoints(w, h);
+    return buildMapPlateGeoPolygon(pts, (x, y) => this.mapCanvasPointToGeo(x, y));
+  }
+
+  /** Verde interior del contorno (bajo las zonas; no es la capa «Base parque»). */
+  private drawParkInteriorMatte(): void {
     const points = PARK_BOUNDARY.map(g => this.geoToCanvas(g));
+    if (points.length < 3) return;
+    const palette = parkInteriorGroundPalette(this.isDarkTheme);
+    this.ctx.fillStyle = palette.base;
+    this.ctx.beginPath();
+    this.ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      this.ctx.lineTo(points[i].x, points[i].y);
+    }
+    this.ctx.closePath();
+    this.ctx.fill();
+  }
+
+  /** Anillo base (-1): cuadrado grande del plano menos contorno del parque. */
+  private drawParkGroundBase(viewport: GroundViewport, ringPlatePoints: { x: number; y: number }[]): void {
+    const holePoints = this.getBaseRingHolePoints();
+    if (holePoints.length < 3 || ringPlatePoints.length < 3) return;
+
+    this.ctx.save();
+    clipParkBaseFrame(this.ctx, ringPlatePoints, holePoints);
     fillPolygonWithGroundTexture(
       this.ctx,
-      points,
+      ringPlatePoints,
       -1,
       this.isDarkTheme,
-      this.theme.boundaryFill,
-      this.isDarkTheme ? PARK_MAP_VIS.parkBaseTintDark : PARK_MAP_VIS.parkBaseTintLight,
+      '',
+      0,
       this.groundPatternCache,
       this.scale,
       viewport,
+      { skipElements: true, skipTint: true, skipEcotone: true },
     );
+    this.ctx.restore();
+  }
+
+  /** Elementos de la base (-1) en el anillo plano−contorno. */
+  private drawParkGroundElements(viewport: GroundViewport, ringPlatePoints: { x: number; y: number }[]): void {
+    const holePoints = this.getBaseRingHolePoints();
+    if (holePoints.length < 3 || ringPlatePoints.length < 3) return;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of ringPlatePoints) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    const pad = 3;
+    const bbox = {
+      minX: minX - pad,
+      minY: minY - pad,
+      maxX: maxX + pad,
+      maxY: maxY + pad,
+    };
+
+    this.ctx.save();
+    clipParkBaseFrame(this.ctx, ringPlatePoints, holePoints);
+    paintSectionGroundElements(this.ctx, -1, this.isDarkTheme, bbox, this.scale, viewport);
+    this.ctx.restore();
   }
 
   private drawSections(w: number, h: number, viewport: GroundViewport): void {
@@ -2494,12 +2639,58 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         this.treePlaceStyleSection = t.styleSection;
       }
       this.treePlaceActive = false;
+      this.fitTreeToView(index);
     } else if (this.treeEditorMode) {
       this.treePlaceActive = true;
     }
     this.treePlacementHint = '';
     this.emitTreeEditorState();
     this.render();
+  }
+
+  /** Centra la cámara en un árbol y acerca hasta que se dibuje el sprite (LOD). */
+  fitTreeToView(index: number): void {
+    if (!this.isBrowser || !this.canvasRef?.nativeElement) return;
+    const t = this.ambientTrees[index];
+    if (!t) return;
+
+    const canvas = this.canvasRef.nativeElement;
+    const w = canvas.width / (window.devicePixelRatio || 1);
+    const h = canvas.height / (window.devicePixelRatio || 1);
+    const cx = w / 2;
+    const cy = h / 2;
+
+    const { x: bcx, y: bcy } = this.treeMapPosition(t);
+    const lodSettings = exportGroundMapSettings();
+    let newScale = Math.max(this.scale, lodSettings.lodFineZoom, 1.15);
+    newScale = this.clampZoom(newScale);
+
+    const rot = this.rotation;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    const dx0 = (bcx - cx) * newScale;
+    const dy0 = (bcy - cy) * newScale;
+    const rx = cos * dx0 - sin * dy0;
+    const ry = sin * dx0 + cos * dy0;
+
+    this._hasZoomAnchor = false;
+    this.sectionFocusAnimating = true;
+    this.targetScale = newScale;
+    this.targetOffsetX = w / 2 - cx - rx;
+    this.targetOffsetY = h / 2 - cy - ry;
+    this.saveState();
+    this.emitViewInfo();
+  }
+
+  private treeLodLayerForSection(section: number): TreeLodLayer {
+    if (section === TREE_BACKDROP_SECTION) return 'backdrop';
+    if (section === TREE_BASE_PARK_SECTION) return 'basePark';
+    return 'zone';
+  }
+
+  /** Posición en espacio mapa (coherente con drawWorld / capas base y fondo). */
+  private treeMapPosition(t: AmbientTreeSlot): { x: number; y: number } {
+    return this.geoToCanvas({ lat: t.lat, lng: t.lng });
   }
 
   updateAmbientTree(index: number, patch: Partial<AmbientTreeSlot>): void {
@@ -2516,14 +2707,15 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
   }
 
   private canPlaceTreeAtGeoForTarget(geo: GeoPoint, target: TreeEditorTarget): boolean {
+    const plate = this.mapPlateGeoPolygon();
     if (target === 'park') {
-      return canPlaceTreeInParkMode(geo, this.editableSections, PARK_BOUNDARY);
+      return canPlaceTreeInParkMode(geo, this.editableSections, PARK_BOUNDARY, plate);
     }
     if (target === TREE_BACKDROP_SECTION) {
-      return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY);
+      return canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY, plate);
     }
     if (target === TREE_BASE_PARK_SECTION) {
-      return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY);
+      return canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, plate);
     }
     const sectionName = findParkSectionAt(geo.lat, geo.lng, this.editableSections);
     const expected = this.editableSections[target]?.name;
@@ -2536,24 +2728,26 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   private resolveTreeSectionForPlacement(geo: GeoPoint): number {
     if (this.treeEditorTarget === 'park') {
-      return resolveTreePlacementForParkMode(geo, this.editableSections, PARK_BOUNDARY)
+      const plate = this.mapPlateGeoPolygon();
+      return resolveTreePlacementForParkMode(geo, this.editableSections, PARK_BOUNDARY, plate)
         ?? TREE_BASE_PARK_SECTION;
     }
     return this.treeEditorTarget as number;
   }
 
   private treePlacementHintForRejectedClick(geo: GeoPoint): string {
+    const plate = this.mapPlateGeoPolygon();
     if (this.treeEditorTarget === TREE_BACKDROP_SECTION) {
-      return 'El click debe caer en el marco gris (fuera del contorno del parque).';
+      return 'El click debe caer fuera del plano cuadrado del mapa (fondo).';
     }
     if (this.treeEditorTarget === TREE_BASE_PARK_SECTION) {
-      return 'El click debe caer dentro del contorno del parque (capa base, no el marco gris).';
+      return 'El click debe caer en el anillo base: fuera del contorno y dentro del plano del mapa.';
     }
     if (this.treeEditorTarget === 'park') {
-      if (!isPointInPolygon(geo, PARK_BOUNDARY) && !canPlaceTreeOnBackdropLayer(geo, PARK_BOUNDARY)) {
-        return 'Ahí es el fondo lejano del mapa. Acércate al parque o elige «Fondo mapa» en Zona.';
+      if (!isPointInPolygon(geo, PARK_BOUNDARY) && !canPlaceTreeOnBaseParkLayer(geo, PARK_BOUNDARY, plate)) {
+        return 'Ahí es el fondo fuera del plano. Acércate al mapa o elige «Fondo mapa» en Zona.';
       }
-      return 'El click debe caer dentro del parque o en el marco gris cercano.';
+      return 'El click debe caer en una zona, en el anillo base o dentro del contorno.';
     }
     return 'El click debe caer dentro de la zona activa.';
   }
@@ -2664,38 +2858,37 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return -1;
   }
 
-  private drawTreeEditorMarkers(w: number, h: number): void {
+  private drawTreeEditorMarkers(
+    w: number,
+    h: number,
+    lodTier: ReturnType<typeof getMapLodTier>,
+    lodCategories: ReturnType<typeof resolveLodCategories>,
+  ): void {
+    const idx = this.selectedTreeIndex;
+    if (idx === null) return;
+    const t = this.ambientTrees[idx];
+    if (!t) return;
+
+    const layer = this.treeLodLayerForSection(t.section);
+    if (!treesLayerVisibleAtLod(layer, lodTier, lodCategories)) return;
+
     const viewport = this.getWorldViewportBounds(w, h);
     const pad = 48;
-    const lo = this.layerOffsets.sections;
-    for (let i = 0; i < this.ambientTrees.length; i++) {
-      const t = this.ambientTrees[i];
-      const pos = this.geoToCanvas({ lat: t.lat, lng: t.lng });
-      pos.x += lo.x;
-      pos.y += lo.y;
-      if (pos.x < viewport.minX - pad || pos.x > viewport.maxX + pad
-        || pos.y < viewport.minY - pad || pos.y > viewport.maxY + pad) {
-        continue;
-      }
-      const inActiveZone = treeMatchesEditorTarget(t.section, this.treeEditorTarget);
-      const selected = i === this.selectedTreeIndex;
-      const dragging = i === this.draggingTreeIndex;
-      const layerColor = t.section === TREE_BACKDROP_SECTION
-        ? '#607d8b'
-        : t.section === TREE_BASE_PARK_SECTION
-          ? '#8d6e63'
-          : (inActiveZone ? '#4caf50' : 'rgba(120,120,120,0.75)');
-      this.ctx.save();
-      this.ctx.fillStyle = dragging ? '#ff5722' : (selected ? '#ff9800' : layerColor);
-      this.ctx.strokeStyle = '#fff';
-      this.ctx.lineWidth = 1.2 / this.scale;
-      const r = (selected ? 5 : 4) / this.scale;
-      this.ctx.beginPath();
-      this.ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.stroke();
-      this.ctx.restore();
+    const pos = this.treeMapPosition(t);
+    if (pos.x < viewport.minX - pad || pos.x > viewport.maxX + pad
+      || pos.y < viewport.minY - pad || pos.y > viewport.maxY + pad) {
+      return;
     }
+
+    const dragging = idx === this.draggingTreeIndex;
+    const r = Math.max(12, PARK_MAP_VIS.treeBaseWorld * 0.55) / this.scale;
+    this.ctx.save();
+    this.ctx.strokeStyle = dragging ? '#ff5722' : '#ff9800';
+    this.ctx.lineWidth = 2.5 / this.scale;
+    this.ctx.beginPath();
+    this.ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
   }
 
   private emitSectionsChanged(): void {
@@ -3277,6 +3470,27 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     return exportGroundMapSettings();
   }
 
+  getLayerFramesSnapshot(): MapLayerFramesData {
+    return cloneMapLayerFrames(this.layerFrames);
+  }
+
+  patchLayerFrames(patch: Partial<MapLayerFramesData>): void {
+    this.layerFrames = normalizeMapLayerFrames({
+      ...this.layerFrames,
+      ...patch,
+      mapPlate: { ...this.layerFrames.mapPlate, ...patch.mapPlate },
+      baseRing: { ...this.layerFrames.baseRing, ...patch.baseRing },
+      zones: { ...this.layerFrames.zones, ...patch.zones },
+      markers: { ...this.layerFrames.markers, ...patch.markers },
+    });
+    this.render();
+  }
+
+  resetLayerFrames(): void {
+    this.layerFrames = cloneMapLayerFrames(DEFAULT_MAP_LAYER_FRAMES);
+    this.render();
+  }
+
   applyGroundSettings(settings: GroundMapSettings | null | undefined, autoTilePx = true): void {
     importGroundMapSettings(settings);
     if (autoTilePx) setManualGroundTilePx(null);
@@ -3526,13 +3740,48 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     this.spatialReferencePlaceIndex = -1;
     this.selectedSpatialReferenceIndex = 0;
     this.emitSpatialReferencesChanged();
-    const clear = findAmbientScenario('clear');
-    if (clear) {
-      this.applyAmbientScenario(clear, { skipCamera: true });
-    } else {
-      this.clearAmbientScenarioVisuals();
-    }
+    this.resetAmbientEffectsToDefault();
     this.invalidateGroundPatterns();
+  }
+
+  private resetAmbientEffectsToDefault(): void {
+    this.rainEffect.clear();
+    this.fogEffect.clear();
+    this.motesEffect.clear();
+    this.cloudShadowEffect.clear();
+    this.leavesEffect.clear();
+    this.nightMistEffect.clear();
+    this.lightningEffect.clear();
+    this.ambientScenarioId = null;
+    this.ambientScenarioTint = null;
+    this.ambientSectionOpacityBoost = 0;
+    const s = AMBIENT_SCENE_CLEARED;
+    this.mapOptions.showRainEffect = s.showRainEffect;
+    this.mapOptions.rainIntensity = s.rainIntensity;
+    this.mapOptions.rainSize = s.rainSize;
+    this.mapOptions.rainSectionIndex = s.rainSectionIndex;
+    this.mapOptions.showFogEffect = s.showFogEffect;
+    this.mapOptions.fogIntensity = s.fogIntensity;
+    this.mapOptions.fogSize = s.fogSize;
+    this.mapOptions.showMotesEffect = s.showMotesEffect;
+    this.mapOptions.motesIntensity = s.motesIntensity;
+    this.mapOptions.motesSize = s.motesSize;
+    this.mapOptions.showCloudShadows = s.showCloudShadows;
+    this.mapOptions.cloudShadowIntensity = s.cloudShadowIntensity;
+    this.mapOptions.cloudShadowSize = s.cloudShadowSize;
+    this.mapOptions.showLeavesEffect = s.showLeavesEffect;
+    this.mapOptions.leavesIntensity = s.leavesIntensity;
+    this.mapOptions.leavesSize = s.leavesSize;
+    this.mapOptions.showTreesEffect = s.showTreesEffect;
+    this.mapOptions.treesIntensity = s.treesIntensity;
+    this.mapOptions.treesSize = s.treesSize;
+    this.mapOptions.showLightningEffect = s.showLightningEffect;
+    this.mapOptions.showNightMistEffect = s.showNightMistEffect;
+    this.mapOptions.nightMistIntensity = s.nightMistIntensity;
+    this.mapOptions.ambientWindDeg = s.ambientWindDeg;
+    this.mapOptions.ambientWindStrength = s.ambientWindStrength;
+    this.syncAmbientZoneCallbacks();
+    this.onOptionChange();
   }
 
   applyAmbientScenario(scenario: AmbientScenario, opts?: { skipCamera?: boolean }): void {
@@ -4078,6 +4327,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
         markerSize: this.markerRadius,
       },
       layerOffsets: JSON.parse(JSON.stringify(this.layerOffsets)),
+      layerFrames: cloneMapLayerFrames(this.layerFrames),
       activeMovableLayer: this.activeMovableLayer,
       sections: this.getEditableSections(),
       spatialReferences: this.getSpatialReferences(),
@@ -4096,6 +4346,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     data: {
       mapState?: Parameters<MapControlComponent['setMapViewState']>[0];
       layerOffsets?: { boundary: { x: number; y: number }; sections: { x: number; y: number }; markers: { x: number; y: number } };
+      layerFrames?: MapLayerFramesData;
       activeMovableLayer?: 'canvas' | 'grid' | 'boundary' | 'sections' | 'markers';
       sections?: ParkSectionRecord[];
       spatialReferences?: SpatialReference[];
@@ -4103,12 +4354,24 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       ambientTrees?: AmbientTreeSlot[];
       groundStyle?: Record<number, ZoneGroundStyle>;
       groundSettings?: GroundMapSettings;
+      version?: number;
+      groundStyleLayerVersion?: number;
     },
     opts?: { skipLegacySave?: boolean },
   ): void {
     if (data.mapState) this.setMapViewState(data.mapState);
     if (data.layerOffsets) {
       this.layerOffsets = JSON.parse(JSON.stringify(data.layerOffsets));
+    }
+    if (data.layerFrames) {
+      this.layerFrames = normalizeMapLayerFrames(data.layerFrames);
+    } else if (data.layerOffsets?.sections) {
+      const sx = data.layerOffsets.sections.x;
+      const sy = data.layerOffsets.sections.y;
+      this.layerFrames = normalizeMapLayerFrames({
+        mapPlate: { x: sx, y: sy, scale: 1, rotationDeg: 0 },
+        zones: { x: sx, y: sy, scale: 1, rotationDeg: 0 },
+      });
     }
     if (data.activeMovableLayer) {
       this.activeMovableLayer = data.activeMovableLayer === 'grid' ? 'canvas' : data.activeMovableLayer;
@@ -4136,7 +4399,10 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       importGroundMapSettings(data.groundSettings);
     }
     if (data.groundStyle != null) {
-      importGroundStyleSnapshot(data.groundStyle);
+      importGroundStyleSnapshot(data.groundStyle, {
+        configVersion: data.version,
+        groundStyleLayerVersion: data.groundStyleLayerVersion,
+      });
     }
     if (data.groundSettings != null || data.groundStyle != null) {
       if (getManualGroundTilePx() == null || data.mapState?.groundTilePx == null) {
