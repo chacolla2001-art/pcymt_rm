@@ -1,0 +1,65 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme (light) — PCyMT Brand Palette -->
+    <style name="Theme.PedroChacolla" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary: Marrón Tierra -->
+        <item name="colorPrimary">@color/pcymt_primary</item>
+        <item name="colorOnPrimary">@color/pcymt_on_primary</item>
+        <item name="colorPrimaryContainer">@color/pcymt_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/pcymt_on_primary_container</item>
+
+        <!-- Secondary: Verde Salvia -->
+        <item name="colorSecondary">@color/pcymt_secondary</item>
+        <item name="colorOnSecondary">@color/pcymt_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/pcymt_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/pcymt_on_secondary_container</item>
+
+        <!-- Tertiary / CTA: Rojo Arcilla -->
+        <item name="colorTertiary">@color/pcymt_tertiary</item>
+        <item name="colorOnTertiary">@color/pcymt_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/pcymt_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/pcymt_on_tertiary_container</item>
+
+        <!-- Error -->
+        <item name="colorError">@color/pcymt_tertiary</item>
+        <item name="colorOnError">@color/pcymt_on_tertiary</item>
+
+        <!-- Surface / Background -->
+        <item name="android:colorBackground">@color/pcymt_background</item>
+        <item name="colorSurface">@color/pcymt_surface</item>
+        <item name="colorSurfaceVariant">@color/pcymt_surface_container</item>
+        <item name="colorOutline">@color/pcymt_outline</item>
+
+        <!-- Status bar / Navigation bar -->
+        <item name="android:statusBarColor">@color/pcymt_primary</item>
+        <item name="android:navigationBarColor">@color/pcymt_background</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="Base.Theme.PedroChacolla" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/pcymt_primary</item>
+        <item name="colorOnPrimary">@color/pcymt_on_primary</item>
+        <item name="colorPrimaryContainer">@color/pcymt_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/pcymt_on_primary_container</item>
+        <!-- Secondary: Verde Salvia -->
+        <item name="colorSecondary">@color/pcymt_secondary</item>
+        <item name="colorOnSecondary">@color/pcymt_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/pcymt_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/pcymt_on_secondary_container</item>
+        <!-- Tertiary / CTA: Rojo Arcilla -->
+        <item name="colorTertiary">@color/pcymt_tertiary</item>
+        <item name="colorOnTertiary">@color/pcymt_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/pcymt_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/pcymt_on_tertiary_container</item>
+        <!-- Surface -->
+        <item name="android:colorBackground">@color/pcymt_background</item>
+        <item name="colorSurface">@color/pcymt_surface</item>
+    </style>
+
+    <!-- Theme overlay for TextInputLayouts on dark backgrounds (game screens) -->
+    <style name="ThemeOverlay.App.TextInput.Dark" parent="">
+        <item name="colorOnSurfaceVariant">#AAFFFFFF</item>
+        <item name="colorOutline">#66FFFFFF</item>
+    </style>
+
+</resources>
+

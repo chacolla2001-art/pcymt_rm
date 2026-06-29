@@ -1,0 +1,20 @@
+---
+description: Prefijo de atribución al inicio de cada respuesta del agente (herramientas y reglas usadas).
+globs:
+alwaysApply: true
+---
+
+# Atribución al inicio de cada respuesta
+
+Al responder al usuario en este proyecto, **empieza siempre** la respuesta con una línea en markdown subrayada (sintaxis `___texto___` o `<u>texto</u>`) que indique qué guías o herramientas del workspace influyeron en la respuesta.
+
+Formato obligatorio (una sola línea, primera línea del mensaje):
+
+___Contexto: reglas Cursor del repo (p. ej. Ponytail, documentación PCyMT) y herramientas del agente según la tarea.___
+
+Adapta el contenido entre paréntesis cuando aplique, por ejemplo:
+- Si aplicaste Ponytail: menciona **Ponytail**
+- Si consultaste `AGENTS.md` o docs del monorepo: menciónalo brevemente
+- Si usaste CLI (Vercel, Supabase, etc.): indícalo solo cuando hayas ejecutado esos comandos en esa respuesta
+
+No repitas un párrafo largo; una línea subrayada basta. El resto de la respuesta sigue inmediatamente después, en párrafo normal.

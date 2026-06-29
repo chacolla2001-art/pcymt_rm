@@ -1,0 +1,110 @@
+[versions]
+agp = "8.6.0"
+kotlin = "2.1.0"
+ksp = "2.1.0-1.0.29"
+coreKtx = "1.15.0"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+constraintlayout = "2.2.1"
+lifecycleLivedataKtx = "2.8.7"
+lifecycleViewmodelKtx = "2.8.7"
+navigationFragmentKtx = "2.8.9"
+navigationUiKtx = "2.8.9"
+sceneform = "1.20.1"
+sceneview = "2.3.0"
+volley = "1.2.1"
+googleid = "1.1.1"
+runner = "1.6.1"
+core = "1.48.0"
+activityKtx = "1.9.3"
+playServicesLocation = "21.3.0"
+coreVersion = "1.15.0"
+sceneformUx = "1.17.1"
+playServicesMaps = "19.2.0"
+okhttp = "4.12.0"
+credentials = "1.5.0"
+gson = "2.11.0"
+glide = "4.16.0"
+security = "1.1.0-alpha06"
+retrofit = "2.9.0"
+loggingInterceptor = "4.12.0"
+hilt = "2.52"
+room = "2.6.1"
+mockito = "5.1.0"
+coroutinesTest = "1.7.3"
+turbine = "1.0.0"
+archCoreTesting = "2.2.0"
+timber = "5.0.1"
+androidsvg = "1.4"
+
+[libraries]
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+arsceneview = { module = "io.github.sceneview:arsceneview", version.ref = "sceneview" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+androidx-lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycleLivedataKtx" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
+androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
+androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
+sceneform = { module = "com.gorisse.thomas.sceneform:sceneform", version.ref = "sceneform" }
+sceneview = { module = "io.github.sceneview:sceneview", version.ref = "sceneview" }
+volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
+googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
+androidx-runner = { group = "androidx.test", name = "runner", version.ref = "runner" }
+core = { group = "com.google.ar", name = "core", version.ref = "core" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+androidx-core = { group = "androidx.core", name = "core", version.ref = "coreVersion" }
+sceneform-ux = { group = "com.google.ar.sceneform.ux", name = "sceneform-ux", version.ref = "sceneformUx" }
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "playServicesMaps" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "glide" }
+glide-ksp = { group = "com.github.bumptech.glide", name = "ksp", version.ref = "glide" }
+glide-okhttp = { group = "com.github.bumptech.glide", name = "okhttp3-integration", version.ref = "glide" }
+
+# Security
+androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security" }
+
+# Networking (Retrofit)
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
+logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "loggingInterceptor" }
+
+# Dependency Injection (Hilt)
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
+
+# Room (Local Database)
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+# Testing
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockito" }
+mockito-android = { group = "org.mockito", name = "mockito-android", version.ref = "mockito" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCoreTesting" }
+hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
+
+# Logging
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+
+# SVG rendering
+androidsvg = { group = "com.caverock", name = "androidsvg-aar", version.ref = "androidsvg" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

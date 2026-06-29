@@ -1,0 +1,21 @@
+.shell-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background-color: var(--sys-surface);
+  color: var(--sys-on-surface);
+  pointer-events: all;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.shell-label {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--sys-on-surface-variant);
+}

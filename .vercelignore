@@ -1,0 +1,14 @@
+# Monorepo: excluir del upload de Vercel (límite 100 MB)
+apps/mobile-android
+tools
+docs
+.github
+shared/uploads
+apps/backend/uploads
+apps/backend/node_modules
+apps/backend/coverage
+apps/web-admin
+**/.git
+**/*.log
+**/.env*
+**/node_modules

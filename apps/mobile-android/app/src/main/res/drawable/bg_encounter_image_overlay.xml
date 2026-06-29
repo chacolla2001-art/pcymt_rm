@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gradient overlay: funde el héroe 3D con el panel inferior.
+     El color final (#070D07) debe coincidir exactamente con el fondo del panel. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:type="linear"
+        android:angle="90"
+        android:startColor="#FF070D07"
+        android:centerColor="#CC070D07"
+        android:endColor="#00070D07" />
+</shape>

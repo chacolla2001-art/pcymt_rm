@@ -1,0 +1,540 @@
+/* ==================== CONTENEDOR PRINCIPAL ==================== */
+.dialog-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 400px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+/* ==================== CABECERA DEL DIÁLOGO ==================== */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background-color: var(--sys-surface-container-highest);
+}
+
+.dialog-title-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dialog-title-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: var(--sys-primary);
+}
+
+.dialog-title-text h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--sys-on-surface);
+}
+
+.dialog-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+}
+
+.dialog-close-btn {
+  color: var(--sys-on-surface-variant);
+}
+
+/* ==================== CONTENIDO ==================== */
+mat-dialog-content {
+  padding: 24px !important;
+  overflow-y: auto;
+  background-color: var(--sys-surface);
+}
+
+/* ==================== GRUPOS ==================== */
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  margin-bottom: 8px;
+}
+
+.group-header.collapsible {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0 -12px 8px;
+  transition: background-color 0.2s;
+}
+
+.group-header.collapsible:hover {
+  background-color: var(--sys-surface-container-high);
+}
+
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-icon {
+  color: var(--sys-primary);
+}
+
+.group-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--sys-on-surface);
+}
+
+.collapse-icon {
+  color: var(--sys-on-surface-variant);
+  transition: transform 0.2s;
+}
+
+.group-description {
+  margin: 0 0 16px;
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+}
+
+.group-divider {
+  margin: 24px 0 !important;
+}
+
+/* ==================== GRID DE CONTROLES ==================== */
+.form-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 1), 1fr);
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.form-controls-grid.collapsed {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* ==================== CAMPOS DE FORMULARIO ==================== */
+.form-field {
+  width: 100%;
+}
+
+mat-form-field {
+  width: 100%;
+}
+
+/* ==================== TOGGLE / CHECKBOX ==================== */
+.toggle-field,
+.checkbox-field {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: var(--sys-surface-container-low);
+  border: 1px solid var(--sys-outline-variant);
+  border-radius: 8px;
+  min-height: 56px;
+  justify-content: center;
+}
+
+.toggle-hint {
+  font-size: 0.75rem;
+  color: var(--sys-on-surface-variant);
+  margin-top: 4px;
+}
+
+/* ==================== RADIO ==================== */
+.radio-field {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: var(--sys-surface-container-low);
+  border: 1px solid var(--sys-outline-variant);
+  border-radius: 8px;
+}
+
+.radio-label {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+  margin-bottom: 12px;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ==================== SLIDER ==================== */
+.slider-field {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: var(--sys-surface-container-low);
+  border: 1px solid var(--sys-outline-variant);
+  border-radius: 8px;
+}
+
+.slider-label {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.slider-field mat-slider {
+  width: 100%;
+}
+
+/* ==================== COLOR ==================== */
+.color-field {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background-color: var(--sys-surface-container-low);
+  border: 1px solid var(--sys-outline-variant);
+  border-radius: 8px;
+}
+
+.color-label {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.color-input-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.color-input {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid var(--sys-outline-variant);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.color-value {
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: var(--sys-on-surface);
+}
+
+/* ==================== FILE UPLOAD ==================== */
+.file-field,
+.image-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.file-label,
+.image-label {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+.file-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed var(--sys-outline-variant);
+  border-radius: 12px;
+  background-color: var(--sys-surface-container-lowest);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 100px;
+}
+
+.file-drop-zone:hover {
+  border-color: var(--sys-primary);
+  background-color: var(--sys-surface-container-low);
+}
+
+.file-icon {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+  color: var(--sys-primary);
+  margin-bottom: 8px;
+}
+
+.file-text {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface-variant);
+}
+
+.file-name {
+  font-size: 0.875rem;
+  color: var(--sys-on-surface);
+  font-weight: 500;
+  text-align: center;
+  word-break: break-all;
+}
+
+.file-remove-btn {
+  margin-top: 8px;
+  color: var(--sys-error);
+}
+
+/* ==================== IMAGE UPLOAD ==================== */
+.image-upload-container {
+  display: flex;
+  gap: 16px;
+}
+
+.image-preview {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--sys-outline-variant);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background-color: var(--sys-error-container) !important;
+  color: var(--sys-error) !important;
+}
+
+.image-drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  border: 2px dashed var(--sys-outline-variant);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.image-drop-zone:hover {
+  border-color: var(--sys-primary);
+  background-color: var(--sys-surface-container-low);
+}
+
+.image-drop-zone mat-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  color: var(--sys-primary);
+}
+
+.image-drop-zone span {
+  font-size: 0.75rem;
+  color: var(--sys-on-surface-variant);
+  margin-top: 4px;
+}
+
+/* ==================== JSON FIELD ==================== */
+.json-field .json-textarea {
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* ==================== HINTS ==================== */
+.group-hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-size: 0.875rem;
+}
+
+.group-hint mat-icon {
+  flex-shrink: 0;
+}
+
+.hint-info {
+  background-color: var(--sys-primary-container);
+  color: var(--sys-on-primary-container);
+}
+
+.hint-warning {
+  background-color: var(--sys-error-container);
+  color: var(--sys-on-error-container);
+}
+
+.hint-error {
+  background-color: var(--sys-error-container);
+  color: var(--sys-error);
+}
+
+.hint-success {
+  background-color: var(--sys-tertiary-container);
+  color: var(--sys-on-tertiary-container);
+}
+
+/* ==================== ACCIONES ==================== */
+mat-dialog-actions {
+  padding: 16px 24px !important;
+  gap: 12px;
+  border-top: 1px solid var(--sys-outline-variant);
+  background-color: var(--sys-surface-container);
+}
+
+mat-dialog-actions button {
+  min-width: 120px;
+}
+
+.btn-spinner {
+  margin-right: 8px;
+}
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .dialog-container {
+    min-width: unset;
+    max-width: 100vw;
+  }
+
+  .form-controls-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px;
+  }
+
+  .dialog-header {
+    padding: 14px 18px;
+  }
+
+  .dialog-title-text h2 {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .dialog-container {
+    min-width: unset;
+    width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .form-controls-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dialog-header {
+    padding: 12px 16px;
+  }
+
+  .dialog-title-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .dialog-title-text h2 {
+    font-size: 1rem;
+  }
+
+  .dialog-subtitle {
+    font-size: 0.75rem;
+  }
+
+  mat-dialog-content {
+    padding: 12px !important;
+  }
+
+  mat-dialog-actions {
+    padding: 12px 16px !important;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+
+  mat-dialog-actions button {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  .group-header {
+    padding: 6px 0;
+  }
+
+  .group-label {
+    font-size: 0.9rem;
+  }
+
+  .toggle-field,
+  .checkbox-field,
+  .radio-field,
+  .slider-field,
+  .color-field {
+    padding: 12px;
+  }
+
+  .upload-button {
+    min-width: unset;
+    width: 100%;
+  }
+}
+
+/* ==================== PASSWORD FIELD WRAPPER ==================== */
+.password-field-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ==================== PASSWORD STRENGTH INDICATOR ==================== */
+.password-strength-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px 8px;
+}
+
+.strength-bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.strength-bar {
+  height: 4px;
+  flex: 1;
+  border-radius: 2px;
+  background-color: #e0e0e0;
+  transition: background-color 0.3s ease;
+}
+
+.strength-bar.filled.strength-weak   { background-color: #f44336; }
+.strength-bar.filled.strength-fair   { background-color: #ff9800; }
+.strength-bar.filled.strength-good   { background-color: #4caf50; }
+.strength-bar.filled.strength-strong { background-color: #2e7d32; }
+
+.strength-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  min-width: 48px;
+  text-align: right;
+}
+
+.strength-label.strength-weak   { color: #f44336; }
+.strength-label.strength-fair   { color: #ff9800; }
+.strength-label.strength-good   { color: #4caf50; }
+.strength-label.strength-strong { color: #2e7d32; }

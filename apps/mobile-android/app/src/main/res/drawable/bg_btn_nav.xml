@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Secondary navigation button — translucent dark with earth-tone border -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF4A3428" />
+            <corners android:radius="14dp" />
+            <stroke android:width="1.5dp" android:color="#FFD9B992" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#CC1C1007" />
+            <corners android:radius="14dp" />
+            <stroke android:width="1.5dp" android:color="#99D9B992" />
+        </shape>
+    </item>
+</selector>

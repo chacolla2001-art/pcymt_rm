@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Individual animal trophy badge for the horizontal scroll in the home game screen -->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/containerTrophy"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:layout_width="72dp"
+    android:layout_height="wrap_content"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="4dp">
+
+    <!-- Circular badge ring + animal icon -->
+    <FrameLayout
+        android:id="@+id/frameTrophyIcon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/bg_trophy_locked">
+
+        <!-- Animal icon — greyscale when locked, full color + CircleCrop when found -->
+        <ImageView
+            android:id="@+id/ivTrophyIcon"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:layout_gravity="center"
+            android:scaleType="centerCrop"
+            android:contentDescription="Animal"
+            tools:src="@drawable/jukumario" />
+
+        <!-- Green checkmark badge — shown when animal is found -->
+        <TextView
+            android:id="@+id/tvFoundBadge"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="bottom|end"
+            android:background="@drawable/bg_badge_check"
+            android:text="✓"
+            android:textColor="#FFFFFFFF"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:visibility="gone"
+            tools:visibility="visible" />
+    </FrameLayout>
+
+    <!-- Animal name — "???" when locked, short name when found -->
+    <TextView
+        android:id="@+id/tvTrophyName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="..."
+        android:textSize="9sp"
+        android:textColor="#CCFFFFFF"
+        android:gravity="center"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:lineSpacingMultiplier="0.9"
+        tools:text="Oso Andino" />
+
+</LinearLayout>

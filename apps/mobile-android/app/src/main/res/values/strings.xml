@@ -1,0 +1,172 @@
+<resources>
+    <!-- app_name is provided by each product flavor (admin/visitor) via resValue -->
+    <string name="title_home">Realidad Mixta</string>
+    <string name="title_dashboard">Mapa</string>
+    <string name="map_you_are_in_section">Estás en: %1$s</string>
+    <string name="section_edu_empty">Sin descripción educativa aún.</string>
+    <string name="map_section_unknown">Dentro del parque</string>
+    <string name="map_scene_panel_title">Escena ambiental</string>
+    <string name="map_scene_panel_hint">Referencias espaciales georreferenciadas y efecto de lluvia sobre el mapa.</string>
+    <string name="map_scene_spatial_refs">Referencias espaciales</string>
+    <string name="map_scene_rain">Lluvia en el mapa</string>
+    <string name="map_scene_rain_intensity">Intensidad de lluvia</string>
+    <string name="map_scene_rain_size">Tamaño de gotas</string>
+    <string name="map_scene_rain_zone">Zona con lluvia</string>
+    <string name="map_scene_rain_zone_all">Todo el parque</string>
+    <string name="map_scene_anim_speed">Velocidad de animación</string>
+    <string name="map_scene_fab_desc">Escena ambiental del mapa</string>
+    <string name="title_notifications">Mi perfil</string>
+    <!-- Strings used for fragments for navigation -->
+    <string name="first_fragment_label">First Fragment</string>
+    <string name="second_fragment_label">Second Fragment</string>
+    <string name="next">Next</string>
+    <string name="previous">Previous</string>
+
+    <string name="lorem_ipsum">
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam in scelerisque sem. Mauris
+        volutpat, dolor id interdum ullamcorper, risus dolor egestas lectus, sit amet mattis purus
+        dui nec risus. Maecenas non sodales nisi, vel dictum dolor. Class aptent taciti sociosqu ad
+        litora torquent per conubia nostra, per inceptos himenaeos. Suspendisse blandit eleifend
+        diam, vel rutrum tellus vulputate quis. Aliquam eget libero aliquet, imperdiet nisl a,
+        ornare ex. Sed rhoncus est ut libero porta lobortis. Fusce in dictum tellus.\n\n
+        Suspendisse interdum ornare ante. Aliquam nec cursus lorem. Morbi id magna felis. Vivamus
+        egestas, est a condimentum egestas, turpis nisl iaculis ipsum, in dictum tellus dolor sed
+        neque. Morbi tellus erat, dapibus ut sem a, iaculis tincidunt dui. Interdum et malesuada
+        fames ac ante ipsum primis in faucibus. Curabitur et eros porttitor, ultricies urna vitae,
+        molestie nibh. Phasellus at commodo eros, non aliquet metus. Sed maximus nisl nec dolor
+        bibendum, vel congue leo egestas.\n\n
+        Sed interdum tortor nibh, in sagittis risus mollis quis. Curabitur mi odio, condimentum sit
+        amet auctor at, mollis non turpis. Nullam pretium libero vestibulum, finibus orci vel,
+        molestie quam. Fusce blandit tincidunt nulla, quis sollicitudin libero facilisis et. Integer
+        interdum nunc ligula, et fermentum metus hendrerit id. Vestibulum lectus felis, dictum at
+        lacinia sit amet, tristique id quam. Cras eu consequat dui. Suspendisse sodales nunc ligula,
+        in lobortis sem porta sed. Integer id ultrices magna, in luctus elit. Sed a pellentesque
+        est.\n\n
+        Aenean nunc velit, lacinia sed dolor sed, ultrices viverra nulla. Etiam a venenatis nibh.
+        Morbi laoreet, tortor sed facilisis varius, nibh orci rhoncus nulla, id elementum leo dui
+        non lorem. Nam mollis ipsum quis auctor varius. Quisque elementum eu libero sed commodo. In
+        eros nisl, imperdiet vel imperdiet et, scelerisque a mauris. Pellentesque varius ex nunc,
+        quis imperdiet eros placerat ac. Duis finibus orci et est auctor tincidunt. Sed non viverra
+        ipsum. Nunc quis augue egestas, cursus lorem at, molestie sem. Morbi a consectetur ipsum, a
+        placerat diam. Etiam vulputate dignissim convallis. Integer faucibus mauris sit amet finibus
+        convallis.\n\n
+        Phasellus in aliquet mi. Pellentesque habitant morbi tristique senectus et netus et
+        malesuada fames ac turpis egestas. In volutpat arcu ut felis sagittis, in finibus massa
+        gravida. Pellentesque id tellus orci. Integer dictum, lorem sed efficitur ullamcorper,
+        libero justo consectetur ipsum, in mollis nisl ex sed nisl. Donec maximus ullamcorper
+        sodales. Praesent bibendum rhoncus tellus nec feugiat. In a ornare nulla. Donec rhoncus
+        libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
+        vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
+    </string>
+    <string name="continuar_con_google">Continuar con Google</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_image_desc">Mascota Jukumario</string>
+    <string name="onboarding_welcome_title">Bienvenido a Juku Go</string>
+    <string name="onboarding_welcome_desc">Explora el Parque de las Culturas y la Madre Tierra y descubre animales en realidad aumentada.</string>
+    <string name="onboarding_explore_title">Explora el parque</string>
+    <string name="onboarding_explore_desc">Usa el mapa y Juku Go para acercarte a los puntos de encuentro con los animales.</string>
+    <string name="onboarding_collect_title">Completa tu colección</string>
+    <string name="onboarding_collect_desc">Encuentra los 12 animales del parque y sigue tu progreso en la pantalla de inicio.</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_start">Empezar a explorar</string>
+    <string name="onboarding_step_format">%1$d de %2$d</string>
+    <string name="out_of_park_banner">Estás fuera de los límites del parque</string>
+    <string name="nav_home">Inicio</string>
+    <string name="nav_map">Mapa</string>
+    <string name="nav_collection">Colección</string>
+    <string name="nav_profile">Perfil</string>
+    <string name="home_explore_cta">Explorar con Juku Go</string>
+    <string name="home_explore_subtitle">Encuentra animales en el parque como en un juego de exploración</string>
+    <string name="home_progress_label">Tu progreso</string>
+    <string name="home_trophies_label">Animales encontrados</string>
+    <string name="collection_subtitle">Toca un animal para verlo en el mapa o abrir la cámara AR</string>
+    <string name="poi_sheet_title">Punto de interés</string>
+    <string name="animal_action_map">Ver en el mapa</string>
+    <string name="animal_action_ar">Abrir cámara AR</string>
+
+    <!-- Encuentro — copy educativo post-guardado -->
+    <string name="encounter_saved">¡Encuentro guardado!</string>
+    <string name="encounter_already_saved">Ya guardado</string>
+    <string name="encounter_save_btn">Guardar encuentro</string>
+    <string name="encounter_save_admin">Guardar (Admin)</string>
+    <string name="encounter_approach">Acércate más</string>
+    <string name="encounter_tip_highlands">Tip: En Tierras Altas habitan especies del altiplano y bosques nublados andinos.</string>
+    <string name="encounter_tip_midlands">Tip: En Tierras Medias conviven animales de valles interandinos y la vida rural.</string>
+    <string name="encounter_tip_lowlands">Tip: En Tierras Bajas encontrarás fauna de selva amazónica y llanos orientales.</string>
+    <string name="encounter_tip_myths">Tip: En Mitos y Leyendas descubrirás criaturas de la tradición oral andina.</string>
+    <string name="encounter_tip_default">Tip: Sigue explorando el parque para completar tu colección de 12 animales.</string>
+
+
+    <string name="host_cloud_anchor">Host Cloud Anchor</string>
+    <string name="resolve_cloud_anchor">Resolve Cloud Anchor</string>
+    <string name="host">Host</string>
+    <string name="resolve">Resolve</string>
+    <string name="reset">Reset</string>
+    <string name="hosting">Hosting…</string>
+    <string name="resolving">Resolving…</string>
+    <string name="cloud_anchor_id_hint">Cloud Anchor ID</string>
+    <string name="insufficient_visual_data">Insufficient visual data - move the device around the object and try again</string>
+    <string name="error_occurred">Error occurred - see the log for more details</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="animal_model_icon">descripcion\n</string>
+    <string name="desc_mascot">hola\n</string>
+
+    <!-- AR Fragment Strings -->
+    <string name="ar_tap_surface_instruction">Pulsa sobre una parte de la superficie para colocar un ancla</string>
+    <string name="ar_simple_tap_surface_instruction">Apunta al suelo y mueve el teléfono lentamente — cuando aparezcan superficies blancas, toca una de ellas para colocar el ancla</string>
+    <string name="ar_back">Atrás</string>
+    <string name="ar_searching_anchors">Buscando anclas disponibles...</string>
+    <string name="ar_loading">Cargando...</string>
+    <string name="ar_user_not_authenticated">Usuario no autenticado</string>
+    <string name="ar_error_loading_anchors">Error al cargar anclas</string>
+    <string name="ar_saving_location">Guardando ubicación...</string>
+    <string name="ar_error_saving">Error al guardar: %s</string>
+    <string name="ar_place_anchor">Colocar ancla</string>
+    <string name="ar_upload">Subir</string>
+    <string name="ar_upload_anchor">Subir ancla</string>
+    <string name="ar_touch_valid_surface">Toca una superficie válida</string>
+
+    <!-- Quality Indicator Strings -->
+    <string name="ar_quality_insufficient">Escanee más alrededor</string>
+    <string name="ar_quality_sufficient">Aceptable, pero puede mejorar</string>
+    <string name="ar_quality_good">Calidad adecuada</string>
+
+    <!-- Hosting/Resolving Strings -->
+    <string name="ar_hosting_error">Error al subir ancla: %s</string>
+    <string name="ar_location_saved_success">Ubicación guardada con éxito</string>
+    <string name="ar_location_error">Error al registrar la ubicación en el servidor</string>
+    <string name="ar_unexpected_error">Error inesperado: %s</string>
+    <string name="ar_no_location_permission">Permiso de ubicación no concedido</string>
+    <string name="ar_no_location_obtained">No se pudo obtener la ubicación</string>
+    <string name="ar_scan_environment">Escanee el entorno</string>
+    <string name="ar_cancel_placement">Cancelar</string>
+    <string name="ar_cancel_edit">Cancelar</string>
+    <string name="ar_arcore_error">Error de ARCore: %s</string>
+    <string name="ar_session_error">Error de sesión AR. Intente de nuevo.</string>
+
+    <!-- Screenshot Strings -->
+    <string name="ar_photo_saved">Foto guardada en la galería</string>
+    <string name="ar_error_saving_image">Error al guardar imagen: %s</string>
+    <string name="ar_error_capturing_image">Error al capturar imagen: %s</string>
+    <string name="ar_no_gallery_access">No se pudo acceder a la galería</string>
+
+    <!-- AR Unsupported Device Strings -->
+    <string name="ar_unsupported_title">Dispositivo no compatible</string>
+    <string name="ar_unsupported_reason_default">Tu dispositivo no cumple con los requisitos para la experiencia de Realidad Aumentada.</string>
+    <string name="ar_unsupported_requirements_title">Requisitos del dispositivo</string>
+    <string name="ar_unsupported_requirements_list">• Google ARCore compatible\n• Procesador Snapdragon 8xx/7xx, Exynos 2200+, Tensor, o Dimensity 8000+\n• Dispositivos verificados: Samsung Galaxy S/A/Z, Google Pixel 4+, OnePlus 8+, Xiaomi 12+\n• Cámara trasera con sensor de profundidad</string>
+    <string name="ar_unsupported_device_info">Información del dispositivo</string>
+    <string name="ar_unsupported_back">Volver al inicio</string>
+
+    <!-- Realidad Aumentada simple (sin cloud anchors) -->
+    <string name="ar_simple_title">Realidad Aumentada</string>
+    <string name="ar_simple_loading">Cargando modelos…</string>
+    <string name="ar_simple_tap_hint">Toca el suelo para colocar el modelo</string>
+    <string name="ar_simple_no_models">No hay modelos disponibles</string>
+    <string name="ar_simple_error_loading">Error al cargar modelos</string>
+    <string name="ar_simple_no_surface">No se detectó una superficie. Apunta la cámara al suelo o una mesa.</string>
+    <string name="ar_simple_waiting_tracking">Esperando que la cámara ubique el espacio…</string>
+
+</resources>

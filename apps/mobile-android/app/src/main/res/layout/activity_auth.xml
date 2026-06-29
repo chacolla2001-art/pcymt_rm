@@ -1,0 +1,21 @@
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/activity_auth_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    tools:context=".ui.auth.AuthActivity">
+
+    <!-- Contenido principal -->
+    <include layout="@layout/content_login" />
+
+    <!-- Banner flotante sobre el contenido -->
+    <include
+        android:id="@+id/banner_overlay"
+        layout="@layout/view_banner_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        />
+
+</FrameLayout>

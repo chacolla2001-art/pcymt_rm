@@ -1,0 +1,130 @@
+<div class="page-container">
+  <div class="page-header">
+    <button mat-icon-button (click)="goBack()" [matTooltip]="'stats.back' | translate" [attr.aria-label]="'stats.back' | translate">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <mat-icon class="header-icon">pets</mat-icon>
+    <h1>{{ 'stats.interactionsByAnimal' | translate }}</h1>
+    <span class="spacer"></span>
+    <mat-button-toggle-group [(value)]="selectedTimeRange" (change)="onTimeRangeChanged($event.value)" class="time-toggle">
+      <mat-button-toggle value="day">{{ 'stats.day' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="month">{{ 'stats.month' | translate }}</mat-button-toggle>
+      <mat-button-toggle value="year">{{ 'stats.year' | translate }}</mat-button-toggle>
+    </mat-button-toggle-group>
+  </div>
+
+  <div class="content-grid">
+    <mat-card appearance="outlined" class="ranking-detail-card">
+      <mat-card-header>
+        <mat-card-title>{{ 'stats.rankingByInteractions' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.rankingByInteractionsSub' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ranking-list-detail">
+          @for (asset of topVirtualAssets; track asset.id; let i = $index) {
+            <div class="ranking-item" (click)="navigateToAsset(asset.id)">
+              <span class="rank-badge rank-{{ i + 1 }}">{{ i + 1 }}</span>
+              <div class="item-info">
+                <span class="item-name">{{ asset.name }}</span>
+                <mat-progress-bar mode="determinate" [value]="getRankingProgress(asset.interactionCount)"></mat-progress-bar>
+              </div>
+              <span class="item-count">{{ asset.interactionCount }}</span>
+              <mat-icon class="item-arrow">chevron_right</mat-icon>
+            </div>
+          }
+          @empty {
+            <div class="empty-state">
+              <mat-icon>info</mat-icon>
+              <p>{{ 'stats.noInteractions' | translate }}</p>
+            </div>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header>
+        <mat-card-title>{{ 'stats.interactionsDistribution' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.interactionsDistributionSub' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ranking-chart-container">
+          <canvas baseChart [data]="rankingBarChartData" [type]="'bar'"></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-card appearance="outlined" class="main-card">
+    <mat-card-content>
+      <div class="period-navigation">
+        <button mat-icon-button (click)="navigateInteractionPeriod(-1)" [matTooltip]="'stats.periodPrev' | translate" [attr.aria-label]="'stats.periodPrev' | translate">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span class="period-label">{{ interactionPeriodLabel }}</span>
+        <button mat-icon-button (click)="navigateInteractionPeriod(1)" [matTooltip]="'stats.periodNext' | translate" [attr.aria-label]="'stats.periodNext' | translate">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        @if (interactionPeriodOffset !== 0) {
+          <button mat-stroked-button class="today-btn" (click)="resetInteractionPeriod()">
+            <mat-icon>today</mat-icon> {{ 'stats.currentPeriod' | translate }}
+          </button>
+        }
+        <span class="spacer"></span>
+        @if (selectedAsset) {
+          <mat-button-toggle-group [(value)]="selectedInteractionType" (change)="onInteractionTypeChanged($event.value)" class="type-toggle">
+            <mat-button-toggle value="all">{{ 'stats.filterAll' | translate }}</mat-button-toggle>
+            <mat-button-toggle value="view">{{ 'stats.filterViews' | translate }}</mat-button-toggle>
+            <mat-button-toggle value="click">{{ 'stats.filterClicks' | translate }}</mat-button-toggle>
+          </mat-button-toggle-group>
+        }
+        <button mat-icon-button (click)="downloadInteractionData()" [matTooltip]="'stats.downloadCsv' | translate" [attr.aria-label]="'stats.downloadCsv' | translate">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+
+      <div class="stats-layout">
+        <div class="filters-panel">
+          <h3 class="filter-section-title">{{ 'stats.animals' | translate }}</h3>
+
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="full-width">
+            <mat-label>{{ 'stats.searchAnimal' | translate }}</mat-label>
+            <input matInput (input)="onSearchInput($event)" [placeholder]="'stats.searchAnimalPlaceholder' | translate">
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+
+          <mat-nav-list class="compact-list model-list">
+            @for (asset of filteredAssets; track asset.id) {
+              <mat-list-item (click)="onAssetClicked(asset)" [activated]="selectedAsset?.id === asset.id">
+                <img matListItemAvatar [src]="apiRoutes.getAssetUrl(asset.icon_url)" [alt]="asset.name" class="model-avatar">
+                <span matListItemTitle>{{ asset.name }}</span>
+              </mat-list-item>
+            }
+            @empty {
+              <mat-list-item>
+                <mat-icon matListItemIcon>info</mat-icon>
+                <span matListItemTitle>{{ 'stats.noAnimals' | translate }}</span>
+              </mat-list-item>
+            }
+          </mat-nav-list>
+
+          @if (selectedAsset) {
+            <div class="selected-user-chip">
+              <img [src]="apiRoutes.getAssetUrl(selectedAsset.icon_url)" [alt]="selectedAsset.name" class="chip-avatar">
+              <span>{{ selectedAsset.name }}</span>
+              <button mat-icon-button (click)="clearAsset()" [attr.aria-label]="'stats.clearAnimalFilter' | translate">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="chart-main">
+          <div class="chart-container-large">
+            <canvas baseChart #interactionChart [data]="interactionChartData" [type]="'bar'"></canvas>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

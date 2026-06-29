@@ -1,0 +1,118 @@
+<header class="app-header">
+  <div class="header-left">
+    <!-- Botón de menú lateral -->
+    <button mat-icon-button class="menu-btn" (click)="toggleDrawer()" [matTooltip]="'header.menu' | translate" [attr.aria-label]="'header.menu' | translate">
+      <mat-icon>menu</mat-icon>
+    </button>
+  </div>
+
+  <div class="header-right">
+    <!-- Acciones rápidas -->
+    <div class="header-actions">
+      @if (!isFullscreen) {
+        <button mat-icon-button class="action-btn" (click)="openFullscreen()"
+                [matTooltip]="'header.fullscreen' | translate" [attr.aria-label]="'header.fullscreen' | translate">
+          <mat-icon>fullscreen</mat-icon>
+        </button>
+      }
+      @if (isFullscreen) {
+        <button mat-icon-button class="action-btn" (click)="closeFullscreen()"
+                [matTooltip]="'header.fullscreenExit' | translate" [attr.aria-label]="'header.fullscreenExit' | translate">
+          <mat-icon>fullscreen_exit</mat-icon>
+        </button>
+      }
+
+      <button mat-icon-button [matMenuTriggerFor]="themeMenu" class="action-btn"
+              [matTooltip]="'header.theme' | translate" [attr.aria-label]="'header.theme' | translate">
+        <mat-icon>{{ themeManager.getThemeModeIcon() }}</mat-icon>
+      </button>
+
+      <mat-menu #themeMenu="matMenu" class="theme-menu">
+        <button mat-menu-item (click)="setThemeMode('light')">
+          <mat-icon>light_mode</mat-icon>
+          <span>{{ 'header.themeLight' | translate }}</span>
+        </button>
+        <button mat-menu-item (click)="setThemeMode('dark')">
+          <mat-icon>dark_mode</mat-icon>
+          <span>{{ 'header.themeDark' | translate }}</span>
+        </button>
+        <button mat-menu-item (click)="setThemeMode('system')">
+          <mat-icon>contrast</mat-icon>
+          <span>{{ 'header.themeSystem' | translate }}</span>
+        </button>
+      </mat-menu>
+    </div>
+
+    <span class="header-separator"></span>
+
+    <!-- Menú de usuario -->
+    <button mat-button [matMenuTriggerFor]="belowMenu" class="user-menu-trigger">
+      <div class="user-menu-content">
+        <div class="user-avatar-button">
+          <img
+            [src]="userAvatar.displayUrl()"
+            (error)="userAvatar.onAvatarImageError($event)"
+            alt="Avatar"
+            class="avatar-mini" />
+        </div>
+        <div class="user-info hide-mobile">
+          <span class="user-name">{{ userFirstName }}</span>
+          <span class="user-role">{{ userRoleDisplay }}</span>
+        </div>
+        <mat-icon class="dropdown-icon hide-mobile">expand_more</mat-icon>
+      </div>
+    </button>
+  </div>
+
+  <mat-menu #belowMenu="matMenu" yPosition="below" class="user-profile-menu custom-menu">
+    <!-- Input oculto para seleccionar archivo -->
+    <input #fileInput type="file" accept="image/*" style="display: none" (change)="onFileSelected($event)">
+    
+    <!-- Cabecera del perfil -->
+    <div class="menu-profile-header" (click)="$event.stopPropagation()">
+      <div class="profile-avatar-container" (click)="fileInput.click()">
+        <img
+          [src]="userAvatar.displayUrl()"
+          (error)="userAvatar.onAvatarImageError($event)"
+          alt="Foto de perfil"
+          class="avatar" />
+        <div class="avatar-overlay">
+          <mat-icon>camera_alt</mat-icon>
+        </div>
+      </div>
+      <div class="profile-info">
+        <span class="profile-name">{{ userFirstName }}</span>
+        <span class="profile-role">{{ userRoleDisplay }}</span>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <!-- Opciones del menú -->
+    <div class="menu-options">
+      <button mat-menu-item class="menu-option" (click)="openDialogVerInfo()">
+        <mat-icon class="menu-icon">person_outline</mat-icon>
+        <div class="menu-option-content">
+          <span class="menu-option-title">{{ 'header.profile' | translate }}</span>
+          <span class="menu-option-subtitle">{{ 'header.profileDesc' | translate }}</span>
+        </div>
+      </button>
+
+      <button mat-menu-item class="menu-option" (click)="openDialogChangePass()">
+        <mat-icon class="menu-icon">lock_outline</mat-icon>
+        <div class="menu-option-content">
+          <span class="menu-option-title">{{ 'header.security' | translate }}</span>
+          <span class="menu-option-subtitle">{{ 'header.securityDesc' | translate }}</span>
+        </div>
+      </button>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <!-- Cerrar sesión -->
+    <button mat-menu-item class="menu-option logout-option" (click)="logout()">
+      <mat-icon class="menu-icon logout-icon">logout</mat-icon>
+      <span class="menu-option-title">{{ 'header.logout' | translate }}</span>
+    </button>
+  </mat-menu>
+</header>

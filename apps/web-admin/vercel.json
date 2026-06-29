@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "node scripts/load-env.js && ng build --configuration production",
+  "outputDirectory": "dist/angular-front/browser",
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

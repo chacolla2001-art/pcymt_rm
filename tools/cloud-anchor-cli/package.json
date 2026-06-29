@@ -1,0 +1,22 @@
+{
+  "name": "cloud-anchor-cli",
+  "version": "1.0.0",
+  "description": "CLI para administrar ARCore Cloud Anchors del Parque PCyMT RM — Mi Teleférico La Paz",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "DEBUG=true node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.3",
+    "dotenv": "^16.4.5",
+    "google-auth-library": "^10.5.0",
+    "inquirer": "^8.2.6",
+    "open": "^8.4.2"
+  }
+}

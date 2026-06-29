@@ -1,0 +1,236 @@
+// Variables locales
+$alert-min-width: 320px;
+$alert-max-width: 450px;
+$alert-border-radius: 12px;
+$alert-padding: 16px;
+
+// Contenedor principal
+.alert-container {
+  position: relative;
+  min-width: $alert-min-width;
+  max-width: $alert-max-width;
+  border-radius: $alert-border-radius;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.3s ease-out;
+}
+
+// Animación de entrada
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Barra de progreso
+.alert-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.3);
+
+  .progress-bar {
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.8);
+    transition: width 50ms linear;
+  }
+}
+
+// Cuerpo de la alerta
+.alert-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: $alert-padding;
+  padding-top: 20px; // Espacio para la barra de progreso
+}
+
+// Wrapper del icono
+.alert-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+
+  .alert-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: white;
+  }
+}
+
+// Contenido de texto
+.alert-content {
+  flex: 1;
+  min-width: 0;
+
+  .alert-title {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    color: inherit;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .alert-message {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    color: inherit;
+    opacity: 0.92;
+    word-wrap: break-word;
+  }
+}
+
+// Botón de cerrar
+.alert-close {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.8) !important;
+  margin: -8px -8px 0 0;
+
+  &:hover {
+    color: white !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// ========== Variantes de color (Material tokens) ==========
+
+@mixin alert-variant($container, $on-container, $accent) {
+  background-color: $container;
+  color: $on-container;
+
+  .alert-icon-wrapper {
+    background-color: $accent;
+    .alert-icon { color: var(--sys-on-primary); }
+  }
+
+  .alert-content .alert-title,
+  .alert-content .alert-message { color: $on-container; }
+
+  .alert-close { color: $accent !important; }
+
+  .alert-progress {
+    background-color: color-mix(in srgb, $accent 20%, transparent);
+    .progress-bar { background-color: $accent; }
+  }
+}
+
+.alert-success {
+  @include alert-variant(
+    var(--sys-tertiary-container),
+    var(--sys-on-tertiary-container),
+    var(--sys-tertiary)
+  );
+}
+
+.alert-warning {
+  @include alert-variant(
+    var(--sys-secondary-container),
+    var(--sys-on-secondary-container),
+    var(--sys-secondary)
+  );
+}
+
+.alert-error {
+  @include alert-variant(
+    var(--sys-error-container),
+    var(--sys-on-error-container),
+    var(--sys-error)
+  );
+}
+
+.alert-info {
+  @include alert-variant(
+    var(--sys-primary-container),
+    var(--sys-on-primary-container),
+    var(--sys-primary)
+  );
+}
+
+// Icon/text on colored snackbar body uses on-container contrast
+.alert-success,
+.alert-warning,
+.alert-error,
+.alert-info {
+  .alert-icon-wrapper {
+    background-color: color-mix(in srgb, currentColor 18%, transparent);
+    .alert-icon { color: inherit; }
+  }
+
+  .alert-close {
+    color: inherit !important;
+    opacity: 0.85;
+  }
+}
+
+// ========== Estilos globales del snackbar ==========
+
+::ng-deep .mat-mdc-snack-bar-container {
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  margin: 16px !important;
+
+  .mdc-snackbar__surface {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    min-width: auto !important;
+  }
+}
+
+// Responsivo
+@media (max-width: 480px) {
+  .alert-container {
+    min-width: 280px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .alert-body {
+    padding: 12px;
+    padding-top: 16px;
+    gap: 10px;
+  }
+
+  .alert-icon-wrapper {
+    width: 36px;
+    height: 36px;
+
+    .alert-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  .alert-content {
+    .alert-title {
+      font-size: 13px;
+    }
+
+    .alert-message {
+      font-size: 13px;
+    }
+  }
+}

@@ -1,0 +1,77 @@
+erDiagram
+    User ||--o{ UserSession : "has many"
+    User ||--o{ UserInteraction : "creates"
+    VirtualAsset ||--o{ Location : "placed at"
+    VirtualAsset ||--o{ UserInteraction : "receives"
+    Location ||--o{ UserInteraction : "location of"
+
+    User {
+        uuid id PK
+        string username UK
+        string email UK
+        string password_hash
+        enum role "admin, user, moderator"
+        string first_name
+        string last_name
+        string document_number UK
+        string avatar_url
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+        timestamp email_verified_at
+        timestamp last_login_at
+    }
+
+    VirtualAsset {
+        uuid id PK
+        string name
+        string scientific_name
+        text description
+        string model_url "3D model file"
+        string icon_url
+        string thumbnail_url
+        string category
+        string habitat
+        integer display_order
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    Location {
+        uuid id PK
+        uuid virtual_asset_id FK
+        decimal latitude "Coordenadas GPS"
+        decimal longitude "Coordenadas GPS"
+        string name
+        text description
+        string section
+        string anchor_code
+        decimal scale "0.1-10"
+        decimal rotation_y "-360 to 360"
+        boolean show_in_map
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    UserSession {
+        uuid id PK
+        uuid user_id FK
+        enum platform "web, mobile, desktop"
+        string ip_address
+        text user_agent
+        timestamp logged_in_at
+        timestamp logged_out_at
+        integer session_duration_seconds
+    }
+
+    UserInteraction {
+        uuid id PK
+        uuid user_id FK
+        uuid virtual_asset_id FK
+        uuid location_id FK
+        enum interaction_type "view, click, scan, share, favorite, zoom, rotate"
+        jsonb metadata
+        timestamp created_at
+    }

@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  fragment_ar_map.xml — Modo Explorador (estilo Pokémon Go) para dispositivos de gama baja.
+  Muestra el mapa del parque con los animales como marcadores interactivos.
+  El usuario se acerca a un animal, lo toca, y puede "guardarlo" (registra interacción).
+-->
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground">
+
+    <!-- ══════════════════════════════════════════════════════
+         Mapa del parque (ocupa toda la pantalla)
+         ══════════════════════════════════════════════════════ -->
+    <com.univalle.pedrochacolla.ui.dashboard.ParkMapView
+        android:id="@+id/arMapParkMapView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- ══════════════════════════════════════════════════════
+         Loading overlay
+         ══════════════════════════════════════════════════════ -->
+    <FrameLayout
+        android:id="@+id/arMapLoadingOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <ProgressBar
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:indeterminateTint="@color/white" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Cargando animales..."
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="@color/white" />
+
+        </LinearLayout>
+    </FrameLayout>
+
+    <!-- ══════════════════════════════════════════════════════
+         Botón volver (esquina superior izquierda)
+         ══════════════════════════════════════════════════════ -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btnBackArMap"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="Volver"
+        android:src="@drawable/ic_arrow_back"
+        app:backgroundTint="?attr/colorSurface"
+        app:tint="?attr/colorOnSurface"
+        app:fabSize="mini"
+        app:elevation="6dp" />
+
+    <!-- ══════════════════════════════════════════════════════
+         Banner: fuera de los límites del parque
+         ══════════════════════════════════════════════════════ -->
+    <TextView
+        android:id="@+id/arMapOutOfBoundsBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="100dp"
+        android:background="#CC8B0000"
+        android:gravity="center"
+        android:padding="12dp"
+        android:text="🚨 Estás fuera del parque — regresa para descubrir animales"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- ══════════════════════════════════════════════════════
+         Banner Admin — visible solo para admins
+         ══════════════════════════════════════════════════════ -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/arMapAdminBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="72dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:background="#CC1565C0"
+        android:gravity="center"
+        android:padding="10dp"
+        android:text="\ud83d\udd10 Modo Administrador \u2014 Ves todos los animales del parque"
+        android:textColor="#FFFFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- ══════════════════════════════════════════════════════
+         FABs de controles (flotantes en el borde derecho)
+         ══════════════════════════════════════════════════════ -->
+    <LinearLayout
+        android:id="@+id/arMapFabColumn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="80dp"
+        android:orientation="vertical"
+        android:gravity="end">
+
+        <!-- Botón Admin: Ver todos / Solo cercanos (solo visible para admin) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/arMapFabAdminShowAll"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Ver todos los animales"
+            android:src="@drawable/ic_explorer"
+            app:backgroundTint="#CC1565C0"
+            app:tint="#FFFFFFFF"
+            app:fabSize="mini"
+            android:visibility="gone" />
+
+        <!-- Botón de Realidad Mixta / Aumentada -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/arMapFabAr"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Cámara AR"
+            android:src="@drawable/icon_camera"
+            app:backgroundTint="?attr/colorPrimaryContainer"
+            app:tint="?attr/colorOnPrimaryContainer"
+            app:fabSize="mini" />
+
+        <!-- Botón de mi ubicación -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/arMapFabMyLocation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:contentDescription="Mi ubicación"
+            android:src="@drawable/ic_my_location"
+            app:backgroundTint="?attr/colorSurface"
+            app:tint="?attr/colorPrimary"
+            app:fabSize="mini" />
+
+    </LinearLayout>
+
+    <!-- ══════════════════════════════════════════════════════
+         Snackbar / mensaje de error (se gestiona via Snackbar API)
+         ══════════════════════════════════════════════════════ -->
+
+</FrameLayout>

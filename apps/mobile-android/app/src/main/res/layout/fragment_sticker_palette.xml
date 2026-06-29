@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/background_dark"
+    android:padding="16dp">
+
+    <!-- Handle bar -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_rounded_dark" />
+
+    <!-- Title + Edit Mode Toggle -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Stickers"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switch_edit_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Editar"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textOn="Sí"
+            android:textOff="No"
+            android:showText="false" />
+    </LinearLayout>
+
+    <!-- Search bar -->
+    <EditText
+        android:id="@+id/et_search_sticker"
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_rounded_dark"
+        android:hint="Buscar sticker..."
+        android:textColorHint="#888888"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:paddingHorizontal="12dp"
+        android:singleLine="true"
+        android:inputType="text"
+        android:imeOptions="actionSearch" />
+
+    <!-- Sticker grid -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_sticker_grid"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="8dp"
+        android:clipToPadding="false"
+        android:padding="4dp" />
+
+    <!-- Status hint — shows what the user should do next -->
+    <TextView
+        android:id="@+id/tv_status_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#90CAF9"
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:paddingVertical="4dp"
+        android:gravity="center"
+        android:visibility="visible"
+        android:text="Activa Editar para modificar stickers" />
+
+    <!-- Selected sticker properties (visible when a sticker is selected in edit mode) -->
+    <LinearLayout
+        android:id="@+id/sticker_properties_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:background="@drawable/bg_rounded_dark"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_selected_sticker_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Scale slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="Escala"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/slider_scale"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0.1"
+                android:valueTo="5.0"
+                android:stepSize="0.05"
+                android:value="1.0" />
+
+            <TextView
+                android:id="@+id/tv_scale_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:gravity="end"
+                android:text="1.0" />
+        </LinearLayout>
+
+        <!-- Rotation slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="Rotación"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/slider_rotation"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0"
+                android:valueTo="360"
+                android:stepSize="1"
+                android:value="0" />
+
+            <TextView
+                android:id="@+id/tv_rotation_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:gravity="end"
+                android:text="0°" />
+        </LinearLayout>
+
+        <!-- Opacity slider -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="Op. Capa"
+                android:textColor="#AAAAAA"
+                android:textSize="12sp" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/slider_opacity"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:stepSize="0.05"
+                android:value="1.0" />
+
+            <TextView
+                android:id="@+id/tv_opacity_value"
+                android:layout_width="40dp"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:textSize="12sp"
+                android:gravity="end"
+                android:text="100%" />
+        </LinearLayout>
+
+        <!-- Delete selected sticker -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_delete_sticker"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_gravity="end"
+            android:text="Eliminar sticker"
+            android:textAllCaps="false"
+            android:textSize="12sp"
+            app:icon="@drawable/ic_delete"
+            app:iconSize="16dp"
+            app:backgroundTint="#FF5252"
+            style="@style/Widget.MaterialComponents.Button" />
+    </LinearLayout>
+
+</LinearLayout>

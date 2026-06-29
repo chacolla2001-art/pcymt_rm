@@ -1,0 +1,122 @@
+<div class="page-container">
+  <div class="page-header">
+    <button mat-icon-button (click)="goBack()" [matTooltip]="'stats.back' | translate" [attr.aria-label]="'stats.back' | translate">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <mat-icon class="header-icon">donut_large</mat-icon>
+    <h1>{{ 'stats.zoneVisits' | translate }}</h1>
+  </div>
+
+  <div class="content-grid">
+    <mat-card appearance="outlined" class="ranking-detail-card">
+      <mat-card-header>
+        <mat-card-title>{{ 'stats.zoneDistribution' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.zoneDistributionSub' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="ranking-list-detail">
+          @for (section of sections; track section.section; let i = $index) {
+            <div class="ranking-item" (click)="navigateToSection(section.section)">
+              <span class="zone-badge" [style.background-color]="getSectionColor(section.section)">
+                <mat-icon>place</mat-icon>
+              </span>
+              <div class="item-info">
+                <span class="item-name">{{ section.section }}</span>
+                <mat-progress-bar mode="determinate" [value]="getProgress(section.interactionCount)"
+                  [style.--mdc-linear-progress-active-indicator-color]="getSectionColor(section.section)">
+                </mat-progress-bar>
+              </div>
+              <span class="item-count" [style.color]="getSectionColor(section.section)">{{ section.interactionCount }}</span>
+              <mat-icon class="item-arrow">chevron_right</mat-icon>
+            </div>
+          }
+          @empty {
+            <div class="empty-state">
+              <mat-icon>info</mat-icon>
+              <p>{{ 'stats.noZoneData' | translate }}</p>
+            </div>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card appearance="outlined" class="chart-card">
+      <mat-card-header>
+        <mat-card-title>{{ 'stats.geoDistribution' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.geoDistributionSub' | translate }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="chart-container">
+          <canvas baseChart [data]="doughnutChartData" [type]="'pie'"></canvas>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-card appearance="outlined" class="main-card stats-card">
+    <mat-card-header class="stats-header">
+      <div class="header-content">
+        <mat-card-title>{{ 'stats.interactionsByZone' | translate }}</mat-card-title>
+        <mat-card-subtitle>{{ 'stats.interactionsByZoneSub' | translate }}</mat-card-subtitle>
+      </div>
+      <div class="header-controls">
+        <mat-button-toggle-group [(value)]="selectedTimeRange" (change)="onTimeRangeChanged($event.value)" class="time-toggle">
+          <mat-button-toggle value="day">{{ 'stats.day' | translate }}</mat-button-toggle>
+          <mat-button-toggle value="month">{{ 'stats.month' | translate }}</mat-button-toggle>
+          <mat-button-toggle value="year">{{ 'stats.year' | translate }}</mat-button-toggle>
+        </mat-button-toggle-group>
+      </div>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="period-navigation">
+        <button mat-icon-button (click)="navigateZonePeriod(-1)" [matTooltip]="'stats.periodPrev' | translate" [attr.aria-label]="'stats.periodPrev' | translate">
+          <mat-icon>chevron_left</mat-icon>
+        </button>
+        <span class="period-label">{{ zonePeriodLabel }}</span>
+        <button mat-icon-button (click)="navigateZonePeriod(1)" [matTooltip]="'stats.periodNext' | translate" [attr.aria-label]="'stats.periodNext' | translate">
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+        @if (zonePeriodOffset !== 0) {
+          <button mat-stroked-button class="today-btn" (click)="resetZonePeriod()">
+            <mat-icon>today</mat-icon> {{ 'stats.currentPeriod' | translate }}
+          </button>
+        }
+        <span class="spacer"></span>
+        <button mat-icon-button (click)="downloadZoneData()" [matTooltip]="'stats.downloadCsv' | translate" [attr.aria-label]="'stats.downloadCsv' | translate">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+
+      <div class="stats-layout">
+        <div class="filters-panel">
+          <h3 class="filter-section-title">{{ 'stats.zones' | translate }}</h3>
+          <mat-nav-list class="compact-list zone-list">
+            @for (section of sections; track section.section) {
+              <mat-list-item (click)="onZoneClicked(section)" [activated]="selectedZone?.section === section.section">
+                <span matListItemIcon class="zone-color-dot" [style.background-color]="getSectionColor(section.section)"></span>
+                <span matListItemTitle>{{ section.section }}</span>
+                <span matListItemMeta class="zone-count">{{ section.interactionCount }}</span>
+              </mat-list-item>
+            }
+          </mat-nav-list>
+
+          @if (selectedZone) {
+            <div class="selected-zone-chip" [style.background-color]="getSectionColor(selectedZone.section) + '22'">
+              <span class="zone-color-dot" [style.background-color]="getSectionColor(selectedZone.section)"></span>
+              <span>{{ selectedZone.section }}</span>
+              <button mat-icon-button (click)="clearZone()" [attr.aria-label]="'stats.clearZoneFilter' | translate">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="chart-main">
+          <div class="chart-container-large">
+            <canvas baseChart #zoneBarChart [data]="zoneBarChartData" [type]="'bar'"></canvas>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

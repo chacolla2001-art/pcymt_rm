@@ -1,0 +1,249 @@
+@use '@angular/material' as mat;
+@use './styles/page-layout';
+@use './styles/auth-layout';
+@use './styles/semantic-tokens';
+
+@import '@fontsource/material-icons/400.css';
+
+// ==================== THEME DEFINITIONS ====================
+// Angular Material 3 default palettes (violet / rose)
+
+// Light theme
+$light-theme: mat.define-theme((
+  color: (
+    theme-type: light,
+    primary: mat.$violet-palette,
+    tertiary: mat.$rose-palette,
+    use-system-variables: true,
+  ),
+  typography: (
+    use-system-variables: true,
+  ),
+));
+
+// Dark theme
+$dark-theme: mat.define-theme((
+  color: (
+    theme-type: dark,
+    primary: mat.$violet-palette,
+    tertiary: mat.$rose-palette,
+    use-system-variables: true,
+  ),
+  typography: (
+    use-system-variables: true,
+  ),
+));
+
+// ==================== APPLY THEMES ====================
+
+html {
+  @include mat.core();
+  @include mat.all-component-themes($light-theme);
+  @include mat.system-level-colors($light-theme);
+  @include mat.system-level-typography($light-theme);
+  background-color: var(--mat-sys-background);
+  color-scheme: light;
+}
+
+html.dark-theme {
+  @include mat.all-component-colors($dark-theme);
+  @include mat.system-level-colors($dark-theme);
+  background-color: var(--mat-sys-background);
+  color-scheme: dark;
+}
+
+// ==================== CSS VARIABLE ALIASES ====================
+// Map --mat-sys-* to --sys-* for component compatibility
+
+:root {
+  // Primary
+  --sys-primary: var(--mat-sys-primary);
+  --sys-on-primary: var(--mat-sys-on-primary);
+  --sys-primary-container: var(--mat-sys-primary-container);
+  --sys-on-primary-container: var(--mat-sys-on-primary-container);
+
+  // Secondary
+  --sys-secondary: var(--mat-sys-secondary);
+  --sys-on-secondary: var(--mat-sys-on-secondary);
+  --sys-secondary-container: var(--mat-sys-secondary-container);
+  --sys-on-secondary-container: var(--mat-sys-on-secondary-container);
+
+  // Tertiary
+  --sys-tertiary: var(--mat-sys-tertiary);
+  --sys-on-tertiary: var(--mat-sys-on-tertiary);
+  --sys-tertiary-container: var(--mat-sys-tertiary-container);
+  --sys-on-tertiary-container: var(--mat-sys-on-tertiary-container);
+
+  // Error
+  --sys-error: var(--mat-sys-error);
+  --sys-on-error: var(--mat-sys-on-error);
+  --sys-error-container: var(--mat-sys-error-container);
+  --sys-on-error-container: var(--mat-sys-on-error-container);
+
+  // Surface
+  --sys-surface: var(--mat-sys-surface);
+  --sys-on-surface: var(--mat-sys-on-surface);
+  --sys-surface-variant: var(--mat-sys-surface-variant);
+  --sys-on-surface-variant: var(--mat-sys-on-surface-variant);
+  --sys-surface-container: var(--mat-sys-surface-container);
+  --sys-surface-container-low: var(--mat-sys-surface-container-low);
+  --sys-surface-container-high: var(--mat-sys-surface-container-high);
+  --sys-surface-container-highest: var(--mat-sys-surface-container-highest);
+  --sys-surface-container-lowest: var(--mat-sys-surface-container-lowest);
+  --sys-surface-bright: var(--mat-sys-surface-bright);
+  --sys-surface-dim: var(--mat-sys-surface-dim);
+  --sys-surface-tint: var(--mat-sys-surface-tint);
+
+  // Background
+  --sys-background: var(--mat-sys-background);
+  --sys-on-background: var(--mat-sys-on-background);
+
+  // Outline
+  --sys-outline: var(--mat-sys-outline);
+  --sys-outline-variant: var(--mat-sys-outline-variant);
+
+  // Inverse
+  --sys-inverse-surface: var(--mat-sys-inverse-surface);
+  --sys-inverse-on-surface: var(--mat-sys-inverse-on-surface);
+  --sys-inverse-primary: var(--mat-sys-inverse-primary);
+
+  // Misc
+  --sys-scrim: var(--mat-sys-scrim);
+  --sys-shadow: var(--mat-sys-shadow);
+}
+
+// ==================== GLOBAL RESET ====================
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  min-height: 100dvh;
+}
+
+app-root {
+  display: block;
+  min-height: 100%;
+  background-color: var(--sys-background);
+}
+
+body {
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: var(--sys-background);
+  color: var(--sys-on-background);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+mat-icon,
+.mat-icon {
+  font-family: 'Material Icons', sans-serif !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+// ==================== SCROLLBAR THEMING ====================
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--sys-surface-container);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sys-outline-variant);
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--sys-outline);
+  }
+}
+
+// ==================== LINK STYLING ====================
+
+a {
+  color: var(--sys-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// ==================== SELECTION STYLING ====================
+
+::selection {
+  background-color: var(--sys-primary-container);
+  color: var(--sys-on-primary-container);
+}
+
+// ==================== RESPONSIVE UTILITIES ====================
+
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+.show-mobile {
+  display: none !important;
+
+  @media (max-width: 768px) {
+    display: block !important;
+  }
+}
+
+// ==================== ACCESSIBILITY ====================
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0.5rem;
+  z-index: 10000;
+  padding: 0.75rem 1rem;
+  border-radius: 0 0 8px 8px;
+  background: var(--sys-primary);
+  color: var(--sys-on-primary);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 4px 12px var(--sys-shadow);
+
+  &:focus {
+    top: 0;
+    outline: 2px solid var(--sys-on-primary);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

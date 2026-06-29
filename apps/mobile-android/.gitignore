@@ -1,0 +1,61 @@
+## Android / Gradle / Android Studio
+
+# Gradle build files
+.gradle/
+**/build/
+
+# Local configuration (sdk path, keystore passwords, etc.)
+/local.properties
+local.properties
+key.properties
+.env
+.env.*
+
+# Signing keys
+*.jks
+*.keystore
+keystore/
+
+# Google services
+google-services.json
+app/google-services.json
+
+# IntelliJ / Android Studio
+/.idea/
+*.iml
+
+# Native build
+.externalNativeBuild/
+.cxx/
+obj/
+
+# Generated files
+/captures/
+/outputs/
+
+# Build artifacts
+*.apk
+*.ap_ 
+*.aab
+
+# Misc
+.DS_Store
+*.log
+*.tmp
+*.bak
+*~
+*.swp
+
+# OS files
+Icon
+
+# Ignore Gradle wrapper caches
+/.gradle/
+
+# Kotlin specific
+.kotlin/
+
+# Exclude IDE/run configuration backups
+*.iws
+
+# Keep this file tracked; user-specific secrets must be removed from repo manually.

@@ -1,0 +1,166 @@
+// Shared page layout — Angular Material design tokens (no Tailwind)
+
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  max-width: min(1600px, 100%);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+
+  .header-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    color: var(--sys-primary);
+  }
+
+  h1,
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--sys-on-surface);
+  }
+
+  .page-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--sys-on-surface);
+  }
+
+  .page-subtitle,
+  .subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.875rem;
+    color: var(--sys-on-surface-variant);
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .time-toggle {
+    height: 36px;
+
+    .mat-button-toggle {
+      height: 36px;
+
+      .mat-button-toggle-label-content {
+        line-height: 36px;
+        padding: 0 12px;
+      }
+    }
+  }
+}
+
+.settings-page {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .page-container,
+  .settings-page {
+    padding: 1rem;
+  }
+
+  .page-header {
+    h1,
+    h2,
+    .page-title {
+      font-size: 1.25rem;
+    }
+  }
+}
+
+// ── Shared empty state (stats + features) ──
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    opacity: 0.65;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+// ── Table empty state (Fase 1 UX) ──
+.table-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    opacity: 0.6;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+.dashboard-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--sys-on-surface-variant);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--sys-error);
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--sys-on-surface);
+  }
+
+  p {
+    margin: 0;
+    max-width: 36ch;
+  }
+}

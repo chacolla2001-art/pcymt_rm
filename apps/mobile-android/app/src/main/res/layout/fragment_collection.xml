@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_visitor_screen"
+    tools:context=".ui.home.StatsFragment">
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollCollection"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="@dimen/spacing_lg">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/screen_padding_h"
+            android:paddingTop="@dimen/screen_padding_top">
+
+            <ImageView
+                android:layout_width="120dp"
+                android:layout_height="60dp"
+                android:layout_gravity="center_horizontal"
+                android:contentDescription="@string/app_name"
+                android:scaleType="centerInside"
+                android:src="@drawable/logo_parque" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:text="@string/app_name"
+                android:textAppearance="@style/TextAppearance.PCyMT.Label" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.PCyMT.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:padding="@dimen/spacing_md">
+
+                    <ImageView
+                        android:id="@+id/ivMascot"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
+                        android:contentDescription="Jukumario"
+                        android:scaleType="centerInside"
+                        android:src="@drawable/juku_gamer" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/spacing_md"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvWelcome"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Title"
+                            tools:text="¡Bienvenido, Pedro!" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/home_progress_label"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Label" />
+
+                        <TextView
+                            android:id="@+id/tvStats"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Body"
+                            android:visibility="gone"
+                            tools:text="Has encontrado 3 de 12 figuras"
+                            tools:visibility="visible" />
+
+                        <FrameLayout
+                            android:id="@+id/loadingOverlay"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/spacing_xs"
+                            android:visibility="gone">
+
+                            <ProgressBar
+                                android:id="@+id/progressStats"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:indeterminateTint="?attr/colorPrimary" />
+                        </FrameLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardAdminNotice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:visibility="gone"
+                app:cardBackgroundColor="?attr/colorPrimaryContainer"
+                app:cardCornerRadius="@dimen/radius_md">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/spacing_md"
+                    android:text="Modo administrador: ves todos los animales en mapa y explorador."
+                    android:textAppearance="@style/TextAppearance.PCyMT.Body"
+                    android:textColor="?attr/colorOnPrimaryContainer" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/banner_out_of_bounds"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:background="?attr/colorErrorContainer"
+                android:gravity="center"
+                android:padding="@dimen/spacing_sm"
+                android:text="@string/out_of_park_banner"
+                android:textColor="?attr/colorOnErrorContainer"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.PCyMT.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_md">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/home_trophies_label"
+                            android:textAppearance="@style/TextAppearance.PCyMT.Title" />
+
+                        <TextView
+                            android:id="@+id/tvAnimalCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/green"
+                            android:textStyle="bold"
+                            tools:text="3 / 12" />
+                    </LinearLayout>
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvAnimalTrophies"
+                        android:layout_width="match_parent"
+                        android:layout_height="96dp"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:orientation="horizontal"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                        tools:listitem="@layout/item_animal_trophy" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cardExplorer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:background="@drawable/bg_cta_primary"
+                android:minHeight="64dp"
+                android:text="@string/home_explore_cta"
+                android:textAllCaps="false"
+                android:textSize="18sp"
+                app:icon="@drawable/ic_explorer"
+                app:iconGravity="textStart"
+                app:iconPadding="@dimen/spacing_sm" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:gravity="center"
+                android:text="@string/home_explore_subtitle"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <FrameLayout
+        android:id="@+id/celebrationOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#CC000000"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/celebrationContent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_xl">
+
+            <TextView
+                android:id="@+id/tvCelebrationTrophy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🏆"
+                android:textSize="88sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:text="¡Felicidades!"
+                android:textAppearance="@style/TextAppearance.PCyMT.Display" />
+
+            <TextView
+                android:id="@+id/tvCelebrationSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:gravity="center"
+                android:text="Encontraste los 12 animales del parque"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnResetGame"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:text="Reiniciar juego" />
+
+            <TextView
+                android:id="@+id/tvCelebrationClose"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:padding="@dimen/spacing_sm"
+                android:text="Cerrar"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/celebrationConfirm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/spacing_xl"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="¿Reiniciar el juego?"
+                android:textAppearance="@style/TextAppearance.PCyMT.Display" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_sm"
+                android:gravity="center"
+                android:text="Se borrarán tus registros de encuentros."
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnConfirmReset"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_lg"
+                android:text="Sí, reiniciar" />
+
+            <TextView
+                android:id="@+id/tvCancelReset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md"
+                android:padding="@dimen/spacing_sm"
+                android:text="Cancelar"
+                android:textAppearance="@style/TextAppearance.PCyMT.Body" />
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

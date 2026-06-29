@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "source": "park-pois-migrated",
+  "syncedAt": "2026-06-26T00:00:00.000Z",
+  "references": [
+    {
+      "id": "ingress",
+      "name": "Ingreso",
+      "lat": -16.4877644,
+      "lng": -68.14655,
+      "category": "acceso",
+      "icon": "ingress",
+      "animation": "pulse",
+      "markerStyle": "marker",
+      "summary": "Punto de entrada principal al parque.",
+      "visible": true
+    },
+    {
+      "id": "box-office",
+      "name": "Boleterías",
+      "lat": -16.48795,
+      "lng": -68.14635,
+      "category": "acceso",
+      "icon": "box-office",
+      "animation": "pulse",
+      "summary": "Venta de entradas y orientación inicial.",
+      "visible": true
+    },
+    {
+      "id": "chiwina",
+      "name": "Chiwiña",
+      "lat": -16.489092,
+      "lng": -68.14522761,
+      "category": "paisaje",
+      "icon": "chiwina",
+      "animation": "bob",
+      "summary": "Espacio cultural y de encuentro en el recorrido.",
+      "visible": true
+    },
+    {
+      "id": "cafeteria",
+      "name": "Cafetería",
+      "lat": -16.489452,
+      "lng": -68.14522761,
+      "category": "servicio",
+      "icon": "cafeteria",
+      "animation": "bob",
+      "summary": "Refrigerios y bebidas durante la visita.",
+      "visible": true
+    },
+    {
+      "id": "teatro",
+      "name": "Teatro Galpón",
+      "lat": -16.48974,
+      "lng": -68.14522761,
+      "category": "cultura",
+      "icon": "teatro",
+      "animation": "ripple",
+      "summary": "Presentaciones y actividades culturales.",
+      "visible": true
+    },
+    {
+      "id": "aguas",
+      "name": "Aguas Danzantes",
+      "lat": -16.490028,
+      "lng": -68.14522761,
+      "category": "cultura",
+      "icon": "aguas",
+      "animation": "ripple",
+      "summary": "Fuente y espectáculo acuático del parque.",
+      "visible": true
+    },
+    {
+      "id": "mirador",
+      "name": "Mirador",
+      "lat": -16.490388,
+      "lng": -68.14522761,
+      "category": "paisaje",
+      "icon": "mirador",
+      "animation": "bob",
+      "summary": "Vista panorámica de las zonas del parque.",
+      "visible": true
+    },
+    {
+      "id": "escenario",
+      "name": "Escenario Principal",
+      "lat": -16.490748,
+      "lng": -68.14522761,
+      "category": "cultura",
+      "icon": "escenario",
+      "animation": "pulse",
+      "summary": "Eventos y shows al aire libre.",
+      "visible": true
+    },
+    {
+      "id": "anfiteatro",
+      "name": "Anfiteatro",
+      "lat": -16.491036,
+      "lng": -68.14522761,
+      "category": "cultura",
+      "icon": "anfiteatro",
+      "animation": "ripple",
+      "summary": "Espacio escénico para actividades grupales.",
+      "visible": true
+    },
+    {
+      "id": "parrillero",
+      "name": "Parrillero",
+      "lat": -16.491396,
+      "lng": -68.14522761,
+      "category": "servicio",
+      "icon": "parrillero",
+      "animation": "bob",
+      "summary": "Zona de parrilla y comidas al aire libre.",
+      "visible": true
+    },
+    {
+      "id": "picnic",
+      "name": "Área de Picnik",
+      "lat": -16.491684,
+      "lng": -68.14522761,
+      "category": "paisaje",
+      "icon": "picnic",
+      "animation": "bob",
+      "summary": "Área de descanso y picnic familiar.",
+      "visible": true
+    }
+  ]
+}

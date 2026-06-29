@@ -1,0 +1,73 @@
+{
+  "version": 2,
+  "source": "osm-boundary-spine+nw-entrance",
+  "syncedAt": "2026-06-25T21:26:36.757Z",
+  "pois": [
+    {
+      "id": "ingress",
+      "name": "Ingreso",
+      "lat": -16.4877644,
+      "lng": -68.14655
+    },
+    {
+      "id": "box-office",
+      "name": "Boleterías",
+      "lat": -16.48795,
+      "lng": -68.14635
+    },
+    {
+      "id": "chiwina",
+      "name": "Chiwiña",
+      "lat": -16.489092,
+      "lng": -68.14522761
+    },
+    {
+      "id": "cafeteria",
+      "name": "Cafetería",
+      "lat": -16.489452,
+      "lng": -68.14522761
+    },
+    {
+      "id": "teatro",
+      "name": "Teatro Galpón",
+      "lat": -16.48974,
+      "lng": -68.14522761
+    },
+    {
+      "id": "aguas",
+      "name": "Aguas Danzantes",
+      "lat": -16.490028,
+      "lng": -68.14522761
+    },
+    {
+      "id": "mirador",
+      "name": "Mirador",
+      "lat": -16.490388,
+      "lng": -68.14522761
+    },
+    {
+      "id": "escenario",
+      "name": "Escenario Principal",
+      "lat": -16.490748,
+      "lng": -68.14522761
+    },
+    {
+      "id": "anfiteatro",
+      "name": "Anfiteatro",
+      "lat": -16.491036,
+      "lng": -68.14522761
+    },
+    {
+      "id": "parrillero",
+      "name": "Parrillero",
+      "lat": -16.491396,
+      "lng": -68.14522761
+    },
+    {
+      "id": "picnic",
+      "name": "Área de Picnik",
+      "lat": -16.491684,
+      "lng": -68.14522761
+    }
+  ]
+}

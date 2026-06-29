@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  bg_captured_badge.xml
+  Fondo de la etiqueta "CAPTURADO" que aparece en la pantalla de detalle
+  cuando el usuario ya ha guardado este animal.
+  Estilo: pill oscura con borde verde brillante, igual que los trofeos
+  pero con forma rectangular redondeada para texto largo.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#CC071A09" />
+    <corners android:radius="20dp" />
+    <stroke android:width="2dp" android:color="#FF34C759" />
+</shape>

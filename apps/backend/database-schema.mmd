@@ -1,0 +1,76 @@
+erDiagram
+    users {
+        uuid id PK
+        string username UK "max:50"
+        string email UK "max:100"
+        string password_hash "max:255, nullable"
+        string role "default:user, max:20"
+        boolean is_active "default:true"
+        string avatar_url "max:500, nullable"
+        string google_id UK "max:255, nullable"
+        timestamp email_verified_at "nullable"
+        timestamp last_login_at "nullable"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    virtual_assets {
+        uuid id PK
+        string name "max:100"
+        string scientific_name "max:150, nullable"
+        text description "nullable"
+        string model_url "max:500"
+        string icon_url "max:500, nullable"
+        string thumbnail_url "max:500, nullable"
+        string category "max:50, nullable"
+        string habitat "max:200, nullable"
+        integer display_order "default:0"
+        boolean is_active "default:true"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    locations {
+        uuid id PK
+        string name "max:100"
+        text description "nullable"
+        text anchor_code "nullable"
+        decimal latitude "precision:10,8"
+        decimal longitude "precision:11,8"
+        string section "max:50, nullable"
+        boolean show_in_map "default:true"
+        float scale "default:1.0"
+        float rotation_y "default:0.0"
+        uuid virtual_asset_id FK "nullable"
+        boolean is_active "default:true"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        enum platform "web|mobile|desktop, default:web"
+        string ip_address "max:45, nullable"
+        text user_agent "nullable"
+        timestamp logged_in_at "default:now"
+        timestamp logged_out_at "nullable"
+        integer session_duration_seconds "nullable"
+    }
+
+    interactions {
+        uuid id PK
+        uuid user_id FK
+        uuid virtual_asset_id FK "nullable"
+        uuid location_id FK "nullable"
+        enum interaction_type "view|click|scan|share|favorite|zoom|rotate"
+        jsonb metadata "nullable"
+        timestamp created_at "default:now"
+    }
+
+    %% Relationships
+    users ||--o{ sessions : "has many"
+    users ||--o{ interactions : "performs"
+    virtual_assets ||--o{ locations : "displayed at"
+    virtual_assets ||--o{ interactions : "interacted with"
+    locations ||--o{ interactions : "receives"
