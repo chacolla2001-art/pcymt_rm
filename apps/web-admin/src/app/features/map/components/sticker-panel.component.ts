@@ -18,27 +18,21 @@ import {
   type TreeEditorTarget,
 } from '../data/ambient-tree-slots';
 import type { ParkSectionRecord } from '../data/park-geometry';
-import type { SpatialReference, SpatialReferenceCategory, SpatialReferenceMarkerStyle } from '../data/spatial-reference';
-import { SPATIAL_REFERENCE_MARKER_STYLES, spatialReferenceSummary } from '../data/spatial-reference';
+import type { SpatialReference } from '../data/spatial-reference';
+import { spatialReferenceFrameUrls, spatialReferenceHasMapImage, spatialReferenceSummary } from '../data/spatial-reference';
 import { resolveSectionFillOpacities } from '../utils/section-color.util';
 import { AMBIENT_SCENARIOS } from '../data/ambient-scenarios';
-import { PARK_MAP_VIS, groundElementSizeFrac } from '../utils/map-park-visual-scale';
+import { PARK_MAP_VIS } from '../utils/map-park-visual-scale';
 import {
-  GROUND_ELEMENT_LABELS,
-  GROUND_ELEMENT_TYPES,
-  GROUND_PARK_LAYER_KEYS,
   GROUND_ZONE_KEYS,
   GROUND_ZONE_LABELS,
-  type GroundElementType,
   type ZoneGroundStyle,
 } from '../utils/draw-ground-texture';
 import {
   DEFAULT_GROUND_MAP_SETTINGS,
-  GROUND_PRESETS,
-  settingsForPreset,
   type GroundMapSettings,
-  type GroundPresetId,
 } from '../utils/ground-preset';
+import { DEFAULT_MAP_LOD_CATEGORIES, type MapLodCategories } from '../utils/map-lod';
 
 /** Event fired by the panel to control the map from outside */
 export type MapControlEvent =
@@ -48,6 +42,8 @@ export type MapControlEvent =
   | { type: 'rotateRight' }
   | { type: 'reset' }
   | { type: 'optionChange'; option: 'showSections' | 'showLabels' | 'showBoundary' | 'showMarkers' | 'showGroundTextures'; value: boolean }
+  | { type: 'toggleStructureLayers' }
+  | { type: 'disableAllLayers' }
   | { type: 'groundTilePxChange'; value: number }
   | { type: 'groundAutoTilePx' }
   | { type: 'groundSettingsChange'; settings: GroundMapSettings }
@@ -58,6 +54,7 @@ export type MapControlEvent =
   | { type: 'groundStyleResetZone'; sectionIndex: number }
   | { type: 'groundStyleResetParkLayers' }
   | { type: 'groundStyleResetAll' }
+  | { type: 'openGroundSettingsCard' }
   | { type: 'setTreePlaceVariant'; variant: 0 | 1 | 2 }
   | { type: 'setTreePlaceStyleSection'; section: number }
   | { type: 'selectAmbientTree'; index: number | null }
@@ -107,6 +104,7 @@ export type MapControlEvent =
   | { type: 'selectSpatialReferenceIndex'; index: number }
   | { type: 'updateSpatialReference'; index: number; patch: Partial<SpatialReference> }
   | { type: 'setSpatialReferencePlaceIndex'; index: number }
+  | { type: 'deleteSpatialReference'; index: number }
   | { type: 'exportSpatialReferencesJson' };
 
 /** Current map view info emitted by MapControlComponent */
@@ -174,262 +172,284 @@ export interface MapViewInfo {
         </div>
       </div>
 
-      <!-- Capas -->
+      <!-- LOD al alejar — global por zoom -->
       <div class="section">
-        <div class="section-header" (click)="toggleSection('layers')">
-          <span class="section-chevron" [class.open]="openSections.layers">▸</span>
-          <span class="section-title">Capas</span>
+        <div class="section-header" (click)="toggleSection('mapLod')">
+          <span class="section-chevron" [class.open]="openSections.mapLod">▸</span>
+          <span class="section-title">LOD al alejar</span>
+          <button type="button" class="section-toggle-btn" [class.active]="localGroundSettings.lodEnabled"
+            (click)="onGroundLodToggle(); $event.stopPropagation()"
+            title="Ocultar detalle al alejar el zoom">
+            {{ localGroundSettings.lodEnabled ? 'ON' : 'OFF' }}
+          </button>
         </div>
-        <div class="section-content" *ngIf="openSections.layers">
-          <p class="section-hint compact">Enciende o apaga capas del mapa. El suelo se configura en la sección «Suelo».</p>
-          <div class="layer-row">
-            <button class="vis-btn" [class.hidden-layer]="!localOpts.showBoundary"
-              (click)="toggleOpt('showBoundary')" title="Mostrar/ocultar contorno">
-              <svg *ngIf="localOpts.showBoundary" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg *ngIf="!localOpts.showBoundary" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-            <span class="layer-label">Contorno del parque</span>
-          </div>
-          <div class="layer-row">
-            <button class="vis-btn" [class.hidden-layer]="!localOpts.showSections"
-              (click)="toggleOpt('showSections')" title="Mostrar/ocultar secciones">
-              <svg *ngIf="localOpts.showSections" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg *ngIf="!localOpts.showSections" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-            <span class="layer-label">Zonas (ecosistemas)</span>
-          </div>
-          <div class="layer-row">
-            <button class="vis-btn" [class.hidden-layer]="!localOpts.showMarkers"
-              (click)="toggleOpt('showMarkers')" title="Mostrar/ocultar marcadores">
-              <svg *ngIf="localOpts.showMarkers" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg *ngIf="!localOpts.showMarkers" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-            <span class="layer-label">Puntos de anclaje</span>
-          </div>
-          <div class="param-row">
-            <label>Tamaño marc.</label>
-            <input type="range" min="4" max="24" step="1" [ngModel]="localMarkerSize"
-              (ngModelChange)="onMarkerSizeChange($event)">
-            <span class="param-val">{{ localMarkerSize }}px</span>
-          </div>
-          <div class="layer-row">
-            <button class="vis-btn" [class.hidden-layer]="!localOpts.showGroundTextures"
-              (click)="toggleOpt('showGroundTextures')" title="Elementos dibujados del suelo por ecosistema">
-              <svg *ngIf="localOpts.showGroundTextures" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg *ngIf="!localOpts.showGroundTextures" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                <line x1="1" y1="1" x2="23" y2="23"/>
-              </svg>
-            </button>
-            <span class="layer-label">Textura del suelo</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Suelo -->
-      <div class="section">
-        <div class="section-header" (click)="toggleSection('ground')">
-          <span class="section-chevron" [class.open]="openSections.ground">▸</span>
-          <span class="section-title">Suelo</span>
-        </div>
-        <div class="section-content scrollable" *ngIf="openSections.ground">
-          <p class="section-hint compact" *ngIf="!localOpts.showGroundTextures">
-            Activa «Textura del suelo» en Capas para ver piedras, hierba y macro en el mapa.
-          </p>
-          <ng-container *ngIf="localOpts.showGroundTextures">
+        <div class="section-content" *ngIf="openSections.mapLod">
+          <p class="section-hint compact">Al alejar, las capas marcadas pierden detalle progresivamente (como en la vida real).</p>
+          <ng-container *ngIf="localGroundSettings.lodEnabled">
             <div class="param-row">
-              <label title="Tamaño base de los elementos dibujados (piedras, hierba…)">Tamaño base</label>
-              <input type="range" [min]="groundTileMin" [max]="groundTileMax" step="0.25" [ngModel]="localGroundTilePx"
-                (ngModelChange)="onGroundTilePxChange($event)">
-              <span class="param-val">{{ localGroundTilePx }}px</span>
-              <button type="button" class="mini-btn" title="Tamaño automático según preset y escala"
-                (click)="onGroundAutoTilePx()">Auto</button>
-            </div>
-            <div class="sub-divider"></div>
-            <p class="ambient-subtitle">Preset suelo</p>
-            <p class="section-hint compact">El tamaño general escala densidad, iconos, ecotono y grano automático.</p>
-            <div class="section-pick-grid preset-pick">
-              <button type="button" class="section-pick-btn"
-                *ngFor="let p of groundPresets"
-                [class.active]="localGroundSettings.presetId === p.id"
-                [title]="p.hint"
-                (click)="onGroundPresetChange(p.id)">
-                <span class="section-pick-label">{{ p.label }}</span>
-              </button>
-            </div>
-            <div class="param-row">
-              <label>Tamaño general</label>
-              <input type="range" [min]="groundScalePercentMin" [max]="groundScalePercentMax" step="5"
-                [ngModel]="localGroundSettings.scalePercent"
-                (ngModelChange)="onGroundScaleChange($event)">
-              <span class="param-val">{{ localGroundSettings.scalePercent }}%</span>
-            </div>
-            <div class="param-row">
-              <label title="Reduce el número de texturas para mejorar el rendimiento">Calidad</label>
-              <input type="range" min="25" max="100" step="5"
-                [ngModel]="localGroundSettings.qualityPercent"
-                (ngModelChange)="onGroundQualityChange($event)">
-              <span class="param-val">{{ localGroundSettings.qualityPercent }}%</span>
-            </div>
-            <p class="section-hint compact">Calidad baja = menos piedras/plantas = más fluido. El tamaño de cada elemento no cambia.</p>
-            <div class="tool-grid cols-2">
-              <button type="button" class="tool-btn" title="Preset Rendimiento: menos texturas, grano grueso, LOD activo"
-                (click)="onGroundPresetChange('performance')">⚡ Rendimiento</button>
-              <button type="button" class="tool-btn" title="Volver al preset equilibrado recomendado"
-                (click)="onGroundPresetChange('balanced')">↺ Equilibrado</button>
-            </div>
-            <button type="button" class="tool-btn danger" style="width:100%;margin-top:6px"
-              title="Quita piedras, hierba, macro y ecotono de TODAS las capas (zonas, base parque, fondo)"
-              (click)="clearAllGroundLayers()">∅ Vaciar todo el piso</button>
-            <div class="sub-divider"></div>
-            <p class="ambient-subtitle">LOD al alejar</p>
-            <p class="section-hint compact">Piedras, plantas y flores desaparecen al zoom lejano (como en la vida real).</p>
-            <div class="layer-row compact">
-              <button class="vis-btn" [class.hidden-layer]="!localGroundSettings.lodEnabled"
-                (click)="onGroundLodToggle()" title="Activar LOD por zoom">
-                <svg *ngIf="localGroundSettings.lodEnabled" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                <svg *ngIf="!localGroundSettings.lodEnabled" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-              </button>
-              <span class="layer-label">LOD activo</span>
-            </div>
-            <div class="param-row" *ngIf="localGroundSettings.lodEnabled">
               <label>Detalle fino</label>
               <input type="range" min="0.3" max="2" step="0.05"
                 [ngModel]="localGroundSettings.lodFineZoom"
                 (ngModelChange)="onGroundLodFineChange($event)">
               <span class="param-val">{{ localGroundSettings.lodFineZoom | number:'1.2-2' }}×</span>
             </div>
-            <div class="param-row" *ngIf="localGroundSettings.lodEnabled">
+            <div class="param-row">
               <label>Detalle medio</label>
               <input type="range" min="0.15" max="1.2" step="0.05"
                 [ngModel]="localGroundSettings.lodMediumZoom"
                 (ngModelChange)="onGroundLodMediumChange($event)">
               <span class="param-val">{{ localGroundSettings.lodMediumZoom | number:'1.2-2' }}×</span>
             </div>
-            <div class="param-row" *ngIf="localGroundSettings.lodEnabled">
-              <label>Ecotono mín.</label>
+            <div class="param-row">
+              <label>Zoom mínimo</label>
               <input type="range" min="0.08" max="0.8" step="0.05"
                 [ngModel]="localGroundSettings.lodEcotoneZoom"
                 (ngModelChange)="onGroundLodEcotoneChange($event)">
               <span class="param-val">{{ localGroundSettings.lodEcotoneZoom | number:'1.2-2' }}×</span>
             </div>
-          </ng-container>
-          <ng-container *ngIf="localOpts.showGroundTextures && isAdmin">
             <div class="sub-divider"></div>
-            <p class="ambient-subtitle">Elementos por zona</p>
-            <p class="section-hint compact">Cada elemento (piedras, hierba, paja…) se dibuja como vector. Ajusta densidad y tamaño mín/máx, o quítalo. Menos densidad = más plano.</p>
+            <p class="ambient-subtitle">Capas afectadas</p>
             <div class="param-row">
-              <label>Zona</label>
-              <select class="el-select ground-zone-select"
-                [ngModel]="groundStyleEditSelectValue"
-                (ngModelChange)="onGroundStyleTargetChange($event)">
-                <option value="park">Todo el parque (sin fondo)</option>
-                <option *ngFor="let z of groundZoneKeys" [value]="z">{{ groundZoneLabels[z] }}</option>
-              </select>
+              <label>Suelo</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localLodCategories.ground"
+                (click)="onLodCategoryToggle('ground')">{{ localLodCategories.ground ? 'ON' : 'OFF' }}</button>
             </div>
-            <p class="section-hint compact" *ngIf="groundStyleEditTarget === 'park'">
-              Aplica a las 3 zonas y a la base del parque (caminos/márgenes bajo las zonas). No afecta al fondo exterior.
-            </p>
-            <p class="section-hint compact" *ngIf="groundStyleEditTarget === -1">
-              Capa bajo las zonas: solo se ve en caminos y bordes no cubiertos por Tierras Altas/Medias/Bajas.
-            </p>
-            <ng-container *ngIf="groundStyleEditZone as zone">
-              <p class="section-hint compact">Ecotono — suaviza el salto con las zonas vecinas.</p>
-              <div class="param-row">
-                <label>Difuminado borde</label>
-                <input type="range" min="0" max="48" step="1"
-                  [ngModel]="groundEdgeBlend(zone)"
-                  (ngModelChange)="onGroundEdgeBlendChange($event)">
-                <span class="param-val">{{ groundEdgeBlend(zone) }}px</span>
-              </div>
-              <div class="param-row">
-                <label>Fuerza difum.</label>
-                <input type="range" min="0" max="100" step="1"
-                  [ngModel]="groundEdgeAlphaPercent(zone)"
-                  (ngModelChange)="onGroundEdgeAlphaChange($event)">
-                <span class="param-val">{{ groundEdgeAlphaPercent(zone) }}%</span>
-              </div>
-              <div class="sub-divider"></div>
-              <div class="ground-el-block" *ngFor="let el of zone.elements; let i = index">
-                <div class="param-row">
-                  <label style="font-weight:600">{{ groundElementLabel(el.type) }}</label>
-                  <button type="button" class="el-remove-btn" title="Quitar elemento"
-                    (click)="removeGroundElement(i)">×</button>
-                </div>
-                <div class="param-row indent">
-                  <label>Densidad</label>
-                  <input type="range" min="0" max="120" step="1"
-                    [ngModel]="groundDensityPercent(el.density)"
-                    (ngModelChange)="onGroundElementDensityChange(i, $event)">
-                  <span class="param-val">{{ groundDensityPercent(el.density) }}%</span>
-                </div>
-                <div class="param-row indent">
-                  <label>Tamaño mín</label>
-                  <input type="range" [min]="groundElementSizePctMin" [max]="groundElementSizePctMax" step="1"
-                    [ngModel]="groundElementSizeMinPercent(el)"
-                    (ngModelChange)="onGroundElementSizeMinChange(i, $event)">
-                  <span class="param-val">{{ groundElementSizeMinPercent(el) }}%</span>
-                </div>
-                <div class="param-row indent">
-                  <label>Tamaño máx</label>
-                  <input type="range" [min]="groundElementSizePctMin" [max]="groundElementSizePctMax" step="1"
-                    [ngModel]="groundElementSizeMaxPercent(el)"
-                    (ngModelChange)="onGroundElementSizeMaxChange(i, $event)">
-                  <span class="param-val">{{ groundElementSizeMaxPercent(el) }}%</span>
-                </div>
-              </div>
-              <div class="param-row add-el-row">
-                <select class="el-select" [(ngModel)]="groundAddType">
-                  <option *ngFor="let t of groundElementTypes" [value]="t">{{ groundElementLabel(t) }}</option>
-                </select>
-                <button type="button" class="tool-btn" (click)="addGroundElement()">+ elemento</button>
-              </div>
-              <div class="sub-divider"></div>
-              <div class="param-row">
-                <label>Variac. macro</label>
-                <input type="range" min="0" max="200" step="1"
-                  [ngModel]="groundMacroDensityPercent(zone)"
-                  (ngModelChange)="onGroundMacroDensityChange($event)">
-                <span class="param-val">{{ groundMacroDensityPercent(zone) }}%</span>
-              </div>
-              <div class="param-row">
-                <label>Opac. macro</label>
-                <input type="range" min="0" max="100" step="1"
-                  [ngModel]="groundMacroAlphaPercent(zone)"
-                  (ngModelChange)="onGroundMacroAlphaChange($event)">
-                <span class="param-val">{{ groundMacroAlphaPercent(zone) }}%</span>
-              </div>
-              <button type="button" class="tool-btn" style="width:100%;margin-bottom:6px"
-                *ngIf="groundStyleEditTarget !== 'park'"
-                title="Copia estos elementos (y macro/ecotono) a TODAS las zonas, base y fondo"
-                (click)="applyGroundStyleToAllZones()">⇊ Aplicar a todas las zonas</button>
-              <div class="tool-grid cols-2">
-                <button type="button" class="tool-btn" (click)="resetGroundStyleZone()">
-                  {{ groundStyleEditTarget === 'park' ? 'Restaurar parque' : 'Restaurar zona' }}
-                </button>
-                <button type="button" class="tool-btn danger" (click)="resetGroundStyleAll()">Restaurar todo</button>
-              </div>
-            </ng-container>
+            <div class="param-row">
+              <label>Ambiente</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localLodCategories.ambient"
+                (click)="onLodCategoryToggle('ambient')">{{ localLodCategories.ambient ? 'ON' : 'OFF' }}</button>
+            </div>
+            <div class="param-row">
+              <label>Árboles</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localLodCategories.trees"
+                (click)="onLodCategoryToggle('trees')">{{ localLodCategories.trees ? 'ON' : 'OFF' }}</button>
+            </div>
+            <div class="param-row">
+              <label>Anclajes</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localLodCategories.markers"
+                (click)="onLodCategoryToggle('markers')">{{ localLodCategories.markers ? 'ON' : 'OFF' }}</button>
+            </div>
+            <div class="param-row">
+              <label>Referencias</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localLodCategories.spatialRefs"
+                (click)="onLodCategoryToggle('spatialRefs')">{{ localLodCategories.spatialRefs ? 'ON' : 'OFF' }}</button>
+            </div>
+            <p class="section-hint compact">Ambiente: lluvia, niebla, motes, hojas, sombras y relámpago. Anclajes: puntos y etiquetas de zona.</p>
           </ng-container>
         </div>
       </div>
+
+      <!-- Capas — una sección por capa -->
+      <div class="panel-group-label">Capas</div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('layerBoundary')">
+          <span class="section-chevron" [class.open]="openSections.layerBoundary">▸</span>
+          <span class="section-title">Contorno del parque</span>
+          <button type="button" class="section-toggle-btn" [class.active]="localOpts.showBoundary"
+            (click)="toggleOpt('showBoundary'); $event.stopPropagation()"
+            title="Mostrar u ocultar contorno del parque">
+            {{ localOpts.showBoundary ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content" *ngIf="openSections.layerBoundary">
+          <p class="section-hint compact">Borde exterior del polígono del parque Mi Teleférico.</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('layerSections')">
+          <span class="section-chevron" [class.open]="openSections.layerSections">▸</span>
+          <span class="section-title">Zonas (ecosistemas)</span>
+          <button type="button" class="section-toggle-btn" [class.active]="localOpts.showSections"
+            (click)="toggleOpt('showSections'); $event.stopPropagation()"
+            title="Mostrar u ocultar Tierras Altas, Medias y Bajas">
+            {{ localOpts.showSections ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content" *ngIf="openSections.layerSections">
+          <p class="section-hint compact">Polígonos de las tres zonas del parque con su color de ecosistema.</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('layerMarkers')">
+          <span class="section-chevron" [class.open]="openSections.layerMarkers">▸</span>
+          <span class="section-title">Puntos de anclaje</span>
+          <button type="button" class="section-toggle-btn" [class.active]="localOpts.showMarkers"
+            (click)="toggleOpt('showMarkers'); $event.stopPropagation()"
+            title="Mostrar u ocultar marcadores AR">
+            {{ localOpts.showMarkers ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content" *ngIf="openSections.layerMarkers">
+          <p class="section-hint compact" *ngIf="!localOpts.showMarkers">Activa ON para ver los puntos de anclaje en el mapa.</p>
+          <ng-container *ngIf="localOpts.showMarkers">
+            <div class="param-row">
+              <label>Etiquetas</label>
+              <button type="button" class="section-toggle-btn" [class.active]="localOpts.showLabels"
+                (click)="toggleOpt('showLabels')">{{ localOpts.showLabels ? 'ON' : 'OFF' }}</button>
+            </div>
+            <div class="param-row">
+              <label>Tamaño marc.</label>
+              <input type="range" min="4" max="24" step="1" [ngModel]="localMarkerSize"
+                (ngModelChange)="onMarkerSizeChange($event)">
+              <span class="param-val">{{ localMarkerSize }}px</span>
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('layerSpatialRefs')">
+          <span class="section-chevron" [class.open]="openSections.layerSpatialRefs">▸</span>
+          <span class="section-title">Referencias espaciales</span>
+          <button type="button" class="section-toggle-btn" [class.active]="spatialRefsOpts.showSpatialReferences"
+            (click)="toggleSpatialRefs(); $event.stopPropagation()"
+            title="Mostrar u ocultar POIs del parque">
+            {{ spatialRefsOpts.showSpatialReferences ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content scrollable" *ngIf="openSections.layerSpatialRefs">
+          <p class="section-hint compact">
+            Cada punto se ve <strong>solo</strong> con SVG o PNG que subas (1 imagen fija, o varias en secuencia). Sin imagen no aparece en el mapa.
+          </p>
+
+          <div class="search-row" *ngIf="isAdmin">
+            <input type="text" class="search-input" placeholder="Buscar referencia…"
+              [(ngModel)]="spatialRefSearchTerm">
+          </div>
+
+          <div class="spatial-ref-list" *ngIf="filteredSpatialReferences.length">
+            <div class="spatial-ref-item" *ngFor="let item of filteredSpatialReferences"
+              [class.placing]="isAdmin && spatialPlaceIndex === item.index"
+              [class.selected]="activeSpatialRefIndex === item.index"
+              (click)="selectSpatialRef(item.index)">
+              <div class="spatial-ref-head">
+                <strong>{{ item.ref.name }}</strong>
+                <span class="spatial-ref-cat">{{ item.ref.category }}</span>
+                <span class="spatial-ref-frame-badge" *ngIf="spatialRefFrameUrls(item.ref).length">
+                  {{ spatialRefFrameUrls(item.ref).length }} img
+                </span>
+                <span class="spatial-ref-frame-badge missing" *ngIf="!spatialReferenceHasMapImage(item.ref)">
+                  sin img
+                </span>
+              </div>
+              <div class="spatial-ref-coords">{{ item.ref.lat | number:'1.5-5' }}, {{ item.ref.lng | number:'1.5-5' }}</div>
+              <div class="spatial-ref-actions" *ngIf="isAdmin">
+                <button type="button" class="tool-btn" [class.active]="spatialPlaceIndex === item.index"
+                  (click)="toggleSpatialPlace(item.index); $event.stopPropagation()">
+                  <span class="tool-icon">📍</span><span>{{ spatialPlaceIndex === item.index ? 'Click mapa…' : 'Ubicar' }}</span>
+                </button>
+                <button type="button" class="tool-btn danger"
+                  (click)="deleteSpatialReference(item.index); $event.stopPropagation()"
+                  title="Eliminar esta referencia">
+                  <span class="tool-icon">✕</span><span>Eliminar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <ng-container *ngIf="activeSpatialRef as ref">
+            <div class="sub-divider"></div>
+            <p class="ambient-subtitle">{{ ref.name }} — animación en mapa</p>
+            <p class="section-hint compact">
+              Sube 2 o más SVG/PNG en orden (frame 1, 2, 3…). Con una sola imagen se muestra fija.
+            </p>
+
+            <div class="spatial-frame-grid" *ngIf="spatialRefFrameUrls(ref).length">
+              <div class="spatial-frame-thumb" *ngFor="let url of spatialRefFrameUrls(ref); let fi = index">
+                <img [src]="url" [alt]="'Frame ' + (fi + 1)">
+                <button type="button" class="el-remove-btn spatial-frame-remove" title="Quitar imagen"
+                  *ngIf="isAdmin" (click)="removeSpatialRefFrame(fi)">×</button>
+                <span class="spatial-frame-idx">{{ fi + 1 }}</span>
+              </div>
+            </div>
+
+            <div class="param-row">
+              <label>Imágenes</label>
+              <span class="param-val">{{ spatialRefFrameUrls(ref).length || 0 }}</span>
+            </div>
+
+            <div class="param-row" *ngIf="spatialRefFrameUrls(ref).length > 1">
+              <label>Velocidad</label>
+              <input type="range" class="opacity-slider" min="1" max="12" step="1"
+                [ngModel]="spatialRefFrameFps(ref)"
+                (ngModelChange)="onSpatialRefFrameFpsChange($event)"
+                [disabled]="!isAdmin">
+              <span class="opacity-val">{{ spatialRefFrameFps(ref) }} fps</span>
+            </div>
+
+            <div class="param-row">
+              <label>Tamaño mapa</label>
+              <input type="range" class="opacity-slider" min="32" max="96" step="2"
+                [ngModel]="ref.displaySize || 48"
+                (ngModelChange)="onSpatialRefPatch({ displaySize: +$event })"
+                [disabled]="!isAdmin">
+              <span class="opacity-val">{{ ref.displaySize || 48 }}px</span>
+            </div>
+
+            <div class="param-row">
+              <label>Visible</label>
+              <button type="button" class="section-toggle-btn" [class.active]="ref.visible"
+                [disabled]="!isAdmin"
+                (click)="onSpatialRefPatch({ visible: !ref.visible })">
+                {{ ref.visible ? 'ON' : 'OFF' }}
+              </button>
+            </div>
+
+            <div class="tool-grid cols-2" *ngIf="isAdmin">
+              <button type="button" class="tool-btn" (click)="spatialRefFramesInput.click()">
+                <span class="tool-icon">＋</span><span>Subir SVG/PNG</span>
+              </button>
+              <button type="button" class="tool-btn danger" [disabled]="!spatialRefFrameUrls(ref).length"
+                (click)="clearSpatialRefAnimation()">∅ Vaciar imágenes</button>
+            </div>
+            <input #spatialRefFramesInput type="file" class="sr-only-input" accept=".svg,.png,image/svg+xml,image/png"
+              multiple (change)="onSpatialRefFramesPicked($event)">
+
+            <button type="button" class="tool-btn danger spatial-ref-delete-btn" *ngIf="isAdmin"
+              (click)="deleteSpatialReference(activeSpatialRefIndex)">
+              Eliminar referencia «{{ ref.name }}»
+            </button>
+          </ng-container>
+
+          <div class="tool-grid cols-2" *ngIf="isAdmin" style="margin-top:8px">
+            <button class="tool-btn" (click)="exportSpatialReferences()" title="Descargar spatial-references.json">
+              <span class="tool-icon">⬇</span><span>Exportar JSON</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Suelo (visibilidad + configuración) -->
+      <div class="section">
+        <div class="section-header" (click)="toggleSection('ground')">
+          <span class="section-chevron" [class.open]="openSections.ground">▸</span>
+          <span class="section-title">Suelo</span>
+          <button type="button" class="section-toggle-btn" [class.active]="localOpts.showGroundTextures"
+            (click)="toggleOpt('showGroundTextures'); $event.stopPropagation()"
+            title="Mostrar u ocultar textura del suelo">
+            {{ localOpts.showGroundTextures ? 'ON' : 'OFF' }}
+          </button>
+        </div>
+        <div class="section-content" *ngIf="openSections.ground">
+          <p class="section-hint compact" *ngIf="!localOpts.showGroundTextures">
+            Activa ON para ver piedras, hierba y variación macro en el mapa.
+          </p>
+          <ng-container *ngIf="localOpts.showGroundTextures">
+            <p class="section-hint compact">Tamaño, calidad, elementos por zona y ecotono están en la ficha flotante del mapa.</p>
+            <button type="button" class="tool-btn" style="width:100%"
+              (click)="openGroundSettingsCard()">⚙ Configurar suelo…</button>
+          </ng-container>
+        </div>
+      </div>
+
+      <button type="button" class="tool-btn danger layers-disable-all"
+        (click)="disableAllLayers()"
+        title="Oculta contorno, zonas, anclajes, referencias espaciales y textura del suelo">
+        ∅ Desactivar todas las capas
+      </button>
 
       <div class="panel-group-label" *ngIf="isAdmin">Ambiente</div>
 
@@ -642,97 +662,6 @@ export interface MapViewInfo {
           </ng-template>
         </div>
       </div>
-
-      <!-- REFERENCIAS ESPACIALES -->
-      <div class="section section-editor-block">
-        <div class="section-header" (click)="toggleSection('spatialRefs')">
-          <span class="section-chevron" [class.open]="openSections.spatialRefs">▸</span>
-          <span class="section-title">Referencias espaciales</span>
-        </div>
-        <div class="section-content scrollable" *ngIf="openSections.spatialRefs">
-          <p class="section-hint" *ngIf="isAdmin">
-            Puntos de escena con ficha propia. PNG o <code>spriteSheet</code> para animación por frames.
-          </p>
-
-          <div class="param-row">
-            <label>Mostrar en mapa</label>
-            <button type="button" class="section-toggle-btn" [class.active]="spatialRefsOpts.showSpatialReferences"
-              (click)="toggleSpatialRefs()">
-              {{ spatialRefsOpts.showSpatialReferences ? 'ON' : 'OFF' }}
-            </button>
-          </div>
-
-          <div class="search-row" *ngIf="isAdmin">
-            <input type="text" class="search-input" placeholder="Buscar referencia…"
-              [(ngModel)]="spatialRefSearchTerm">
-          </div>
-
-          <div class="param-row" *ngIf="isAdmin">
-            <label>Animación</label>
-            <input type="range" class="opacity-slider" min="20" max="200" step="5"
-              [ngModel]="spatialRefsOpts.spatialAnimPercent"
-              (ngModelChange)="onSpatialAnimSpeedChange($event)">
-            <span class="opacity-val">{{ spatialRefsOpts.spatialAnimPercent }}%</span>
-          </div>
-
-          <div class="spatial-ref-list" *ngIf="filteredSpatialReferences.length">
-            <div class="spatial-ref-item" *ngFor="let item of filteredSpatialReferences"
-              [class.placing]="isAdmin && spatialPlaceIndex === item.index"
-              [class.selected]="isAdmin && activeSpatialRefIndex === item.index"
-              (click)="isAdmin && selectSpatialRef(item.index)">
-              <div class="spatial-ref-head">
-                <strong>{{ item.ref.name }}</strong>
-                <span class="spatial-ref-cat">{{ item.ref.category }}</span>
-              </div>
-              <div class="spatial-ref-coords">{{ item.ref.lat | number:'1.5-5' }}, {{ item.ref.lng | number:'1.5-5' }}</div>
-              <button type="button" class="tool-btn" *ngIf="isAdmin" [class.active]="spatialPlaceIndex === item.index"
-                (click)="toggleSpatialPlace(item.index); $event.stopPropagation()">
-                <span class="tool-icon">📍</span><span>{{ spatialPlaceIndex === item.index ? 'Click mapa…' : 'Ubicar' }}</span>
-              </button>
-            </div>
-          </div>
-
-          <ng-container *ngIf="isAdmin && activeSpatialRef as ref">
-            <div class="param-row">
-              <label>Estilo marcador</label>
-              <div class="marker-style-row">
-                <button type="button" class="marker-style-btn" *ngFor="let st of markerStyles"
-                  [class.active]="(ref.markerStyle || 'circle') === st"
-                  (click)="onMarkerStyleChange(st)">{{ markerStyleLabel(st) }}</button>
-              </div>
-            </div>
-
-            <div class="param-row">
-              <label>Tamaño (px)</label>
-              <input type="range" class="opacity-slider" min="32" max="80" step="2"
-                [ngModel]="ref.displaySize || 48"
-                (ngModelChange)="onSpatialRefPatch({ displaySize: +$event })">
-              <span class="opacity-val">{{ ref.displaySize || 48 }}</span>
-            </div>
-
-            <div class="param-row">
-              <label>Visible</label>
-              <button type="button" class="section-toggle-btn" [class.active]="ref.visible"
-                (click)="onSpatialRefPatch({ visible: !ref.visible })">
-                {{ ref.visible ? 'ON' : 'OFF' }}
-              </button>
-            </div>
-
-            <label class="section-edu-label">Ficha — información</label>
-            <textarea class="spatial-ref-textarea" rows="4" maxlength="800"
-              [ngModel]="spatialRefSummary(ref)"
-              (ngModelChange)="onSpatialRefSummaryChange($event)"
-              placeholder="Texto de la ficha al pulsar el marcador…"></textarea>
-          </ng-container>
-
-          <div class="tool-grid cols-2" *ngIf="isAdmin">
-            <button class="tool-btn" (click)="exportSpatialReferences()" title="Descargar spatial-references.json">
-              <span class="tool-icon">⬇</span><span>Exportar JSON</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
 
       <div class="section section-editor-block" *ngIf="isAdmin">
         <div class="section-header" (click)="toggleSection('treeEditor')">
@@ -1271,6 +1200,11 @@ export interface MapViewInfo {
       background: var(--sp-active);
       border-color: var(--sp-accent);
       color: var(--sp-accent);
+    }
+
+    .layers-disable-all {
+      width: calc(100% - 16px);
+      margin: 8px 8px 12px;
     }
 
     /* Layer row */
@@ -1927,11 +1861,43 @@ export interface MapViewInfo {
       text-transform: uppercase;
     }
 
+    .spatial-ref-frame-badge {
+      margin-left: auto;
+      font-size: 9px;
+      color: var(--sp-accent);
+      background: var(--sp-active);
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
+    .spatial-ref-frame-badge.missing {
+      color: var(--sp-text2);
+      background: color-mix(in srgb, var(--sp-text2) 12%, transparent);
+    }
+
     .spatial-ref-coords {
       font-size: 10px;
       color: var(--sp-text2);
       margin: 4px 0 6px;
       font-family: monospace;
+    }
+
+    .spatial-ref-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .spatial-ref-actions .tool-btn {
+      flex: 1;
+      min-width: 0;
+      justify-content: center;
+    }
+
+    .spatial-ref-delete-btn {
+      width: 100%;
+      margin-top: 10px;
+      justify-content: center;
     }
 
     .spatial-ref-item.selected {
@@ -1951,6 +1917,61 @@ export interface MapViewInfo {
       font-size: 11px;
       resize: vertical;
       box-sizing: border-box;
+    }
+
+    .sr-only-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .spatial-frame-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+      gap: 6px;
+      margin: 6px 0 8px;
+    }
+
+    .spatial-frame-thumb {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      border: 1px solid var(--sp-border);
+      background: var(--sp-input-bg);
+      overflow: hidden;
+    }
+
+    .spatial-frame-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .spatial-frame-remove {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      line-height: 16px;
+      padding: 0;
+    }
+
+    .spatial-frame-idx {
+      position: absolute;
+      bottom: 2px;
+      left: 4px;
+      font-size: 9px;
+      color: var(--sp-text2);
+      background: color-mix(in srgb, var(--sp-bg) 80%, transparent);
+      padding: 0 3px;
+      border-radius: 3px;
     }
 
     .marker-style-row {
@@ -2010,7 +2031,6 @@ export interface MapViewInfo {
 
     .config-server-actions { margin-top: 4px; }
     .ground-zone-pick .section-pick-btn { padding: 6px 8px; font-size: 10px; }
-    .preset-pick { grid-template-columns: repeat(2, 1fr); }
     .mini-btn {
       font-size: 9px;
       padding: 2px 6px;
@@ -2053,7 +2073,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   @Input() spatialPlaceIndex = -1;
   @Input() activeSpatialRefIndex = 0;
   @Input() sessionSavedAt: string | null = null;
-  @Input() groundStyle: Record<number, ZoneGroundStyle> = {};
   @Input() groundSettings: GroundMapSettings | null = null;
   @Input() sceneOpts = {
     activeScenarioId: null as string | null,
@@ -2093,8 +2112,9 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     spatialAnimPercent: 100,
   };
 
-  readonly markerStyles = SPATIAL_REFERENCE_MARKER_STYLES;
   readonly spatialRefSummary = spatialReferenceSummary;
+  readonly spatialRefFrameUrls = spatialReferenceFrameUrls;
+  readonly spatialReferenceHasMapImage = spatialReferenceHasMapImage;
   readonly ambientScenarios = AMBIENT_SCENARIOS;
 
   @Output() mapControlEvent = new EventEmitter<MapControlEvent>();
@@ -2119,33 +2139,25 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
 
   /** Marker dot size (px) */
   localMarkerSize = 10;
-  localGroundTilePx: number = PARK_MAP_VIS.groundTilePx;
   localGroundSettings: GroundMapSettings = { ...DEFAULT_GROUND_MAP_SETTINGS };
-  readonly groundPresets = GROUND_PRESETS;
-  readonly groundTileMin = PARK_MAP_VIS.groundTileMin;
-  readonly groundTileMax = PARK_MAP_VIS.groundTileMax;
-  readonly groundElementSizePctMin = PARK_MAP_VIS.groundElementSizePctMin;
-  readonly groundElementSizePctMax = PARK_MAP_VIS.groundElementSizePctMax;
-  readonly groundScalePercentMin = PARK_MAP_VIS.groundScalePercentMin;
-  readonly groundScalePercentMax = PARK_MAP_VIS.groundScalePercentMax;
   readonly treesSizePctMin = PARK_MAP_VIS.treesSizePctMin;
   readonly treesSizePctMax = PARK_MAP_VIS.treesSizePctMax;
   readonly treeSlotScalePctMin = PARK_MAP_VIS.treeSlotScalePctMin;
   readonly treeSlotScalePctMax = PARK_MAP_VIS.treeSlotScalePctMax;
   readonly groundZoneKeys = GROUND_ZONE_KEYS;
   readonly groundZoneLabels = GROUND_ZONE_LABELS;
-  readonly groundElementTypes = GROUND_ELEMENT_TYPES;
-  groundStyleEditTarget: number | 'park' = 'park';
-  groundAddType: GroundElementType = 'stone';
 
   /** Collapsible sections state */
   openSections = {
-    layers: true,
+    mapLod: false,
+    layerBoundary: false,
+    layerSections: false,
+    layerMarkers: false,
+    layerSpatialRefs: false,
     ground: false,
     sectionEditor: false,
     treeEditor: false,
     scene: false,
-    spatialRefs: false,
     info: false,
     config: false,
   };
@@ -2178,14 +2190,13 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
         showBoundary: this.mapViewInfo.showBoundary,
         showMarkers: this.mapViewInfo.showMarkers,
       };
-      this.localGroundTilePx = this.mapViewInfo.groundTilePx ?? PARK_MAP_VIS.groundTilePx;
       this.cdr.markForCheck();
     }
     if (changes['groundSettings'] && this.groundSettings) {
-      this.localGroundSettings = { ...this.groundSettings };
-      this.cdr.markForCheck();
-    }
-    if (changes['groundStyle']) {
+      this.localGroundSettings = {
+        ...this.groundSettings,
+        lodCategories: { ...DEFAULT_MAP_LOD_CATEGORIES, ...this.groundSettings.lodCategories },
+      };
       this.cdr.markForCheck();
     }
     if (changes['sceneOpts']) {
@@ -2206,7 +2217,13 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
 
   private emitConfiguringLayers(): void {
     this.configuringLayersChange.emit(
-      !this.collapsed && (this.openSections.layers || this.openSections.ground),
+      !this.collapsed && (
+        this.openSections.layerBoundary
+        || this.openSections.layerSections
+        ||         this.openSections.layerMarkers
+        || this.openSections.layerSpatialRefs
+        || this.openSections.ground
+      ),
     );
   }
 
@@ -2336,16 +2353,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
 
   get activeSpatialRef(): SpatialReference | null {
     return this.spatialReferences[this.activeSpatialRefIndex] ?? null;
-  }
-
-  markerStyleLabel(st: SpatialReferenceMarkerStyle): string {
-    const labels: Record<SpatialReferenceMarkerStyle, string> = {
-      circle: '○ Círculo',
-      pin: '▼ Pin',
-      square: '□ Cuadrado',
-      marker: '📍 Marcador',
-    };
-    return labels[st];
   }
 
   get ambientScenarioSelectValue(): string {
@@ -2625,10 +2632,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     this.cdr.markForCheck();
   }
 
-  onMarkerStyleChange(style: SpatialReferenceMarkerStyle): void {
-    this.onSpatialRefPatch({ markerStyle: style });
-  }
-
   onSpatialRefPatch(patch: Partial<SpatialReference>): void {
     this.mapControlEvent.emit({
       type: 'updateSpatialReference',
@@ -2647,6 +2650,68 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     });
   }
 
+  spatialRefFrameFps(ref: SpatialReference): number {
+    return ref.frameSequence?.fps ?? 6;
+  }
+
+  onSpatialRefFrameFpsChange(fps: number): void {
+    const ref = this.activeSpatialRef;
+    if (!ref?.frameSequence?.frames?.length) return;
+    this.onSpatialRefPatch({
+      frameSequence: { ...ref.frameSequence, fps: Math.min(24, Math.max(1, Number(fps) || 8)) },
+    });
+  }
+
+  onSpatialRefFramesPicked(event: Event): void {
+    const ref = this.activeSpatialRef;
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    input.value = '';
+    if (!ref || !files?.length) return;
+
+    const readFile = (file: File): Promise<string | null> => new Promise((resolve) => {
+      const ok = file.type === 'image/png'
+        || file.type === 'image/svg+xml'
+        || file.name.toLowerCase().endsWith('.svg')
+        || file.name.toLowerCase().endsWith('.png');
+      if (!ok) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+
+    Promise.all(Array.from(files).map(readFile)).then((urls) => {
+      const added = urls.filter((u): u is string => !!u);
+      if (!added.length) return;
+      const existing = ref.frameSequence?.frames ?? [];
+      const fps = ref.frameSequence?.fps ?? 6;
+      this.onSpatialRefPatch({
+        frameSequence: { frames: [...existing, ...added], fps },
+        imageUrl: undefined,
+        spriteSheet: undefined,
+      });
+    });
+  }
+
+  removeSpatialRefFrame(index: number): void {
+    const ref = this.activeSpatialRef;
+    if (!ref?.frameSequence?.frames?.length) return;
+    const frames = ref.frameSequence.frames.filter((_, i) => i !== index);
+    if (!frames.length) {
+      this.clearSpatialRefAnimation();
+      return;
+    }
+    this.onSpatialRefPatch({ frameSequence: { ...ref.frameSequence, frames } });
+  }
+
+  clearSpatialRefAnimation(): void {
+    this.onSpatialRefPatch({ frameSequence: undefined, imageUrl: undefined, spriteSheet: undefined });
+  }
+
   toggleSpatialPlace(index: number): void {
     const next = this.spatialPlaceIndex === index ? -1 : index;
     this.mapControlEvent.emit({ type: 'setSpatialReferencePlaceIndex', index: next });
@@ -2655,6 +2720,14 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
 
   exportSpatialReferences(): void {
     this.mapControlEvent.emit({ type: 'exportSpatialReferencesJson' });
+  }
+
+  deleteSpatialReference(index: number): void {
+    const ref = this.spatialReferences[index];
+    if (!ref) return;
+    if (!confirm(`¿Eliminar la referencia «${ref.name}»?`)) return;
+    this.mapControlEvent.emit({ type: 'deleteSpatialReference', index });
+    this.cdr.markForCheck();
   }
 
   selectVertex(vertexIndex: number): void {
@@ -2710,6 +2783,14 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     }
   }
 
+  disableAllLayers(): void {
+    this.mapControlEvent.emit({ type: 'disableAllLayers' });
+  }
+
+  openGroundSettingsCard(): void {
+    this.mapControlEvent.emit({ type: 'openGroundSettingsCard' });
+  }
+
   toggleOpt(option: 'showSections' | 'showLabels' | 'showBoundary' | 'showMarkers' | 'showGroundTextures'): void {
     (this.localOpts as any)[option] = !(this.localOpts as any)[option];
     this.mapControlEvent.emit({ type: 'optionChange', option, value: (this.localOpts as any)[option] });
@@ -2719,30 +2800,6 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
   onMarkerSizeChange(size: number): void {
     this.localMarkerSize = size;
     this.mapControlEvent.emit({ type: 'markerSize', value: size } as MapControlEvent);
-  }
-
-  onGroundTilePxChange(px: number): void {
-    this.localGroundTilePx = px;
-    this.mapControlEvent.emit({ type: 'groundTilePxChange', value: px });
-  }
-
-  onGroundAutoTilePx(): void {
-    this.mapControlEvent.emit({ type: 'groundAutoTilePx' });
-  }
-
-  onGroundPresetChange(id: GroundPresetId): void {
-    this.localGroundSettings = settingsForPreset(id, this.localGroundSettings);
-    this.emitGroundSettingsChange();
-  }
-
-  onGroundScaleChange(percent: number): void {
-    this.localGroundSettings = { ...this.localGroundSettings, scalePercent: percent };
-    this.emitGroundSettingsChange();
-  }
-
-  onGroundQualityChange(percent: number): void {
-    this.localGroundSettings = { ...this.localGroundSettings, qualityPercent: percent };
-    this.emitGroundSettingsChange();
   }
 
   onGroundLodToggle(): void {
@@ -2765,174 +2822,21 @@ export class StickerPanelComponent implements OnChanges, AfterViewInit {
     this.emitGroundSettingsChange();
   }
 
+  get localLodCategories(): MapLodCategories {
+    return { ...DEFAULT_MAP_LOD_CATEGORIES, ...this.localGroundSettings.lodCategories };
+  }
+
+  onLodCategoryToggle(key: keyof MapLodCategories): void {
+    const cats = this.localLodCategories;
+    this.localGroundSettings = {
+      ...this.localGroundSettings,
+      lodCategories: { ...cats, [key]: !cats[key] },
+    };
+    this.emitGroundSettingsChange();
+  }
+
   private emitGroundSettingsChange(): void {
     this.mapControlEvent.emit({ type: 'groundSettingsChange', settings: { ...this.localGroundSettings } });
-  }
-
-  get groundStyleEditSelectValue(): string {
-    return this.groundStyleEditTarget === 'park' ? 'park' : String(this.groundStyleEditTarget);
-  }
-
-  onGroundStyleTargetChange(raw: string): void {
-    this.groundStyleEditTarget = raw === 'park' ? 'park' : Number(raw);
-  }
-
-  get groundStyleEditZone(): ZoneGroundStyle | null {
-    if (this.groundStyleEditTarget === 'park') {
-      return this.resolveParkGroundEditTemplate();
-    }
-    return this.resolveGroundStyleLayer(this.groundStyleEditTarget);
-  }
-
-  private resolveGroundStyleLayer(key: number): ZoneGroundStyle | null {
-    return this.groundStyle[key] ?? this.groundStyle[0] ?? this.groundStyle[1] ?? null;
-  }
-
-  /** Plantilla de edición en modo parque: zona 0, o la primera capa del parque con datos. */
-  private resolveParkGroundEditTemplate(): ZoneGroundStyle | null {
-    for (const key of GROUND_PARK_LAYER_KEYS) {
-      const z = this.groundStyle[key];
-      if (z?.elements?.length) return z;
-    }
-    return this.resolveGroundStyleLayer(0);
-  }
-
-  groundElementLabel(type: GroundElementType): string {
-    return GROUND_ELEMENT_LABELS[type];
-  }
-
-  groundDensityPercent(density: number): number {
-    return Math.round(density * 100);
-  }
-
-  groundMacroDensityPercent(zone: ZoneGroundStyle): number {
-    return Math.round(zone.macroDensity * 100);
-  }
-
-  groundMacroAlphaPercent(zone: ZoneGroundStyle): number {
-    return Math.round(zone.macroAlpha * 100);
-  }
-
-  groundEdgeBlend(zone: ZoneGroundStyle): number {
-    return Math.round(zone.edgeBlend ?? 0);
-  }
-
-  groundEdgeAlphaPercent(zone: ZoneGroundStyle): number {
-    return Math.round((zone.edgeBlendAlpha ?? 0.85) * 100);
-  }
-
-  groundElementSizeMinPercent(el: { sizeMin: number }): number {
-    return Math.round(el.sizeMin * 100);
-  }
-
-  groundElementSizeMaxPercent(el: { sizeMax: number }): number {
-    return Math.round(el.sizeMax * 100);
-  }
-
-  onGroundElementDensityChange(elIndex: number, percent: number): void {
-    const zone = this.patchedGroundZone();
-    zone.elements[elIndex].density = Math.min(1.2, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundElementSizeMinChange(elIndex: number, percent: number): void {
-    const zone = this.patchedGroundZone();
-    const el = zone.elements[elIndex];
-    if (!el) return;
-    el.sizeMin = groundElementSizeFrac(Number(percent));
-    if (el.sizeMax < el.sizeMin) el.sizeMax = el.sizeMin;
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundElementSizeMaxChange(elIndex: number, percent: number): void {
-    const zone = this.patchedGroundZone();
-    const el = zone.elements[elIndex];
-    if (!el) return;
-    el.sizeMax = groundElementSizeFrac(Number(percent));
-    if (el.sizeMin > el.sizeMax) el.sizeMin = el.sizeMax;
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundEdgeBlendChange(px: number): void {
-    const zone = this.patchedGroundZone();
-    zone.edgeBlend = Math.min(48, Math.max(0, Number(px) || 0));
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundEdgeAlphaChange(percent: number): void {
-    const zone = this.patchedGroundZone();
-    zone.edgeBlendAlpha = Math.min(1, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
-  }
-
-  addGroundElement(): void {
-    const zone = this.patchedGroundZone();
-    zone.elements.push({ type: this.groundAddType, density: 0.15, min: 0, sizeMin: 0.2, sizeMax: 0.4 });
-    this.emitGroundStyleZone(zone);
-  }
-
-  removeGroundElement(elIndex: number): void {
-    const zone = this.patchedGroundZone();
-    zone.elements.splice(elIndex, 1);
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundMacroDensityChange(percent: number): void {
-    const zone = this.patchedGroundZone();
-    zone.macroDensity = Math.min(2, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
-  }
-
-  onGroundMacroAlphaChange(percent: number): void {
-    const zone = this.patchedGroundZone();
-    zone.macroAlpha = Math.min(1, Math.max(0, Number(percent) || 0) / 100);
-    this.emitGroundStyleZone(zone);
-  }
-
-  /** Copia los elementos (y macro/ecotono) de la zona en edición a TODAS las zonas + base. */
-  applyGroundStyleToAllZones(): void {
-    this.mapControlEvent.emit({ type: 'groundStyleApplyAll', style: this.patchedGroundZone() });
-  }
-
-  clearAllGroundLayers(): void {
-    this.mapControlEvent.emit({ type: 'groundStyleClearAll' });
-  }
-
-  resetGroundStyleZone(): void {
-    if (this.groundStyleEditTarget === 'park') {
-      this.mapControlEvent.emit({ type: 'groundStyleResetParkLayers' });
-      return;
-    }
-    this.mapControlEvent.emit({ type: 'groundStyleResetZone', sectionIndex: this.groundStyleEditTarget });
-  }
-
-  resetGroundStyleAll(): void {
-    this.mapControlEvent.emit({ type: 'groundStyleResetAll' });
-  }
-
-  private patchedGroundZone(): ZoneGroundStyle {
-    const z = this.groundStyleEditZone;
-    if (!z) return { elements: [], macroDensity: 1, macroAlpha: 1 };
-    return {
-      macroDensity: z.macroDensity,
-      macroAlpha: z.macroAlpha,
-      edgeBlend: z.edgeBlend,
-      edgeBlendAlpha: z.edgeBlendAlpha,
-      bridge: z.bridge ? { ...z.bridge, elements: z.bridge.elements.map((e) => ({ ...e })) } : undefined,
-      elements: z.elements.map((e) => ({ ...e })),
-    };
-  }
-
-  private emitGroundStyleZone(zone: ZoneGroundStyle): void {
-    if (this.groundStyleEditTarget === 'park') {
-      this.mapControlEvent.emit({ type: 'groundStyleApplyParkLayers', style: zone });
-      return;
-    }
-    this.mapControlEvent.emit({
-      type: 'groundStyleZoneChange',
-      sectionIndex: this.groundStyleEditTarget,
-      style: zone,
-    });
   }
 
   onEffectWindDirection(effect: AmbientEffectWindKey, deg: number): void {

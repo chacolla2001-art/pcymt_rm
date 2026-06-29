@@ -10,6 +10,7 @@ import {
   MapControlEvent,
   MapViewInfo
 } from '../components/sticker-panel.component';
+import { GroundSettingsCardComponent } from '../components/ground-settings-card.component';
 import { MapLayerConfigPanelComponent } from '../components/map-layer-config-panel.component';
 import { MapSessionService } from '../services/map-session.service';
 import { MapConfigData, MAP_CONFIG_VERSION } from '../models/map-layer-config.model';
@@ -21,6 +22,7 @@ import type { AmbientTreeSlot, TreeEditorTarget } from '../data/ambient-tree-slo
 import { findAmbientScenario } from '../data/ambient-scenarios';
 import { ThemeManagerService } from '../../../core/services/theme-manager.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { TranslatePipe } from '../../../shared/pipes/translate.pipe';
 
 /**
  * MAP FEATURE — Smart Container
@@ -33,7 +35,7 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-map-container',
   standalone: true,
-  imports: [CommonModule, MapControlComponent, StickerPanelComponent, MapLayerConfigPanelComponent],
+  imports: [CommonModule, MapControlComponent, StickerPanelComponent, MapLayerConfigPanelComponent, GroundSettingsCardComponent, TranslatePipe],
   template: `
     <div class="container-wrapper">
 
@@ -61,7 +63,6 @@ import { AuthService } from '../../../core/services/auth.service';
         [activeSpatialRefIndex]="activeSpatialRefIndex"
         [sceneOpts]="sceneOpts"
         [spatialRefsOpts]="spatialRefsOpts"
-        [groundStyle]="groundStyleOpts"
         [groundSettings]="groundSettingsOpts"
         [sessionSavedAt]="sessionSavedAt"
         (mapControlEvent)="onMapControlEvent($event)"
@@ -72,6 +73,13 @@ import { AuthService } from '../../../core/services/auth.service';
       <!-- Central canvas area -->
       <div class="map-area">
         <div class="map-float-toolbar">
+          <button type="button" class="float-btn" [class.active]="groundSettingsCardOpen"
+            title="Configuración del suelo"
+            (click)="toggleGroundSettingsCard()">⌗</button>
+          <button type="button" class="float-btn float-btn--primary"
+            [class.active]="!structureLayersVisible"
+            [title]="structureLayersVisible ? ('map.hideStructureLayers' | translate) : ('map.showStructureLayers' | translate)"
+            (click)="onMapControlEvent({ type: 'toggleStructureLayers' })">⬡</button>
           <button type="button" class="float-btn" title="Acercar" (click)="onMapControlEvent({ type: 'zoomIn' })">+</button>
           <button type="button" class="float-btn" title="Alejar" (click)="onMapControlEvent({ type: 'zoomOut' })">−</button>
           <button type="button" class="float-btn" title="Centrar mapa" (click)="onMapControlEvent({ type: 'centerMap' })">⌖</button>
@@ -90,6 +98,17 @@ import { AuthService } from '../../../core/services/auth.service';
           (treeEditorStateChanged)="onTreeEditorStateChanged($event)"
           (spatialReferencesChanged)="onSpatialReferencesChanged($event)">
         </app-map-control>
+
+        <app-ground-settings-card
+          [visible]="groundSettingsCardOpen"
+          [isAdmin]="isAdmin"
+          [isDarkTheme]="isDarkTheme"
+          [groundStyle]="groundStyleOpts"
+          [groundSettings]="groundSettingsOpts"
+          [groundTilePx]="currentViewInfo?.groundTilePx ?? 5"
+          (closed)="groundSettingsCardOpen = false"
+          (mapControlEvent)="onMapControlEvent($event)">
+        </app-ground-settings-card>
       </div>
 
       <!-- Map config panel: always present (hidden behind canvas overlay) -->
@@ -147,6 +166,10 @@ import { AuthService } from '../../../core/services/auth.service';
       border-color: var(--sys-primary);
       background: var(--sys-primary);
       color: var(--sys-on-primary);
+    }
+    .float-btn--primary {
+      font-size: 16px;
+      font-weight: 700;
     }
   `]
 })
@@ -218,6 +241,7 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
   sessionSavedAt: string | null = null;
   groundStyleOpts: Record<number, ZoneGroundStyle> = {};
   groundSettingsOpts: GroundMapSettings | null = null;
+  groundSettingsCardOpen = false;
 
   private readonly isBrowser: boolean;
   private sessionSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -348,6 +372,12 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.scheduleSessionSave();
   }
 
+  get structureLayersVisible(): boolean {
+    const info = this.currentViewInfo;
+    if (!info) return true;
+    return info.showBoundary || info.showSections || info.showMarkers;
+  }
+
   // ── Map control events from sticker panel ─────────────────
 
   onMapControlEvent(event: MapControlEvent): void {
@@ -359,6 +389,14 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'rotateRight':  this.mapControl.rotateOnce('right'); break;
       case 'reset':        this.mapControl.resetView(); break;
       case 'optionChange': this.mapControl.setMapOption(event.option, event.value); break;
+      case 'toggleStructureLayers': this.mapControl.toggleStructureLayers(); break;
+      case 'disableAllLayers':
+        this.mapControl.disableAllMapLayers();
+        this.spatialRefsOpts.showSpatialReferences = false;
+        break;
+      case 'openGroundSettingsCard':
+        this.groundSettingsCardOpen = true;
+        break;
       case 'groundTilePxChange': this.mapControl.setGroundTilePx(event.value); break;
       case 'groundSettingsChange':
         this.mapControl.applyGroundSettings(event.settings);
@@ -638,6 +676,12 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
         this.mapControl.updateSpatialReference(event.index, event.patch);
         this.spatialReferences = this.mapControl.getSpatialReferences();
         break;
+      case 'deleteSpatialReference':
+        this.mapControl.deleteSpatialReference(event.index);
+        this.spatialReferences = this.mapControl.getSpatialReferences();
+        this.activeSpatialRefIndex = this.mapControl.selectedSpatialReferenceIndex;
+        this.spatialPlaceIndex = this.mapControl.spatialReferencePlaceIndex;
+        break;
       case 'setSpatialReferencePlaceIndex':
         this.spatialPlaceIndex = event.index;
         this.mapControl.setSpatialReferencePlaceIndex(event.index);
@@ -752,6 +796,10 @@ export class MapContainerComponent implements OnInit, AfterViewInit, OnDestroy {
     this.router.navigate(['/anchor-points'], {
       queryParams: { filterId: anchorId }
     });
+  }
+
+  toggleGroundSettingsCard(): void {
+    this.groundSettingsCardOpen = !this.groundSettingsCardOpen;
   }
 
   // ── Map config panel events ────────────────────────────────

@@ -15,6 +15,12 @@ export interface SpatialReferenceSpriteSheet {
   columns?: number;
 }
 
+/** Animación como colección de SVG o PNG (un archivo por frame). */
+export interface SpatialReferenceFrameSequence {
+  frames: string[];
+  fps?: number;
+}
+
 export interface SpatialReferenceEducation {
   summary: string;
   referenceImageUrl?: string;
@@ -39,8 +45,24 @@ export interface SpatialReference {
   imageUrl?: string;
   /** Secuencia de frames en sprite sheet. */
   spriteSheet?: SpatialReferenceSpriteSheet;
+  /** Colección de SVG/PNG — un archivo por frame de animación. */
+  frameSequence?: SpatialReferenceFrameSequence;
   /** Tamaño en px de pantalla (default 48). */
   displaySize?: number;
+}
+
+export function spatialReferenceFrameUrls(ref: SpatialReference): string[] {
+  return ref.frameSequence?.frames?.filter(Boolean) ?? [];
+}
+
+export function spatialReferenceHasMapImage(ref: SpatialReference): boolean {
+  return spatialReferenceFrameUrls(ref).length > 0 || !!ref.imageUrl;
+}
+
+export function spatialReferencePrimaryImageUrl(ref: SpatialReference): string | undefined {
+  const frames = spatialReferenceFrameUrls(ref);
+  if (frames.length) return frames[0];
+  return ref.imageUrl ?? ref.spriteSheet?.url ?? ref.education?.referenceImageUrl;
 }
 
 export const SPATIAL_REFERENCE_MARKER_STYLES: SpatialReferenceMarkerStyle[] = [
@@ -52,7 +74,7 @@ export function spatialReferenceSummary(ref: SpatialReference): string {
 }
 
 export function spatialReferenceImageUrl(ref: SpatialReference): string | undefined {
-  return ref.education?.referenceImageUrl || ref.imageUrl;
+  return spatialReferencePrimaryImageUrl(ref) ?? ref.education?.referenceImageUrl;
 }
 
 interface SpatialReferencesFile {

@@ -3,7 +3,6 @@ import {
   buildPresetGroundStyles,
   mergeGroundStyles,
   DEFAULT_GROUND_MAP_SETTINGS,
-  groundLodTier,
   groundQualityFactor,
   elementVisibleAtLod,
   ecotoneStepsForLod,
@@ -13,6 +12,8 @@ import {
   type GroundLodTier,
   type GroundMapSettings,
 } from './ground-preset';
+import { effectiveGroundLodTier } from './map-lod';
+import { DEFAULT_MAP_LOD_CATEGORIES } from './map-lod';
 
 /**
  * Suelo procedural — estilo cartoon isométrico (tipo Carbot).
@@ -526,7 +527,11 @@ export function exportGroundMapSettings(): GroundMapSettings {
 
 export function importGroundMapSettings(settings: Partial<GroundMapSettings> | null | undefined): void {
   activeGroundMapSettings = settings
-    ? { ...DEFAULT_GROUND_MAP_SETTINGS, ...settings }
+    ? {
+        ...DEFAULT_GROUND_MAP_SETTINGS,
+        ...settings,
+        lodCategories: { ...DEFAULT_MAP_LOD_CATEGORIES, ...settings.lodCategories },
+      }
     : { ...DEFAULT_GROUND_MAP_SETTINGS };
 }
 
@@ -956,7 +961,7 @@ function paintEcotoneBridge(
   const strength = style.edgeBlendAlpha ?? 0.85;
   if (band <= 0 || strength <= 0 || points.length < 3) return;
 
-  const lodTier = groundLodTier(mapScale, activeGroundMapSettings);
+  const lodTier = effectiveGroundLodTier(mapScale, activeGroundMapSettings);
   const steps = ecotoneStepsForLod(lodTier);
   if (steps <= 0) return;
 
@@ -1060,7 +1065,7 @@ export function fillPolygonWithGroundTexture(
 
   const style = styleForSection(sectionIndex);
   const palette = paletteForSection(sectionIndex, isDark);
-  const lodTier = groundLodTier(mapScale, activeGroundMapSettings);
+  const lodTier = effectiveGroundLodTier(mapScale, activeGroundMapSettings);
   const quality = groundQualityFactor(activeGroundMapSettings);
   const unit = resolveGroundTilePx();
 
@@ -1112,7 +1117,7 @@ export function fillMapRectWithBackdrop(
   ctx.fillRect(x, y, w, h);
 
   const style = styleForSection(-2);
-  const lodTier = groundLodTier(mapScale, activeGroundMapSettings);
+  const lodTier = effectiveGroundLodTier(mapScale, activeGroundMapSettings);
   const quality = groundQualityFactor(activeGroundMapSettings);
   const unit = resolveGroundTilePx();
   const region = intersectRegion({ minX: x, minY: y, maxX: x + w, maxY: y + h }, viewport);

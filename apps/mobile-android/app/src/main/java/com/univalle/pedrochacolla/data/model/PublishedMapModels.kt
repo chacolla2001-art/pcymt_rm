@@ -156,6 +156,11 @@ data class SpatialSpriteSheetData(
     val columns: Int? = null,
 )
 
+data class SpatialFrameSequenceData(
+    val frames: List<String>? = null,
+    val fps: Int? = null,
+)
+
 /** Referencia espacial publicada (`spatialReferences` en config). */
 data class SpatialReferenceData(
     val id: String = "",
@@ -174,6 +179,8 @@ data class SpatialReferenceData(
     val imageUrl: String? = null,
     @SerializedName("spriteSheet")
     val spriteSheet: SpatialSpriteSheetData? = null,
+    @SerializedName("frameSequence")
+    val frameSequence: SpatialFrameSequenceData? = null,
     @SerializedName("displaySize")
     val displaySize: Double? = null,
 )

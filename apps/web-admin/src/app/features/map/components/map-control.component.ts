@@ -111,6 +111,17 @@ import {
   type GroundViewport,
 } from '../utils/draw-ground-texture';
 import type { GroundMapSettings } from '../utils/ground-preset';
+import {
+  ambientEffectVisibleAtLod,
+  ambientLodIntensityMul,
+  getMapLodTier,
+  markerLabelsVisibleAtLod,
+  markersVisibleAtLod,
+  resolveLodCategories,
+  sectionLabelsVisibleAtLod,
+  spatialRefsVisibleAtLod,
+  treesLayerVisibleAtLod,
+} from '../utils/map-lod';
 
 type GeoPoint = SharedGeoPoint;
 type ParkSection = SharedParkSection;
@@ -1492,6 +1503,11 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     const w = canvas.width / dpr;
     const h = canvas.height / dpr;
 
+    const lodSettings = exportGroundMapSettings();
+    const lodTier = getMapLodTier(this.scale, lodSettings);
+    const lodCategories = resolveLodCategories(lodSettings);
+    const ambientMul = ambientLodIntensityMul(lodTier, lodCategories);
+
     // Always reset to DPR-only transform to guarantee a clean slate each frame
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -1513,13 +1529,13 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.ctx.save();
       this.ctx.translate(lo.x, lo.y);
       this.drawMapGroundBackdrop(w, h, vp);
-      if (this.mapOptions.showTreesEffect) {
+      if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('backdrop', lodTier, lodCategories)) {
         this.drawPlacedBackdropTrees(w, h);
       }
       if (PARK_BOUNDARY.length >= 3) {
         this.drawParkGroundBase(vp);
       }
-      if (this.mapOptions.showTreesEffect) {
+      if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('basePark', lodTier, lodCategories)) {
         this.drawPlacedBaseParkTrees(w, h);
       }
       this.ctx.restore();
@@ -1536,7 +1552,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
       this.drawBoundary(w, h);
       this.ctx.restore();
     }
-    if (this.mapOptions.showMarkers) {
+    if (this.mapOptions.showMarkers && markersVisibleAtLod(lodTier, lodCategories)) {
       const lo = this.layerOffsets.markers;
       this.ctx.save(); this.ctx.translate(lo.x, lo.y);
       this.drawMarkerDots(w, h);
@@ -1546,7 +1562,7 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (this.treeEditorMode) {
       this.drawTreeEditorMarkers(w, h);
     }
-    if (this.mapOptions.showTreesEffect) {
+    if (this.mapOptions.showTreesEffect && treesLayerVisibleAtLod('zone', lodTier, lodCategories)) {
       this.treesEffect.drawWorld(this.ctx, this.buildTreesDrawOptions(w, h));
     }
 
@@ -1557,31 +1573,40 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     // Capa ambiental (bajo referencias espaciales)
     const ambientClip = this.buildRainClipPath();
     const ambientToScreen = (bx: number, by: number) => this.baseCanvasToScreen(bx, by);
-    if (this.mapOptions.showCloudShadows) {
+    if (this.mapOptions.showCloudShadows && ambientEffectVisibleAtLod('cloudShadows', lodTier, lodCategories)) {
+      this.ctx.save();
+      if (ambientMul < 1) this.ctx.globalAlpha = ambientMul;
       this.cloudShadowEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+      this.ctx.restore();
     }
-    if (this.mapOptions.showFogEffect) {
+    if (this.mapOptions.showFogEffect && ambientEffectVisibleAtLod('fog', lodTier, lodCategories)) {
+      this.ctx.save();
+      if (ambientMul < 1) this.ctx.globalAlpha = ambientMul;
       this.fogEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
+      this.ctx.restore();
     }
-    if (this.mapOptions.showNightMistEffect) {
+    if (this.mapOptions.showNightMistEffect && ambientEffectVisibleAtLod('nightMist', lodTier, lodCategories)) {
+      this.ctx.save();
+      if (ambientMul < 1) this.ctx.globalAlpha = ambientMul;
       this.nightMistEffect.draw(
         this.ctx, ambientClip, ambientToScreen, this.scale, this.isDarkTheme, w, h,
       );
+      this.ctx.restore();
     }
-    if (this.mapOptions.showRainEffect) {
+    if (this.mapOptions.showRainEffect && ambientEffectVisibleAtLod('rain', lodTier, lodCategories)) {
       this.rainEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
     }
-    if (this.mapOptions.showMotesEffect) {
+    if (this.mapOptions.showMotesEffect && ambientEffectVisibleAtLod('motes', lodTier, lodCategories)) {
       this.motesEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
     }
-    if (this.mapOptions.showLeavesEffect) {
+    if (this.mapOptions.showLeavesEffect && ambientEffectVisibleAtLod('leaves', lodTier, lodCategories)) {
       this.leavesEffect.draw(this.ctx, ambientClip, ambientToScreen, this.scale);
     }
-    if (this.mapOptions.showLightningEffect) {
+    if (this.mapOptions.showLightningEffect && ambientEffectVisibleAtLod('lightning', lodTier, lodCategories)) {
       this.lightningEffect.draw(this.ctx, ambientClip, w, h);
     }
     this.drawAmbientScenarioTint(ambientClip, w, h);
-    if (this.mapOptions.showSpatialReferences) {
+    if (this.mapOptions.showSpatialReferences && spatialRefsVisibleAtLod(lodTier, lodCategories)) {
       this.spatialRefLayer.draw(this.ctx, this.spatialReferences, {
         geoToScreen: (geo) => this.geoToScreen(geo),
         phase: this.spatialRefsPhase,
@@ -1594,7 +1619,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
 
     // Section names (screen-space, always readable)
-    if (this.mapOptions.showSections && this.mapOptions.showSectionLabels) {
+    if (this.mapOptions.showSections && this.mapOptions.showSectionLabels
+      && sectionLabelsVisibleAtLod(lodTier, lodCategories)) {
       this.drawSectionLabels();
     }
 
@@ -1603,7 +1629,8 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     }
 
     // Marker labels (screen-space) — shift by markers layer offset converted to screen delta
-    if (this.mapOptions.showMarkers && this.mapOptions.showLabels) {
+    if (this.mapOptions.showMarkers && this.mapOptions.showLabels
+      && markerLabelsVisibleAtLod(lodTier, lodCategories)) {
       const lo = this.layerOffsets.markers;
       if (lo.x !== 0 || lo.y !== 0) {
         const s = this.scale;
@@ -2128,8 +2155,37 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
     if (patch.summary !== undefined && !ref.education) {
       ref.education = { summary: patch.summary };
     }
+    this.spatialRefLayer.preload(this.spatialReferences);
     this.emitSpatialReferencesChanged();
     this.render();
+  }
+
+  deleteSpatialReference(index: number): void {
+    if (index < 0 || index >= this.spatialReferences.length) return;
+    this.spatialReferences.splice(index, 1);
+    this.selectedSpatialReferenceIndex = this.adjustIndexAfterRemoval(
+      this.selectedSpatialReferenceIndex, index,
+    );
+    this.spatialReferencePlaceIndex = this.adjustIndexAfterRemoval(
+      this.spatialReferencePlaceIndex, index,
+    );
+    if (this.playerSpatialRefIndex !== null) {
+      const next = this.adjustIndexAfterRemoval(this.playerSpatialRefIndex, index);
+      this.playerSpatialRefIndex = next >= 0 ? next : null;
+    }
+    this.emitSpatialReferencesChanged();
+    this.render();
+  }
+
+  private adjustIndexAfterRemoval(current: number, removedIndex: number): number {
+    if (current < 0) return current;
+    if (current === removedIndex) {
+      return this.spatialReferences.length
+        ? Math.min(removedIndex, this.spatialReferences.length - 1)
+        : -1;
+    }
+    if (current > removedIndex) return current - 1;
+    return current;
   }
 
   setSelectedSpatialReferenceIndex(index: number): void {
@@ -3176,6 +3232,32 @@ export class MapControlComponent implements AfterViewInit, OnDestroy, OnInit {
 
   setMapOption(option: 'showSections' | 'showLabels' | 'showBoundary' | 'showMarkers' | 'showGroundTextures', value: boolean): void {
     this.mapOptions[option] = value;
+    this.onOptionChange();
+    this.emitViewInfo();
+  }
+
+  /** Oculta contorno, zonas, anclajes, etiquetas y textura del suelo. */
+  disableAllMapLayers(): void {
+    this.mapOptions.showBoundary = false;
+    this.mapOptions.showSections = false;
+    this.mapOptions.showMarkers = false;
+    this.mapOptions.showLabels = false;
+    this.mapOptions.showGroundTextures = false;
+    this.mapOptions.showSpatialReferences = false;
+    this.onOptionChange();
+    this.emitViewInfo();
+  }
+
+  /** Toggle contorno del parque, zonas y puntos de anclaje (etiquetas incluidas). */
+  toggleStructureLayers(): void {
+    const anyVisible = this.mapOptions.showBoundary
+      || this.mapOptions.showSections
+      || this.mapOptions.showMarkers;
+    const next = !anyVisible;
+    this.mapOptions.showBoundary = next;
+    this.mapOptions.showSections = next;
+    this.mapOptions.showMarkers = next;
+    this.mapOptions.showLabels = next;
     this.onOptionChange();
     this.emitViewInfo();
   }

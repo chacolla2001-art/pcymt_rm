@@ -1,4 +1,6 @@
 import { clampGroundTilePx } from './map-park-visual-scale';
+import type { MapLodCategories } from './map-lod';
+import { DEFAULT_MAP_LOD_CATEGORIES } from './map-lod';
 import type {
   EcotoneBridgeStyle,
   GroundElementSpec,
@@ -93,6 +95,8 @@ export interface GroundMapSettings {
   lodMediumZoom: number;
   /** Por debajo de este zoom el ecotono se simplifica mucho. */
   lodEcotoneZoom: number;
+  /** Qué capas responden al LOD (todas activas por defecto). */
+  lodCategories?: Partial<MapLodCategories>;
 }
 
 export const DEFAULT_GROUND_MAP_SETTINGS: GroundMapSettings = {
@@ -103,6 +107,7 @@ export const DEFAULT_GROUND_MAP_SETTINGS: GroundMapSettings = {
   lodFineZoom: 0.95,
   lodMediumZoom: 0.55,
   lodEcotoneZoom: 0.35,
+  lodCategories: { ...DEFAULT_MAP_LOD_CATEGORIES },
 };
 
 /** Settings sugeridos al elegir un preset (calidad/grano coherentes con la receta). */
